@@ -7,9 +7,10 @@ Este documento estabelece as regras inegociáveis para o desenvolvimento de toda
 
 ## 1. Regras de Ouro Inegociáveis
 
-1. **1 Sprint = 1 Branch de Feature = 1 PR Aberta:**
-   - Nenhuma sprint é concluída sem que uma Pull Request formal seja aberta da branch `feature/sprint-XX-<nome>` para `main`.
-   - A PR deve conter o template oficial completamente preenchido e assinado por todos os especialistas.
+1. **1 Sprint = 1 Branch de Feature = 1 PR Aberta para Staging:**
+   - Nenhuma sprint é concluída sem que uma Pull Request formal seja aberta da branch `feature/sprint-XX-<nome>` para `staging`.
+   - O merge de `staging` para `main` é de responsabilidade exclusiva do usuário após validação em ambiente de homologação.
+   - A PR para `staging` deve conter o template oficial completamente preenchido e assinado por todos os 9 especialistas.
 
 2. **TDD Estrito (Test-Driven Development — Red, Green, Refactor):**
    - **🔴 RED:** Nenhum código de produção deve ser escrito antes de existir um teste unitário/de integração correspondente que falhe.
@@ -22,10 +23,11 @@ Este documento estabelece as regras inegociáveis para o desenvolvimento de toda
      - A persona **Especialista QA** utiliza a skill `qa-use-cases-validator` para auditar a completude e consistência.
      - A codificação TDD só inicia após essa validação autônoma.
 
-4. **Documento SPEC e ADRs Pré-Sprint:**
-   - Antes de implementar a Sprint 1 e sprints com decisões estruturais, o **Especialista Arquiteto** deve redigir:
+4. **Documento SPEC e ADRs Pré-Sprint Aprovados pelo Usuário:**
+   - Antes de iniciar a implementação da Sprint 1 e de sprints com decisões estruturais, o **Especialista Arquiteto** deve redigir:
      - O documento de **SPEC Técnica** (`docs/specs/sprint-XX-<nome>-spec.md`).
      - Os devidos **ADRs (Architecture Decision Records)** em `docs/adrs/`.
+   - ⚠️ **Portão Obrigatório:** Tanto a SPEC quanto os ADRs DEVEM ser apresentados ao usuário e aprovados formalmente por ele antes do início de qualquer escrita de código da sprint.
 
 5. **Testes de Segurança e Meta-teste AST:**
    - Qualquer teste relacionado a segurança, controle de acesso, injeção, sanitização, vazamento de dados ou vulnerabilidades DEVE:

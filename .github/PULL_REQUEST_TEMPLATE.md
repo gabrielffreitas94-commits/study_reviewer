@@ -2,9 +2,9 @@
 ## 📋 Identificação da Sprint
 * **Sprint:** `Sprint XX — [Nome da Sprint]`
 * **Branch de Origem:** `feature/sprint-XX-[nome]`
-* **Branch de Destino:** `main`
-* **Documento SPEC:** `docs/specs/sprint-XX-[nome]-spec.md`
-* **ADRs Relacionados:** `docs/adrs/ADR-XXX-...`
+* **Branch de Destino:** `staging`
+* **Documento SPEC Aprovado pelo Usuário:** `docs/specs/sprint-XX-[nome]-spec.md`
+* **ADRs Aprovados pelo Usuário:** `docs/adrs/ADR-XXX-...`
 
 ---
 
