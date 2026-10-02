@@ -41,6 +41,10 @@ jobs:
         run: |
           uv run mypy src tests
 
+      - name: Run Architecture AST Compliance Tests (ADR-001)
+        run: |
+          uv run pytest tests/architecture/ -v
+
       - name: Run Security Governance AST Meta-test
         run: |
           uv run pytest tests/governance/ -v

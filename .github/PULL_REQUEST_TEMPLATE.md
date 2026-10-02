@@ -34,6 +34,15 @@
 
 ---
 
+## 📐 Conformidade Arquitetural & ADRs Ativas (Auditoria do Arquiteto)
+- [ ] O teste automatizado de arquitetura AST (`tests/architecture/test_clean_architecture.py`) passou com 100% de sucesso.
+- [ ] As decisões estruturais das ADRs ativas foram rigorosamente seguidas:
+  - [ ] **ADR-001 (Clean Architecture):** Núcleo de domínio puro (zero imports de ORM/frameworks), inversão de dependência via Protocols e use cases agnósticos.
+  - [ ] **ADR-002 (Gap Indexing na Pool):** Posições em múltiplos de 100, inserção por ponto médio nos 10% e rebalanceamento preventivo implementado.
+  - [ ] **ADR-003 (Docker & Migrações):** Paridade dev/prod via Docker Compose com healthchecks, execução não-root e migrações versionadas no Alembic.
+
+---
+
 ## 🏛️ Bancada dos 10 Especialistas — Auditoria Obrigatória
 > **Importante:** Todo especialista deve emitir seu parecer. Status permitidos: `[APROVADO]` ou `[N/A JUSTIFICADO]`.
 

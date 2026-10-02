@@ -50,6 +50,12 @@ O Especialista Arquiteto inspeciona a base de código respondendo a seis critér
    * Os módulos são coesos, com responsabilidades bem delimitadas?
    * Há alguma dependência circular entre módulos ou pacotes? *Se houver, é bloqueio imediato.*
 
+7. **Auditoria de Conformidade com as ADRs Ativas:**
+   * O Especialista Arquiteto inspeciona todas as ADRs aprovadas e vigentes em `docs/adrs/`.
+   * Cada decisão arquitetural registrada (ex: ADR-001 Clean Architecture, ADR-002 Gap Indexing, ADR-003 Docker & Migrações) é verificada contra o diff da sprint.
+   * O especialista executa e comprova o sucesso do teste automatizado de arquitetura (`tests/architecture/test_clean_architecture.py`).
+   * Se qualquer implementação desviar ou contrariar uma ADR aprovada sem que haja uma nova ADR formal de substituição, a PR é sumariamente bloqueada.
+
 ---
 
 ## 3. Emissão de Parecer na PR
