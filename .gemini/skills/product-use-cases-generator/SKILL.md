@@ -20,23 +20,43 @@ O funcionamento desta skill é agnóstico a projetos, extraindo as regras de neg
 
 ## 2. Categorias Obrigatórias de Cenários
 
-A matriz gerada DEVE cobrir impreterivelmente quatro categorias para cada funcionalidade descrita no PRD:
+A matriz gerada DEVE cobrir impreterivelmente uma taxonomia completa de cenários para cada funcionalidade descrita no PRD:
 
-1. **Caminho Feliz (Happy Path):**
-   * Fluxo ideal onde entradas válidas geram transições de estado bem-sucedidas e os resultados esperados são alcançados.
-2. **Cenários de Borda (Edge Cases):**
-   * Limites matemáticos, extremos de intervalos, valores mínimos e máximos permitidos.
-   * Coleções especiais (listas vazias, com 1 elemento, coleções cheias).
-   * Transições de estado nos nós de fronteira do ciclo de vida das entidades.
-   * Formatação de dados no padrão especificado pelo PRD (ex: formatos de data, códigos, chaves).
-3. **Validações de Entrada e Rejeição:**
-   * Textos vazios, campos nulos onde não é permitido, strings com apenas espaços em branco.
-   * Chaves e relacionamentos com identificadores inexistentes.
-   * Valores numéricos fora das faixas válidas especificadas no PRD.
-   * Tipos de dados incompatíveis.
-4. **Falhas e Inconsistências de Negócio:**
-   * Tentativas de operação em entidades em estados inválidos conforme as regras do PRD.
-   * Violações de invariantes de domínio e restrições de unicidade.
+1. **Caminho Feliz (Happy Path & Variações Válidas):**
+   * Fluxo nominal principal com entradas típicas e sucesso absoluto.
+   * Variações válidas secundárias (ex: ações com parâmetros opcionais omitidos vs preenchidos).
+   * Persistência correta do estado final e integridade dos dados retornados.
+
+2. **Cenários de Borda e Fronteiras Matemáticas (Edge Cases & Boundary Values):**
+   * **Limites de Coleções:** Listas vazias (0 elementos), coleções unitárias (1 elemento), coleções no tamanho exato de corte/página, coleções extensas.
+   * **Fronteiras Numéricas e Fórmulas:** Valores no limite exato inferior, limite exato superior, imediatamente abaixo e imediatamente acima dos limites permitidos pelo PRD.
+   * **Arredondamento e Frações:** Comportamento diante de divisão inteira, arredondamento para cima/baixo (`ceil`/`floor`), valores decimais e proporções percentuais.
+   * **Fronteiras Temporais:** Transições de início e fim de período, viradas de dia, mês e ano, anos bissextos e datas no formato estrito exigido pelo PRD.
+
+3. **Validação de Entrada e Rejeição de Payloads (Input & Schema Validation):**
+   * **Campos de Texto:** Strings vazias, strings compostas exclusivamente por espaços em branco, limites mínimos e máximos de caracteres permitidos.
+   * **Tipagem e Formatação:** Valores de tipos incompatíveis (ex: texto em campo numérico), formatos de data inválidos, valores fora de listas permitidas (enums).
+   * **Identificadores e Chaves:** UUIDs malformados, referências a identificadores inexistentes no banco/sistema.
+   * **Campos Obrigatórios vs Opcionais:** Omissão de atributos requeridos e tentativa de envio de campos extras não mapeados.
+
+4. **Invariantes de Domínio e Regras de Negócio (Business Rules & Invariants):**
+   * Violação direta de restrições expressas no PRD (ex: notas fora de escala, operações fora da janela permitida, violações de precedência).
+   * Restrições de unicidade (tentativas de duplicidade de chaves, nomes únicos ou vínculos exclusivos).
+   * Integridade de relacionamento (ex: exclusão de entidades pai com filhos ativos, consistência de dados históricos).
+
+5. **Ciclo de Vida e Transições de Estado (State Lifecycle & Transitions):**
+   * Operações válidas permitidas apenas em estados específicos da entidade.
+   * Tentativas de transição de estado proibidas (ex: pular etapas obrigatórias ou reverter estados terminais).
+   * Operações sobre entidades arquivadas, canceladas ou inativas.
+
+6. **Concorrência, Idempotência e Repetição de Ações (Idempotency & Concurrency):**
+   * Repetição imediata da mesma requisição/ação (garantindo comportamento idempotente quando esperado).
+   * Tentativas de submissão duplicada (ex: duplo clique ou envios consecutivos rápidos).
+   * Consistência do estado diante de operações em sequência na mesma entidade.
+
+7. **Tratamento de Falhas e Mensagens de Feedback (Error Handling & User Feedback):**
+   * Garantia de que falhas de negócio retornam mensagens semânticas, claras e acionáveis para o usuário, sem expor dados internos de infraestrutura ou stack traces.
+   * Preservação da atomicidade (se a operação falhar no meio, nenhuma alteração parcial de estado deve persistir).
 
 ---
 
@@ -45,7 +65,7 @@ A matriz gerada DEVE cobrir impreterivelmente quatro categorias para cada funcio
 Cada use case deve ser estruturado com:
 - **ID:** `UC-S<Sprint>-<Numero>` (ex: `UC-S01-01`)
 - **Título do Cenário:** Claro e autoexplicativo.
-- **Categoria:** `Caminho Feliz` | `Edge Case` | `Validação de Entrada` | `Falha de Negócio` | `Segurança`
+- **Categoria:** `Caminho Feliz` | `Edge Case & Limites` | `Validação de Entrada` | `Invariante de Domínio` | `Transição de Estado` | `Concorrência & Idempotência` | `Tratamento de Falhas` | `Segurança`
 - **Especificação BDD:**
   ```gherkin
   Cenário: [Título]

@@ -5,7 +5,7 @@ description: Audits pull request changes against the project PRD.md and approved
 
 # Product Requirements Auditor (Skill do Especialista de Produto)
 
-Esta skill é utilizada pelo **Especialista de Produto** durante a auditoria final da Sprint, imediatamente antes da abertura ou aprovação da Pull Request direcionada para a branch `staging`.
+Esta skill é utilizada pelo **Especialista de Produto** durante a auditoria final da Sprint, imediatamente antes da abertura ou aprovação da Pull Request.
 
 O funcionamento desta skill é agnóstico a projetos, extraindo os critérios de aceitação e regras de negócio do `PRD.md` vigente no repositório.
 
