@@ -8,39 +8,59 @@
     <!-- Barra de Filtros e Indicador de Progresso -->
     <div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         
-        <!-- Filtros de Matéria / Tema -->
-        <form method="GET" action="/study" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <!-- Filtros de Matéria / Tema com Reatividade HTMX (Zero Full Page Reload) -->
+        <form 
+            id="study-filter-form" 
+            method="GET" 
+            action="/study" 
+            class="flex flex-wrap items-center gap-2 w-full sm:w-auto"
+            onsubmit="return false;"
+        >
             <label for="filter-subject" class="sr-only">Filtrar por Matéria</label>
             <select 
                 id="filter-subject" 
                 name="subject_id" 
-                onchange="const top = this.form.querySelector('#filter-topic'); if (top) top.value = ''; this.form.submit()"
-                class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[200px] sm:max-w-xs truncate"
+                hx-get="/study"
+                hx-target="#flashcard-container"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+                hx-trigger="change"
+                onchange="const top = document.getElementById('filter-topic'); if (top) top.value = '';"
+                class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[240px] sm:max-w-xs truncate transition shadow-sm cursor-pointer"
+                title="Atalho: M para selecionar matéria"
             >
-                <option value="">Todas as Matérias (Global)</option>
+                <option value="">Todas as Matérias (Global — {{ global_card_count }} {% if global_card_count == 1 %}card{% else %}cards{% endif %})</option>
                 {% for sub in subjects %}
                     <option value="{{ sub.id }}" {% if selected_subject_id == sub.id|string %}selected{% endif %}>
-                        {{ sub.name }}
+                        {{ sub.name }} ({{ subject_card_counts.get(sub.id|string, 0) }} {% if subject_card_counts.get(sub.id|string, 0) == 1 %}card{% else %}cards{% endif %})
                     </option>
                 {% endfor %}
             </select>
 
-            {% if topics and topics|length > 0 %}
-            <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
-            <select 
-                id="filter-topic" 
-                name="topic_id" 
-                onchange="this.form.submit()"
-                class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[200px] sm:max-w-xs truncate"
-            >
-                <option value="">Todos os Temas da Matéria</option>
-                {% for top in topics %}
-                    <option value="{{ top.id }}" {% if selected_topic_id == top.id|string %}selected{% endif %}>
-                        {{ top.name }}
-                    </option>
-                {% endfor %}
-            </select>
-            {% endif %}
+            <div id="filter-topic-container" class="inline-flex items-center">
+                {% if topics and topics|length > 0 %}
+                <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+                <select 
+                    id="filter-topic" 
+                    name="topic_id" 
+                    hx-get="/study"
+                    hx-target="#flashcard-container"
+                    hx-swap="outerHTML"
+                    hx-push-url="true"
+                    hx-include="#filter-subject"
+                    hx-trigger="change"
+                    class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[240px] sm:max-w-xs truncate transition shadow-sm cursor-pointer"
+                    title="Atalho: T para selecionar tema"
+                >
+                    <option value="">Todos os Temas da Matéria ({{ subject_card_counts.get(selected_subject_id, 0) }} {% if subject_card_counts.get(selected_subject_id, 0) == 1 %}card{% else %}cards{% endif %})</option>
+                    {% for top in topics %}
+                        <option value="{{ top.id }}" {% if selected_topic_id == top.id|string %}selected{% endif %}>
+                            {{ top.name }} ({{ topic_card_counts.get(top.id|string, 0) }} {% if topic_card_counts.get(top.id|string, 0) == 1 %}card{% else %}cards{% endif %})
+                        </option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </div>
         </form>
 
         <!-- Indicador de Progresso (Card X de Y • Rodada Z) -->
@@ -64,9 +84,9 @@
 
 {% block scripts %}
 <script>
-    // Gerenciamento ergonômico de atalhos de teclado (Espaço e Enter/Seta Direita)
+    // Gerenciamento ergonômico de atalhos de teclado (Espaço, Enter/Seta Direita, M e T)
     document.addEventListener('keydown', function(e) {
-        // Ignora digitação em campos de entrada/formulários
+        // Ignora atalhos de navegação se estiver em campo de entrada/textarea/select
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
             return;
         }
@@ -86,6 +106,24 @@
             const nextBtn = document.getElementById('btn-next');
             if (nextBtn) {
                 nextBtn.click();
+            }
+        }
+
+        // Atalho 'm' ou 'M': Foca no seletor de matéria
+        if (e.key === 'm' || e.key === 'M') {
+            const subjectSelect = document.getElementById('filter-subject');
+            if (subjectSelect) {
+                e.preventDefault();
+                subjectSelect.focus();
+            }
+        }
+
+        // Atalho 't' ou 'T': Foca no seletor de tema (se visível)
+        if (e.key === 't' || e.key === 'T') {
+            const topicSelect = document.getElementById('filter-topic');
+            if (topicSelect) {
+                e.preventDefault();
+                topicSelect.focus();
             }
         }
     });

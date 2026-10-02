@@ -243,6 +243,12 @@ def test_study_view_with_empty_or_invalid_query_params(client: TestClient) -> No
     resp4 = client.get(f"/flashcards/new?subject_id={sub['id']}&topic_id=")
     assert resp4.status_code == 200
 
+    # Requisição HTMX ao alterar filtro retorna partial com swaps out-of-band
+    resp_htmx = client.get(f"/study?subject_id={sub['id']}", headers={"HX-Request": "true"})
+    assert resp_htmx.status_code == 200
+    assert "flashcard-container" in resp_htmx.text
+    assert 'hx-swap-oob="true"' in resp_htmx.text
+
 
 @pytest.mark.integration
 def test_create_flashcard_web_multi_topic_and_single_button(client: TestClient) -> None:

@@ -78,6 +78,15 @@ def study_view(
     subjects = ListSubjectsUseCase(subject_repo).execute()
     topics = ListTopicsBySubjectUseCase(topic_repo).execute(sub_uuid) if sub_uuid else []
 
+    # Information Scent: Contagem em tempo real de cards disponíveis por matéria/tema
+    global_card_count = card_repo.count_pool(None, None)
+    subject_card_counts: dict[str, int] = {
+        str(sub.id): card_repo.count_pool(sub.id, None) for sub in subjects
+    }
+    topic_card_counts: dict[str, int] = {
+        str(top.id): card_repo.count_pool(None, top.id) for top in topics
+    }
+
     card: StudyCardDTO | None = None
     try:
         get_current_uc = GetCurrentStudyCardUseCase(card_repo, session_repo, topic_repo)
@@ -85,19 +94,33 @@ def study_view(
     except EmptyPoolError:
         card = None
 
+    context = {
+        "card": card,
+        "side": "front",
+        "subjects": subjects,
+        "topics": topics,
+        "selected_subject_id": str(sub_uuid) if sub_uuid else None,
+        "selected_topic_id": str(top_uuid) if top_uuid else None,
+        "subject_id": sub_uuid,
+        "topic_id": top_uuid,
+        "global_card_count": global_card_count,
+        "subject_card_counts": subject_card_counts,
+        "topic_card_counts": topic_card_counts,
+        "update_filters": True,
+    }
+
+    # Se for requisição ágil HTMX, renderiza apenas o fragmento parcial com swaps out-of-band
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/card.html",
+            context=context,
+        )
+
     return templates.TemplateResponse(
         request=request,
         name="study.html",
-        context={
-            "card": card,
-            "side": "front",
-            "subjects": subjects,
-            "topics": topics,
-            "selected_subject_id": str(sub_uuid) if sub_uuid else None,
-            "selected_topic_id": str(top_uuid) if top_uuid else None,
-            "subject_id": sub_uuid,
-            "topic_id": top_uuid,
-        },
+        context=context,
     )
 
 
