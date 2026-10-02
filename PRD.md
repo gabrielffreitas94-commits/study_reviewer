@@ -1,4 +1,4 @@
-# Product Requirements Document (PRD) — v5.1
+# Product Requirements Document (PRD) — v5.2
 ## Study Reviewer — Sistema Inteligente de Revisão Ativa e Repetição Espaçada
 
 ---
@@ -6,57 +6,81 @@
 ## 1. Visão Geral do Produto
 
 ### 1.1 Missão
-O **Study Reviewer** é uma aplicação pessoal focada em aprendizado contínuo e retenção de longo prazo, dividida em dois sistemas complementares:
-1. **Flashcards (Pool Contínua por Rodadas):** Rotação sequencial da pool com inserção aleatória de novos cards nos **primeiros 10%** da fila e **shuffle geral** da lista toda ao concluir cada ciclo/rodada de revisão.
-2. **Perguntas Abertas (Mecânica SRS Estrita):** Fila de repetição espaçada por calendário (`[1, 7, 15, 30, 60, 90, 180]` dias), promoção estrita a **100% de acerto**, penalidade de regressão no nível 6 (retorno ao nível 2) e auditoria histórica completa.
+O **Study Reviewer** é uma aplicação focada em aprendizado contínuo e retenção de longo prazo, dividida em dois sistemas complementares de estudo ativo:
+1. **Flashcards (Pool Contínua por Rodadas):** Rotação sequencial da pool com inserção de novos cards nos **primeiros 10%** da fila e **shuffle geral** da lista toda ao concluir cada ciclo/rodada de revisão. Opera com navegação ágil, atalhos de teclado e gestos de toque no celular, sem notas e sem complexidade de agendamento por dias.
+2. **Perguntas Abertas (Mecânica SRS Estrita):** Fila de repetição espaçada por calendário (`[1, 7, 15, 30, 60, 90, 180]` dias), promoção estrita a **100% de acerto**, penalidade de regressão no nível 6 (retorno ao nível 2 com reagendamento para `hoje + 15d`) e auditoria histórica completa.
+
+---
 
 ### 1.2 Princípios de Engenharia e Arquitetura
-* **Clean Architecture Estrita:** Divisão em 4 camadas concêntricas (Entities, Use Cases, Interface Adapters, Frameworks & Drivers).
+* **Clean Architecture Estrita e Casos de Uso Agnósticos:** Divisão em 4 camadas concêntricas (Entities, Use Cases, Interface Adapters, Frameworks & Drivers). A camada de Casos de Uso é 100% agnóstica, servindo tanto os controladores web (Jinja2 + HTMX) quanto a futura API REST para o aplicativo mobile sem duplicação de lógica.
 * **Paridade Dev/Prod com Docker:** Desenvolvimento e produção utilizam a mesma stack conteinerizada (Docker Compose com PostgreSQL e FastAPI).
-* **Datas Puramente Calendárias:** Todo o agendamento de perguntas abertas opera no formato `YYYY-MM-DD` (sem horas, minutos ou complicação de timezone).
-* **Web Responsivo + Flutter Nativo (Sem PWA):** A interface web com Tailwind é responsiva para uso no celular e haverá um app dedicado em Flutter.
-* **Auditoria Histórica Preservada:** Auditoria exclusiva para perguntas abertas, ligada diretamente à Matéria (`subject_id`) e ao Tema (`topic_id`), mantendo colunas explícitas de histórico desnormalizado (`historical_subject_name`, `historical_topic_name`).
-* **Inteligência Artificial Planejada e Modular:** Fase preparatória dedicada para definir a arquitetura de base de conhecimento (grounding com livros digitalizados/RAG seletivo) e bancada de avaliação (personas/skills especializadas de correção).
+* **Evolução Segura de Schema com Migrações Versionadas:** Requisito não-funcional de controle automatizado de versões de banco de dados, garantindo migrações contínuas sem quebras ou perda de dados.
+* **Datas Puramente Calendárias:** Todo o agendamento de perguntas abertas opera no formato `YYYY-MM-DD` (sem horas, minutos ou desvios de fuso horário).
+* **Segurança e Criptografia em Repouso com AES-256-GCM:** Autenticação segura na borda por sessão/cookie, sanitização estrita de inputs contra XSS (via biblioteca de sanitização como `nh3`) e proteção de segredos/tokens armazenados utilizando Criptografia Autenticada **AES-256-GCM (AEAD)**.
+* **Auditoria Histórica e Privacidade por Design (LGPD):** Auditoria exclusiva para perguntas abertas ligada à Matéria (`subject_id`) e ao Tema (`topic_id`) com colunas desnormalizadas congeladas (`historical_subject_name`, `historical_topic_name`). Suporte a exportação de dados em JSON e diretriz de efemeridade estrita para áudios gravados na Sprint 8 (descarte imediato pós-transcrição).
+* **Design System e Dark Mode Nativo:** Interface responsiva Mobile-First com TailwindCSS, suporte nativo a Tema Claro e Escuro (via seletor de classe, sem cintilação visual de carregamento/FOUC e com respeito ao `prefers-color-scheme`).
 
 ---
 
 ## 2. Mecânica dos Flashcards (Sprint 1 — Pool Contínua por Rodadas)
 
-Os Flashcards **não** utilizam algoritmo de dias nem auditoria. Eles operam em uma **Pool Dinâmica de Rodada Completa**:
+Os Flashcards **não** utilizam algoritmo de dias nem auditoria. Eles operam em uma **Pool Dinâmica de Rodada Completa** com suporte a estudo de **Todas as Matérias (Global)** ou com **Filtro por Matéria/Tema Específico**.
 
 ```mermaid
 flowchart TD
-    subgraph Ciclo_da_Pool["Ciclo da Pool de Flashcards"]
-        Head["Primeiros 10% da Pool (Posições 0 a 0.1 * N)"]
+    subgraph Ciclo_da_Pool["Ciclo da Pool de Flashcards (Gap Indexing: múltiplos de 100)"]
+        Head["Primeiros 10% da Pool (Posições Iniciais)"]
         Body["Restante da Pool"]
-        Tail["Fim da Pool (Último Card)"]
+        Tail["Fim da Pool (Último Card da Rodada)"]
     end
 
-    NewCard["Novo Card Cadastrado"] -->|Inserido Aleatoriamente| Head
+    NewCard["Novo Card Cadastrado"] -->|Inserção por Ponto Médio| Head
     User["Usuário Revisa"] -->|Card a Card sequencialmente| Tail
-    Tail -->|Ao terminar o último card da lista| Shuffle["Shuffle Completo em toda a lista (Nova Rodada)"]
+    Tail -->|Ao concluir último card| Shuffle["Shuffle Completo + Redistribuição em Gaps de 100"]
     Shuffle --> Head
 ```
 
-### 2.1 Regras de Operação da Pool:
-1. **Estrutura Ordenada:** A pool contém $N$ flashcards ordenados por posição (`0` a $N - 1$).
-2. **Inserção de Novos Cards (Prioridade Inicial):**
-   * Quando um novo flashcard é cadastrado, ele é inserido em uma posição aleatória dentro dos **primeiros 10%** da lista:
-     $$\text{índice\_inserção} = \text{random}(0, \max(1, \lfloor 0.1 \times N \rfloor))$$
-   * Isso assegura que novos conteúdos sejam revisados rapidamente sem ter que esperar toda a pool passar.
-3. **Revisão Sequencial da Rodada:**
-   * O usuário visualiza o card atual $\rightarrow$ clica em "Ver Resposta" $\rightarrow$ clica em "Próximo".
-   * O ponteiro avança para o próximo card da fila.
-4. **Fim de Rodada e Shuffle Geral:**
-   * Quando o usuário finaliza a leitura do **último card da lista**, o ciclo da rodada se encerra.
-   * O sistema realiza automaticamente um **embaralhamento completo (shuffle)** em todos os $N$ elementos da pool e reinicia o ponteiro na posição 0 para uma nova rodada imprevisível.
-5. **Sem Notas e Sem Auditoria:** Flashcards não demandam autoavaliação nem logs analíticos, priorizando velocidade e fluidez.
+### 2.1 Regras de Operação da Pool & Gap Indexing
+
+1. **Ordenação por Gap Indexing (Múltiplos de 100):**
+   * Cada flashcard na pool de estudo possui um campo numérico `position`.
+   * Na inicialização ou após cada shuffle geral, os cards recebem posições espaçadas de 100 em 100 (`100, 200, 300, 400...`).
+
+2. **Inserção de Novos Cards nos Primeiros 10%:**
+   * Quando um novo flashcard é cadastrado, ele é alocado em uma posição aleatória entre os primeiros 10% da fila:
+     $$\text{índice\_alvo} = \text{random}(0, \max(1, \lfloor 0.1 \times N \rfloor))$$
+   * A nova posição é calculada como o ponto médio entre o card anterior e o próximo daquele índice:
+     $$\text{nova\_posição} = pos_{ant} + \lfloor (pos_{prox} - pos_{ant}) / 2 \rfloor$$
+   * Isso permite inserção instantânea em banco relacional sem necessidade de renumerar os demais cards da pool.
+
+3. **Tratamento Exaustivo de Edge Cases no Posicionamento:**
+   * **Pool Vazia ($N = 0$):** O primeiro card inserido recebe `position = 100`.
+   * **Pool Unitária ($N = 1$):** O novo card recebe `position = 50` (antes) ou `position = 200` (depois), conforme sorteio.
+   * **Inserção no Início Absoluto (antes do primeiro card):** Se o card for inserido antes do índice 0, sua posição será $\lfloor pos_{primeiro} / 2 \rfloor$. Se $pos_{primeiro} \le 1$, o sistema dispara rebalanceamento preventivo.
+   * **Esgotamento de Gap ($pos_{prox} - pos_{ant} \le 1$):** Caso múltiplos cards sejam inseridos consecutivamente no mesmo intervalo até não haver inteiros livres, o sistema dispara um rebalanceamento local dos vizinhos ou redistribuição uniforme da pool em múltiplos de 100.
+   * **Exclusão de Card no Meio da Rodada:** Se um card for excluído enquanto uma rodada estiver em andamento, o card é removido e o tamanho $N$ decrementa. O ponteiro da rodada avança naturalmente para o próximo card da sequência sem quebrar a rodada. Se o card excluído era o último restante da rodada, o ciclo se encerra e o shuffle é acionado.
+
+4. **Navegação e Persistência da Sessão:**
+   * O estado da rodada é persistido em banco de dados na entidade `FlashcardPoolSession` (`session_id`, `current_position`, `round_number`, `subject_id_filter`), permitindo ao usuário pausar os estudos, fechar o navegador e retomar exatamente de onde parou.
+   * Ao finalizar o último card da lista, a rodada se encerra: o sistema reembaralha todos os cards da pool ativa, redistribui as posições em múltiplos de 100, incrementa o `round_number` e posiciona o ponteiro no primeiro card da nova rodada.
+
+5. **Ergonomia, Atalhos de Teclado e Gestos Touch:**
+   * **Atalhos no Desktop:**
+     * `Barra de Espaço`: Virar o card (alternar entre Pergunta e Resposta).
+     * `Enter` ou `Seta para a Direita`: Avançar para o próximo card.
+   * **Comandos Touch no Mobile (Web Responsivo e Flutter):**
+     * `Toque Único (Tap)` no card: Virar o card / Revelar resposta.
+     * `Deslizar para a Esquerda (Swipe Left)`: Avançar para o próximo card.
+     * `Arrastar para Baixo (Pull to Refresh)`: Sincronizar sessão e recarregar a fila.
+     * *Nota de Produto:* Não existe funcionalidade de favoritos; o foco é fluidez contínua sem categorizações paralelas.
+   * **Indicador de Ritmo:** Exibição clara do progresso atual (ex: *"Card 14 de 50 • Rodada 2"*).
 
 ---
 
 ## 3. Mecânica das Perguntas Abertas (Mecânica SRS Estrita)
 
-As perguntas abertas seguem o algoritmo de repetição espaçada por calendário e auditoria completa.
+As perguntas abertas seguem o algoritmo estrito de repetição espaçada por calendário e auditoria completa.
 
 ### 3.1 Níveis de Intervalo e Regra de Penalidade
 $$\text{Intervalos} = [1, 7, 15, 30, 60, 90, 180] \text{ dias}$$
@@ -69,13 +93,13 @@ $$\text{Intervalos} = [1, 7, 15, 30, 60, 90, 180] \text{ dias}$$
 | **3** | 30 dias | Avança para **Nível 4** (+60 dias) | Permanece no **Nível 3** (Reagenda para `hoje + 30d`) |
 | **4** | 60 dias | Avança para **Nível 5** (+90 dias) | Permanece no **Nível 4** (Reagenda para `hoje + 60d`) |
 | **5** | 90 dias | Avança para **Nível 6** (+180 dias) | Permanece no **Nível 5** (Reagenda para `hoje + 90d`) |
-| **6** | 180 dias | Permanece no **Nível 6** (`hoje + 180d`) | ⚠️ **Regride para o Nível 2** (`hoje + 15d`) |
+| **6** | 180 dias | Permanece no **Nível 6** (`hoje + 180d`) | ⚠️ **Regride para o Nível 2** (Reagenda estritamente para `hoje + 15d`) |
 
 ### 3.2 Fases das Perguntas Abertas:
-* **Fase 1 (MVP — Sprint 2):** Usuário visualiza a pergunta, elabora mentalmente a resposta, clica em "Ver Resposta Esperada" e atribui sua nota de 0 a 100 (sem digitação nem gravação de voz).
-* **Fase 2 (Planejamento de IA, RAG de Livros & Bancada de Avaliação — Sprint 6):** Concepção da base de livros digitalizados, escolha de skills e arquitetura de múltiplos avaliadores.
-* **Fase 3 (IA com Texto — Sprint 7):** Digitação da resposta e correção automática por IA com nota e feedback detalhado baseado nos livros e rubricas selecionados.
-* **Fase 4 (IA com Voz — Sprint 8):** Gravação de voz com transcrição e avaliação semântica direta pelo Gemini Flash.
+* **Fase 1 (MVP — Sprint 2):** Usuário visualiza a pergunta, elabora mentalmente a resposta, clica em "Ver Resposta Esperada" e atribui sua nota de 0 a 100 (sem digitação nem áudio).
+* **Fase 2 (Planejamento de IA, RAG de Livros & Bancada de Avaliação — Sprint 6):** Concepção da base de livros digitalizados e arquitetura de múltiplos avaliadores.
+* **Fase 3 (IA com Texto — Sprint 7):** Digitação da resposta e correção automática por IA com nota e feedback detalhado.
+* **Fase 4 (IA com Voz — Sprint 8):** Gravação de voz com envio direto para o Gemini Flash para transcrição e avaliação semântica. O arquivo de áudio é estritamente efêmero, sendo descartado imediatamente após a resposta da IA para proteção da privacidade biométrica (LGPD).
 
 ---
 
@@ -110,7 +134,7 @@ erDiagram
         text prompt
         text expected_answer
         int current_level "0 a 6"
-        date next_review_date
+        date next_review_date "YYYY-MM-DD"
         date created_date
     }
 
@@ -119,8 +143,8 @@ erDiagram
         uuid question_id FK
         uuid subject_id FK "Relação direta com Matéria para agrupamentos macro"
         uuid topic_id FK "Relação direta com Tema para filtros granulares (nullable)"
-        string historical_subject_name "Nome histórico da matéria congelado no momento da revisão"
-        string historical_topic_name "Nome histórico do tema congelado no momento da revisão"
+        string historical_subject_name "Nome histórico congelado no momento da revisão"
+        string historical_topic_name "Nome histórico congelado no momento da revisão"
         date review_date "YYYY-MM-DD"
         int score "0 a 100"
         int level_before
@@ -137,28 +161,31 @@ erDiagram
 ```mermaid
 flowchart TD
     subgraph Camada_4["4. Frameworks & Drivers"]
-        Docker["Docker & Docker Compose"]
+        Docker["Docker & Docker Compose (Dev/Prod Parity)"]
         FastAPI_App["FastAPI Web Framework & Uvicorn"]
-        SQLAlchemy_Postgres["PostgreSQL via SQLAlchemy 2.0"]
+        Postgres_DB["PostgreSQL (Neon / Local) via SQLAlchemy"]
         Templates_HTMX["Templates Jinja2 + HTMX + TailwindCSS"]
     end
 
     subgraph Camada_3["3. Interface Adapters"]
-        Controllers["FastAPI Routers & Controllers"]
+        Controllers_Web["Web Controllers (HTML/HTMX Responses)"]
+        Controllers_API["API Controllers (JSON REST Responses para Flutter)"]
         Repo_Impl["SqlAlchemyFlashcardRepository, SqlAlchemyQuestionRepository, SqlAlchemyAuditRepository"]
+        Mappers["Domain/ORM Mappers"]
     end
 
-    subgraph Camada_2["2. Use Cases (Application Layer)"]
+    subgraph Camada_2["2. Use Cases (Application Layer - 100% Agnóstica)"]
         UC_Card["GetNextFlashcardUseCase, ReviewFlashcardUseCase, CreateFlashcardUseCase"]
         UC_Question["ReviewQuestionUseCase, GetDueQuestionsUseCase"]
-        UC_Ports["Protocols: IFlashcardRepo, IQuestionRepo, IAuditRepo"]
+        UC_Ports["Protocols: IFlashcardRepo, IQuestionRepo, IAuditRepo, ISessionRepo"]
     end
 
-    subgraph Camada_1["1. Entities & Domain Services (Core)"]
-        E_Flashcard["Flashcard Entity (Pool & Positions)"]
+    subgraph Camada_1["1. Entities & Domain Services (Core Puro)"]
+        E_Flashcard["Flashcard Entity (Position & Contents)"]
+        E_Session["FlashcardPoolSession Entity"]
         E_Question["Question Entity (SRS Level & Date)"]
         E_Audit["ReviewAuditLog Entity"]
-        DS_Pool["FlashcardPoolService (Insert 10%, Round Shuffle All)"]
+        DS_Pool["FlashcardPoolService (Gap Indexing, Middle Point Insert, Round Shuffle)"]
         DS_Spacing["SpacingPolicyService (1..180d, Nível 6 -> 2)"]
     end
 
@@ -169,88 +196,54 @@ flowchart TD
 
 ---
 
-## 6. Ambiente e Deploy (Docker & Cloud Gratuita)
+## 6. Ambiente e Deploy
 
-* **Desenvolvimento Local:** Executado via `docker compose up` (FastAPI com hot reload + PostgreSQL 16 persistente).
-* **Produção:** Neon Serverless PostgreSQL (Free Tier) + Render.com Web Service via Dockerfile.
+* **Desenvolvimento Local:** Executado via `docker compose up` (FastAPI com hot-reload + PostgreSQL 16 persistente).
+* **Produção:** Neon Serverless PostgreSQL (Free Tier) + Render.com Web Service via Dockerfile multi-stage enxuto rodando sob usuário não-root.
+* **Segurança na Nuvem:** Autenticação de sessão ativada na borda para proteção dos dados pessoais em ambiente público, e encriptação com **AES-256-GCM** para segredos armazenados.
 
 ---
 
-## 7. Roadmap Estratégico por Sprints (8 Sprints)
+## 7. Critérios de Aceitação Gerais — Definition of Done (DoD)
+
+Para que qualquer Sprint seja considerada concluída e receba autorização de merge para a branch `staging`:
+1. [ ] **Aderência Estrita de Negócio:** 100% dos use cases e regras da sprint no PRD implementados sem desvios ou escopo fantasma.
+2. [ ] **TDD Aplicado (Red-Green-Refactor):** Todos os testes unitários e de integração escritos antes do código de produção correspondente.
+3. [ ] **100% de Cobertura de Testes Obrigatória:** Suíte de testes passando com 100% de cobertura confirmada no backend (`pytest-cov`) e frontend em processos totalmente isolados.
+4. [ ] **Governança de Testes de Segurança:** Testes com impacto de segurança decorados com `@pytest.mark.security`, docstring estruturada contendo `"Vulnerabilidade prevenida:"` e `"Garantia de segurança:"`, e meta-teste AST 100% aprovado.
+5. [ ] **Qualidade Estática de Código:** Linters e checagem de tipos (Ruff format/check e Mypy strict) passando com zero alertas e sem supressões artificiais.
+6. [ ] **Aderência à Clean Architecture:** Núcleo de domínio Python puro (sem dependência de frameworks/ORM), use cases agnósticos e inversão de dependência via Protocols.
+7. [ ] **Auditoria Unânime da Bancada:** Pareceres formais assinados pelos **10 Especialistas** no template oficial de PR (`[APROVADO]` ou `[N/A JUSTIFICADO]`).
+8. [ ] **Paridade Docker Comprovada:** Aplicação e banco executando perfeitamente via `docker compose up`.
+9. [ ] **Pull Request Aberta para Staging:** PR devidamente aberta com documentação e histórico rastreável.
+
+---
+
+## 8. Roadmap Estratégico por Sprints
 
 ```mermaid
 flowchart TD
-    S1["Sprint 1: MVP Flashcards em Produção (Docker + Pool por Rodada)"] --> S2["Sprint 2: MVP Perguntas Abertas (SRS Manual)"]
+    S1["Sprint 1: MVP Flashcards em Produção (Docker + Pool por Rodada com Gaps de 100)"] --> S2["Sprint 2: MVP Perguntas Abertas (SRS Manual)"]
     S2 --> S3["Sprint 3: Sistema de Auditoria Completa"]
     S3 --> S4["Sprint 4: App Mobile Dedicado em Flutter"]
     S4 --> S5["Sprint 5: Dashboard Analítico de Performance"]
     S5 --> S6["Sprint 6: Pesquisa, Arquitetura e Planejamento da IA & RAG de Livros"]
     S6 --> S7["Sprint 7: IA com Resposta Escrita (Gemini Flash)"]
-    S7 --> S8["Sprint 8: IA com Resposta em Voz (Gemini Multimodal)"]
+    S7 --> S8["Sprint 8: IA com Resposta em Voz Efêmera (Gemini Multimodal)"]
 ```
 
 ### 🎯 Sprint 1: MVP Flashcards em Produção (Foco Imediato)
-* **Objetivo:** Sistema de flashcards funcional em produção na nuvem, rodando localmente via Docker.
+* **Objetivo:** Sistema de flashcards funcional em produção na nuvem, rodando localmente via Docker, com suporte a estudo global ou por matéria/tema selecionado.
 * **Escopo:**
-  * Setup Docker & Docker Compose com PostgreSQL e FastAPI.
-  * Clean Architecture: Domínio de Flashcards com `FlashcardPoolService`:
-    * Novos cards inseridos aleatoriamente nos primeiros 10% da pool.
-    * Navegação sequencial do topo até o fim.
-    * Shuffle geral da pool completa ao concluir a leitura do último card.
-  * CRUD de Matérias, Temas e Flashcards.
-  * Interface web responsiva com HTMX + TailwindCSS.
+  * Setup Docker Compose com PostgreSQL e FastAPI.
+  * Clean Architecture: Domínio de Flashcards com `FlashcardPoolService` operando via **Gap Indexing (múltiplos de 100)**:
+    * Inserção aleatória no ponto médio dos primeiros 10% da pool com rebalanceamento automático contra colisões.
+    * Navegação sequencial persistida via `FlashcardPoolSession` em banco de dados.
+    * Fim de rodada com shuffle completo redistribuindo a pool em múltiplos de 100.
+  * CRUD de Matérias, Temas e Flashcards com modo de cadastro ágil.
+  * Interface web responsiva Mobile-First com Jinja2 + HTMX + TailwindCSS.
+  * Suporte a Dark Mode nativo com prevenção de FOUC.
+  * Atalhos de teclado no desktop (`Espaço`/`Enter`) e gestos ergonômicos de toque no mobile.
+  * Autenticação de sessão na borda e criptografia AES-256-GCM para dados protegidos.
   * Deploy do banco no Neon e do app no Render.
-* **Entregável:** Link de produção ativo no Render com Docker, sem auditoria e 100% funcional.
-
-### 🎯 Sprint 2: MVP Perguntas Abertas (SRS Manual)
-* **Objetivo:** Adicionar o modo de perguntas abertas com espaçamento de 1 a 180 dias.
-* **Escopo:**
-  * Entidade `Question` com data puramente calendária (`YYYY-MM-DD`).
-  * `SpacingPolicyService`: avanço com 100% e regressão do Nível 6 para o Nível 2 em caso de nota < 100%.
-  * Fila diária de revisão (`next_review_date <= hoje`).
-  * Interface manual simples: Usuário lê a pergunta, pensa na resposta, clica em "Ver Resposta Esperada" e seleciona sua nota de 0 a 100 (sem escrita nem áudio).
-* **Entregável:** Modo de perguntas com algoritmo estrito de espaçamento ativo.
-
-### 🎯 Sprint 3: Sistema de Auditoria Completa
-* **Objetivo:** Iniciar gravação de auditoria imutável das perguntas abertas.
-* **Escopo:**
-  * Tabela `review_audit_log` com FK para `subject_id` e `topic_id`, colunas `historical_subject_name`, `historical_topic_name`, `score`, `level_before`, `level_after`, `review_date`.
-  * Gravação automática a cada revisão submetida.
-* **Entregável:** Persistência de auditoria ativa em produção.
-
-### 🎯 Sprint 4: App Mobile Dedicado em Flutter
-* **Objetivo:** Aplicativo nativo em Flutter para Android e iOS.
-* **Escopo:**
-  * Projeto Flutter consumindo a API REST do backend FastAPI.
-  * Telas nativas de estudo da Pool de Flashcards e das Perguntas Abertas.
-* **Entregável:** App Flutter rodando no smartphone conectado ao backend em produção.
-
-### 🎯 Sprint 5: Dashboard Analítico de Performance
-* **Objetivo:** Visualização analítica dos dados de estudo acumulados desde a Sprint 3.
-* **Escopo:**
-  * Painel com gráficos (taxa de acerto por matéria/tema, curva de esquecimento, mapa de calor de revisões por dia).
-* **Entregável:** Aba de Estatísticas no Web e no app Flutter.
-
-### 🎯 Sprint 6: Pesquisa, Arquitetura e Planejamento da IA, RAG de Livros & Bancada de Avaliação
-* **Objetivo:** Projetar em detalhes o motor de IA antes de codificar a avaliação automática.
-* **Tópicos de Análise e Planejamento:**
-  1. **Base de Livros Digitalizados & RAG Seletivo:**
-     * **Biblioteca Digital do Usuário:** Catálogo de livros, manuais, doutrinas ou PDFs cadastrados pelo usuário.
-     * **Seleção Ativa de Obras para Validação:** O usuário poderá marcar quais livros específicos deseja utilizar como base de validação para cada matéria, tema ou sessão de revisão (ex: *"Validar respostas usando apenas o Livro X do Autor A e o Manual Y do Autor B"*).
-     * **Estratégias de Grounding:** Avaliação entre RAG com busca vetorial (`pgvector` / embeddings) vs Gemini File API / Long Context Window (injeção direta do trecho ou índice do livro).
-     * **Citações e Justificativas:** Análise da viabilidade da IA citar capítulo/página do livro selecionado onde o conceito se encontra.
-  2. **Seleção de Skills & Personas de Avaliação:**
-     * Perfis de avaliação configuráveis (ex: *Banca Examinadora Rigorosa FGV/Cebraspe*, *Professor Socrático Feynman*, *Code Reviewer Técnico*).
-  3. **Bancada de Avaliação Multi-agente (Evaluation Panel):**
-     * Modelo de múltiplos avaliadores virtuais atuando em conjunto para emitir notas parciais (ex: Precisão Teórica, Vocabulário Técnico, Clareza) e nota final de consenso.
-  4. **PoC Técnica, Latência e Free Tier:**
-     * Validação dos prompts de rubrica, JSON Schema estrito, estimativa de latência e cotas da API gratuita do Gemini.
-* **Entregável:** Documento de Especificação Técnica da IA (Architecture Spike), detalhando o RAG de livros digitalizados, personas, schemas e viabilidade técnica.
-
-### 🎯 Sprint 7: IA com Resposta Escrita (Google Gemini Flash)
-* **Objetivo:** O usuário digita a resposta da pergunta aberta e a IA/Bancada avalia a precisão semântica (0-100%) confrontando com o gabarito e com os livros selecionados na Sprint 6.
-* **Entregável:** Avaliação automática por IA de texto em produção.
-
-### 🎯 Sprint 8: IA com Resposta em Voz (Gemini Multimodal)
-* **Objetivo:** Gravação de áudio no navegador e no Flutter com envio direto para o Gemini Flash para transcrição e avaliação semântica fundamentada.
-* **Entregável:** Revisão 100% por voz (Técnica Feynman automatizada).
+* **Entregável:** Link de produção ativo no Render com Docker, sem auditoria analítica e 100% funcional.
