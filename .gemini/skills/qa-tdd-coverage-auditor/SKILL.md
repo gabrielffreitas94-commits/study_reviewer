@@ -1,52 +1,58 @@
 ---
 name: qa-tdd-coverage-auditor
-description: Audits the automated test suite, verifies 100% test coverage in isolated backend and frontend processes, inspects assertion quality, and enforces TDD rigor during PR review.
+description: Audits holistic software quality, static code health, maintainability, error resilience, and 100% test coverage in isolated backend and frontend processes during PR review.
 ---
 
-# QA TDD & Coverage Auditor (Skill do Especialista QA)
+# QA Quality & Coverage Auditor (Skill do Especialista QA)
 
 Esta skill é utilizada pelo **Especialista QA** durante a auditoria final da Sprint, imediatamente antes da abertura ou aprovação da Pull Request.
 
-Seu objetivo é auditar a suíte de testes automatizados, garantir o cumprimento inegociável da barreira de **100% de cobertura de código**, verificar a qualidade e profundidade das asserções e assegurar que a entrega seja resiliente, determinística e livre de testes frágeis (*flaky*).
+Seu objetivo é auditar a **qualidade integral do incremento de software**: combinando a inspeção estática de saúde do código (complexidade, tipagem, legibilidade e *code smells*), a robustez do tratamento de falhas e o cumprimento rigoroso da barreira de **100% de cobertura de testes**, com asserções profundas e determinísticas.
 
 ---
 
 ## 1. Entrada e Gatilho
 * **Arquivos e Artefatos Base:**
-  * Suíte de testes em `tests/` e código de produção em `src/`.
+  * Código de produção em `src/` e suíte de testes em `tests/`.
   * Matriz de use cases aprovada em `docs/sprints/sprint-XX/01-use-cases-and-edge-cases.md`.
-  * Relatórios de cobertura gerados pelo `pytest-cov` e pelos runners de teste de frontend.
+  * Relatórios de linter (Ruff), checagem estática de tipos (Mypy) e cobertura de testes (`pytest-cov` e runners de frontend).
 * **Gatilho de Execução:** Conclusão da implementação da Sprint e prontidão para a auditoria formal da Pull Request.
 
 ---
 
-## 2. Checklist Exaustivo de Auditoria de QA
+## 2. Checklist Exaustivo de Auditoria Holística de QA
 
-O Especialista QA realiza uma inspeção aprofundada baseada em cinco pilares fundamentais:
+O Especialista QA realiza uma auditoria rigorosa estruturada em seis pilares essenciais de qualidade:
 
-1. **Barreira Inegociável de 100% de Cobertura de Código:**
-   * **Backend:** A execução de `pytest --cov=src --cov-fail-under=100` atinge 100% estrito de cobertura de linhas e branches? Nenhuma linha ou desvio condicional ficou de fora?
-   * **Frontend:** Os testes de templates, componentes e rotinas de interface foram executados em processo isolado e registraram aprovação integral?
-   * **Zero Linhas Mortas:** Há código de produção escrito que não seja exercitado por nenhum teste? *Se houver, o código deve ser removido ou o teste deve ser escrito.*
+1. **Qualidade Estática do Código & Manutenibilidade:**
+   * **Complexidade Ciclomática e Cognitiva:** As funções são concisas, com responsabilidade única e fluxo linear? Há condicionais aninhadas em excesso ou funções excessivamente longas? *Funções com alta complexidade devem ser refatoradas.*
+   * **Tipagem Estrita sem Atalhos:** A checagem de tipos estrita passa sem erros e sem uso abusivo de `Any`, `type: ignore` ou casts inseguros.
+   * **Conformidade com Linters:** O código passa limpo pelos linters sem supressões artificiais (`# noqa`) e com formatação consistente.
+   * **Legibilidade e Expressividade:** Nomes de variáveis, funções e classes expressam claramente a intenção de negócio, evitando abreviações crípticas ou nomes genéricos (`data`, `temp`, `res`).
+   * **Zero Código Duplicado (*DRY*) e Zero Código Morto:** Ausência de duplicações de lógica e ausência de trechos de código não utilizados ou comentados.
 
-2. **Qualidade e Profundidade das Asserções:**
-   * **Proibição de Asserções Fracas/Ocas:** Não são permitidos testes com `assert True`, `assert response.status_code == 200` desacompanhado da validação do payload, ou `assert result is not None` quando valores exatos deveriam ser inspecionados.
-   * **Validação de Efeitos Colaterais:** Além do valor de retorno, o teste valida se o estado persistido no banco ou no repositório foi alterado conforme o esperado?
-   * **Testes de Exceção:** Quando uma exceção de domínio é esperada, o teste valida tanto o tipo da exceção quanto a mensagem semântica associada (`pytest.raises(..., match=...)`)?
+2. **Resiliência e Qualidade dos Contratos de Erro:**
+   * **Hierarquia de Exceções Semânticas:** O sistema define exceções explícitas de domínio e aplicação para cada cenário de erro, em vez de lançar exceções genéricas (`Exception`, `ValueError` genérico).
+   * **Proibição de Captura Silenciosa:** É terminantemente proibido silenciar erros (`except: pass` ou captura genérica sem tratamento). Todo erro capturado deve ser tratado, transformado em erro semântico ou devidamente registrado.
+   * **Atomicidade de Operações:** O código garante que operações compostas não deixem estados inconsistentes caso uma falha ocorra no meio do processamento.
 
-3. **Aderência à Pirâmide de Testes:**
-   * **Testes Unitários:** O núcleo de domínio (entidades, value objects e domain services) possui testes puros, extremamente rápidos e sem necessidade de mocks ou bancos de dados?
-   * **Testes de Integração:** Os adaptadores (repositórios, controllers da API, clientes) são testados contra instâncias de teste efêmeras ou isoladas?
-   * **Testes Ponta a Ponta (E2E):** Os fluxos críticos de ponta a ponta foram exercitados sem que a base de testes fique excessivamente pesada?
+3. **Barreira Inegociável de 100% de Cobertura de Código:**
+   * **Backend:** A execução de `pytest --cov=src --cov-fail-under=100` atinge 100% estrito de cobertura de linhas e branches? Nenhuma linha, desvio condicional ou bloco `else` ficou sem ser exercitado.
+   * **Frontend:** Os testes de templates, componentes e scripts foram executados em processo isolado e registraram aprovação integral.
 
-4. **Isolamento, Determinismo e Ausência de Fragilidade (*Flakiness*):**
-   * **Controle de Tempo:** Os testes que dependem de datas ou prazos utilizam injeção explícita de data ou bibliotecas de congelamento de tempo, eliminando qualquer risco de quebra por virada de meia-noite ou fuso horário?
-   * **Isolamento de Estado:** A execução de um teste não deixa resíduos de dados que afetem a execução dos testes subsequentes (cada teste é executado em transação isolada ou com limpeza automática)?
-   * **Independência de Ordem:** A suíte de testes passa com sucesso independentemente da ordem em que os testes são executados?
-   * **Zero Rede Externa:** Nenhum teste faz chamadas HTTP para servidores ou serviços externos reais na internet.
+4. **Qualidade e Profundidade das Asserções:**
+   * **Proibição de Asserções Fracas/Ocas:** Não são aceitos testes com `assert True`, asserções puramente de status HTTP (`assert response.status_code == 200`) sem validação do corpo da resposta, ou verificações genéricas de não-nulo (`assert result is not None`).
+   * **Inspeção de Estado e Efeitos Colaterais:** O teste valida o valor de retorno, o estado das entidades e as mutações persistidas no banco/repositório.
+   * **Testes de Exceção Ricos:** O teste valida tanto o tipo exato da exceção quanto a mensagem semântica esperada (`pytest.raises(CustomException, match="...")`).
 
-5. **Rastreabilidade Integral com os Use Cases:**
-   * Cada caso de uso aprovado na matriz `01-use-cases-and-edge-cases.md` possui pelo menos um teste correspondente implementado na suíte?
+5. **Isolamento, Determinismo e Pirâmide de Testes:**
+   * **Pirâmide Equilibrada:** Domínio com testes unitários puros, ultra-rápidos e sem mocks desnecessários; adaptadores testados com bancos isolados/transacionais; fluxos críticos com testes ponta a ponta.
+   * **Zero Testes Frágeis (*Flaky*):** A suíte passa de forma consistente e idêntica em qualquer ordem de execução e em qualquer máquina.
+   * **Controle Determinístico de Tempo:** Datas e relógios são injetados ou congelados, eliminando riscos de quebra por virada de meia-noite, fuso horário ou atrasos de processamento.
+   * **Zero Dependência de Rede Externa:** Nenhum teste faz conexões a serviços reais externos da internet.
+
+6. **Rastreabilidade com a Matriz de Casos de Uso:**
+   * Todos os cenários aprovados na matriz `01-use-cases-and-edge-cases.md` possuem cobertura de testes explícita e correspondência verificada.
 
 ---
 
@@ -56,10 +62,10 @@ A skill gera a saída formal padronizada para inclusão na tabela de especialist
 
 ### Caso Aprovado:
 ```markdown
-| **2** | **Especialista QA** | `[APROVADO]` | Suíte auditada: 100% de cobertura confirmada no backend (pytest-cov) e no frontend em processos separados. Ausência de testes flaky, asserções profundas e determinísticas. Todos os XX casos de uso foram cobertos. |
+| **2** | **Especialista QA** | `[APROVADO]` | Qualidade holística auditada: 100% de cobertura confirmada no backend e frontend em processos separados. Código estático limpo, com baixa complexidade ciclomática, tipagem estrita e sem code smells. Exceções semânticas e asserções profundas em todos os XX casos de uso. |
 ```
 
 ### Caso Reprovado / Bloqueante:
 ```markdown
-| **2** | **Especialista QA** | `[BLOQUEANTE]` | Auditoria reprovada: [descrever se a cobertura ficou abaixo de 100%, se foram identificadas asserções frágeis ou testes não determinísticos]. Necessário ajuste imediato antes do merge. |
+| **2** | **Especialista QA** | `[BLOQUEANTE]` | Auditoria de qualidade reprovada: [descrever se a cobertura ficou abaixo de 100%, se foram identificadas asserções frágeis, complexidade excessiva, supressão indevida de linters ou exceções mal tratadas]. Ajuste necessário antes do merge. |
 ```
