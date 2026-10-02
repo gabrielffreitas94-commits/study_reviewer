@@ -30,6 +30,15 @@ def create_app() -> FastAPI:
     # Adiciona middleware de segurança HTTP
     app.add_middleware(SecurityHeadersMiddleware)
 
+    # Monta arquivos estáticos locais (CSS/JS)
+    from pathlib import Path
+
+    from fastapi.staticfiles import StaticFiles
+
+    static_dir = Path(__file__).resolve().parent.parent.parent / "adapters" / "web" / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
     # Registra rotas web (Jinja2 / HTMX) e API REST (JSON)
     app.include_router(web_router)
     app.include_router(api_router)
