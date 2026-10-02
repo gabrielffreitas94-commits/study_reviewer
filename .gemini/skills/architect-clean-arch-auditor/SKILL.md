@@ -13,7 +13,7 @@ Seu objetivo é auditar o código implementado para garantir a conformidade estr
 
 ## 1. Entrada e Gatilho
 * **Arquivos e Artefatos Base:**
-  * Git diff da branch da sprint contra `staging` / `main`.
+  * Git diff da branch da sprint contra a branch `staging` (`git diff staging...HEAD`).
   * Documento SPEC aprovado (`docs/specs/sprint-XX-*-spec.md`) e ADRs vigentes.
   * Estrutura de pacotes e arquivos em `src/`.
 * **Gatilho de Execução:** Conclusão da implementação e suíte de testes passando com 100% de cobertura, durante o processo de auditoria de PR.
