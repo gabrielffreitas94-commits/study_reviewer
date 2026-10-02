@@ -40,6 +40,16 @@ templates = Jinja2Templates(directory=str(templates_dir))
 web_router = APIRouter()
 
 
+def _parse_uuid(val: str | None) -> UUID | None:
+    """Converte string para UUID com segurança, tratando valores vazios como None."""
+    if val and val.strip():
+        try:
+            return UUID(val.strip())
+        except ValueError:
+            return None
+    return None
+
+
 @web_router.get("/", response_class=RedirectResponse)
 def index() -> RedirectResponse:
     """Redireciona a raiz para a tela principal de estudo."""
@@ -49,23 +59,26 @@ def index() -> RedirectResponse:
 @web_router.get("/study", response_class=HTMLResponse)
 def study_view(
     request: Request,
-    subject_id: UUID | None = None,
-    topic_id: UUID | None = None,
+    subject_id: str | None = None,
+    topic_id: str | None = None,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Renderiza a tela de estudo de flashcards com suporte a filtros e Gap Indexing."""
+    sub_uuid = _parse_uuid(subject_id)
+    top_uuid = _parse_uuid(topic_id)
+
     subject_repo = SqlAlchemySubjectRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
     card_repo = SqlAlchemyFlashcardRepository(db)
     session_repo = SqlAlchemySessionRepository(db)
 
     subjects = ListSubjectsUseCase(subject_repo).execute()
-    topics = ListTopicsBySubjectUseCase(topic_repo).execute(subject_id) if subject_id else []
+    topics = ListTopicsBySubjectUseCase(topic_repo).execute(sub_uuid) if sub_uuid else []
 
     card: StudyCardDTO | None = None
     try:
         get_next_uc = GetNextFlashcardUseCase(card_repo, session_repo, default_rng)
-        card = get_next_uc.execute(GetNextCardDTO(subject_id=subject_id, topic_id=topic_id))
+        card = get_next_uc.execute(GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid))
     except EmptyPoolError:
         card = None
 
@@ -77,10 +90,10 @@ def study_view(
             "side": "front",
             "subjects": subjects,
             "topics": topics,
-            "selected_subject_id": str(subject_id) if subject_id else None,
-            "selected_topic_id": str(topic_id) if topic_id else None,
-            "subject_id": subject_id,
-            "topic_id": topic_id,
+            "selected_subject_id": str(sub_uuid) if sub_uuid else None,
+            "selected_topic_id": str(top_uuid) if top_uuid else None,
+            "subject_id": sub_uuid,
+            "topic_id": top_uuid,
         },
     )
 
@@ -135,8 +148,8 @@ def next_card(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Endpoint HTMX para avançar para o próximo card da rodada."""
-    sub_uuid = UUID(subject_id) if subject_id and subject_id.strip() else None
-    top_uuid = UUID(topic_id) if topic_id and topic_id.strip() else None
+    sub_uuid = _parse_uuid(subject_id)
+    top_uuid = _parse_uuid(topic_id)
 
     card_repo = SqlAlchemyFlashcardRepository(db)
     session_repo = SqlAlchemySessionRepository(db)
@@ -163,14 +176,16 @@ def next_card(
 @web_router.get("/flashcards/new", response_class=HTMLResponse)
 def new_flashcard_view(
     request: Request,
-    subject_id: UUID | None = None,
-    topic_id: UUID | None = None,
+    subject_id: str | None = None,
+    topic_id: str | None = None,
     success: bool = False,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Tela de cadastro ágil de flashcards com atalhos."""
+    sub_uuid = _parse_uuid(subject_id)
+    top_uuid = _parse_uuid(topic_id)
     topic_repo = SqlAlchemyTopicRepository(db)
-    topics = topic_repo.list_by_subject(subject_id) if subject_id else []
+    topics = topic_repo.list_by_subject(sub_uuid) if sub_uuid else []
     if not topics:
         # Se não filtrou por matéria, lista todos os temas existentes
         from sqlalchemy import select
@@ -186,7 +201,7 @@ def new_flashcard_view(
         name="flashcards_new.html",
         context={
             "topics": topics,
-            "selected_topic_id": str(topic_id) if topic_id else None,
+            "selected_topic_id": str(top_uuid) if top_uuid else None,
             "success": success,
             "error": None,
         },

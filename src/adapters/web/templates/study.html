@@ -14,7 +14,7 @@
             <select 
                 id="filter-subject" 
                 name="subject_id" 
-                onchange="this.form.submit()"
+                onchange="const top = this.form.querySelector('#filter-topic'); if (top) top.value = ''; this.form.submit()"
                 class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
                 <option value="">Todas as Matérias (Global)</option>

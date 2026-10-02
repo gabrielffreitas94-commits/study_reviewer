@@ -178,3 +178,13 @@ def test_api_domain_validation_errors(client: TestClient) -> None:
     )
     assert card_err.status_code == 422
     assert "entre 1 e 5.000 caracteres" in card_err.json()["detail"]
+
+
+@pytest.mark.integration
+def test_api_study_next_with_empty_or_invalid_query_params(client: TestClient) -> None:
+    """Verifica que /api/v1/study/next tolera query params vazios ou inválidos."""
+    resp1 = client.get("/api/v1/study/next?subject_id=&topic_id=")
+    assert resp1.status_code == 404  # Pool vazia (tratado como None)
+
+    resp2 = client.get("/api/v1/study/next?subject_id=invalid&topic_id=not-a-uuid")
+    assert resp2.status_code == 404

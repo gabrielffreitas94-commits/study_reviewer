@@ -223,3 +223,21 @@ def test_new_flashcard_view_without_filter(client: TestClient) -> None:
     resp = client.get("/flashcards/new")
     assert resp.status_code == 200
     assert "Roma Antiga" in resp.text
+
+
+@pytest.mark.integration
+def test_study_view_with_empty_or_invalid_query_params(client: TestClient) -> None:
+    """Requisições GET com query params vazios ou inválidos não devem quebrar com erro 422."""
+    sub = client.post("/api/v1/subjects", json={"name": "Filosofia Moderna"}).json()
+    resp1 = client.get(f"/study?subject_id={sub['id']}&topic_id=")
+    assert resp1.status_code == 200
+    assert "Filosofia Moderna" in resp1.text
+
+    resp2 = client.get("/study?subject_id=&topic_id=")
+    assert resp2.status_code == 200
+
+    resp3 = client.get("/study?subject_id=invalid-uuid&topic_id=not-a-uuid")
+    assert resp3.status_code == 200
+
+    resp4 = client.get(f"/flashcards/new?subject_id={sub['id']}&topic_id=")
+    assert resp4.status_code == 200

@@ -54,19 +54,31 @@ class CreateFlashcardRequest(BaseModel):
     back: str = Field(..., min_length=1, max_length=10000)
 
 
+def _parse_uuid(val: str | None) -> UUID | None:
+    """Converte string para UUID com segurança, tratando valores vazios como None."""
+    if val and val.strip():
+        try:
+            return UUID(val.strip())
+        except ValueError:
+            return None
+    return None
+
+
 @api_router.get("/study/next", response_model=StudyCardDTO)
 def get_next_study_card_api(
-    subject_id: UUID | None = None,
-    topic_id: UUID | None = None,
+    subject_id: str | None = None,
+    topic_id: str | None = None,
     db: Session = Depends(get_db),
 ) -> StudyCardDTO:
     """Retorna o próximo card da pool e metadados de rodada em JSON."""
+    sub_uuid = _parse_uuid(subject_id)
+    top_uuid = _parse_uuid(topic_id)
     card_repo = SqlAlchemyFlashcardRepository(db)
     session_repo = SqlAlchemySessionRepository(db)
 
     try:
         use_case = GetNextFlashcardUseCase(card_repo, session_repo, default_rng)
-        return use_case.execute(GetNextCardDTO(subject_id=subject_id, topic_id=topic_id))
+        return use_case.execute(GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid))
     except EmptyPoolError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
