@@ -51,6 +51,22 @@ html.dark body {
   word-wrap: break-word;
 }
 
+/* Chip entry animation */
+@keyframes chip-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-chip {
+  animation: chip-fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* 3D Flashcard Flip Mechanics */
 .perspective-1000 {
   perspective: 1000px;

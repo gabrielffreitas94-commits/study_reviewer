@@ -85,10 +85,13 @@ def test_full_web_flashcard_flow(client: TestClient) -> None:
     resp_api_top = client.get(f"/api/v1/subjects/{sub_id}/topics")
     top_id = resp_api_top.json()[0]["id"]
 
-    # 3. Acessa tela de cadastro de flashcard
+    # 3. Acessa tela de cadastro de flashcard (com chips e busca fuzzy)
     resp_new = client.get(f"/flashcards/new?topic_id={top_id}")
     assert resp_new.status_code == 200
     assert "Cadastrar Flashcard" in resp_new.text
+    assert "selected-chips-container" in resp_new.text
+    assert "topic-search-input" in resp_new.text
+    assert "btn-clear-all-chips" in resp_new.text
 
     # 4. Cadastra primeiro card com o botão único Salvar Flashcard
     resp_card1 = client.post(

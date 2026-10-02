@@ -43,7 +43,7 @@
     <!-- Formulário Ágil de Cadastro com Botão Único (ADR-004) -->
     <form method="POST" action="/flashcards" id="flashcard-form" class="space-y-6 bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         
-        <!-- Seleção de Temas (N:N com Teto Defensivo de 1 a 5 Temas) -->
+        <!-- Seleção de Temas (N:N com Teto Defensivo de 1 a 5 Temas, Chips no Topo e Busca Fuzzy) -->
         <div class="space-y-3">
             <div class="flex items-center justify-between">
                 <label id="topics-group-label" class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -55,19 +55,97 @@
                 </span>
             </div>
 
-            <div role="group" aria-labelledby="topics-group-label" class="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl space-y-4 max-h-64 overflow-y-auto">
+            <!-- Chips Selecionados no Topo (Evolução de Usabilidade para Grandes Volumes) -->
+            <div id="selected-chips-wrapper" class="p-3 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/80 rounded-xl min-h-[52px] flex flex-col justify-center transition-all">
+                <div class="flex items-center justify-between mb-1.5" id="chips-header" style="display: none;">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        Temas Selecionados
+                    </span>
+                    <button 
+                        type="button" 
+                        id="btn-clear-all-chips" 
+                        class="text-[11px] text-rose-500 hover:text-rose-600 dark:text-rose-400 font-medium hover:underline focus:outline-none"
+                    >
+                        Desmarcar todos
+                    </button>
+                </div>
+                
+                <div id="selected-chips-container" class="flex flex-wrap items-center gap-1.5" role="region" aria-label="Temas selecionados">
+                    <span id="no-chips-placeholder" class="text-xs text-slate-400 dark:text-slate-500 italic">
+                        Nenhum tema selecionado ainda. Busque e marque os temas abaixo (mínimo 1, máximo 5).
+                    </span>
+                </div>
+            </div>
+
+            <!-- Input de Busca Fuzzy com Acentuação e Limpeza Rápida -->
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500 text-sm">
+                    <span aria-hidden="true">🔍</span>
+                </div>
+                <input 
+                    type="text" 
+                    id="topic-search-input" 
+                    placeholder="Buscar por tema ou matéria... (Pressione / para focar)"
+                    autocomplete="off"
+                    spellcheck="false"
+                    class="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-inner"
+                    aria-label="Filtrar lista de temas e matérias"
+                >
+                <button 
+                    type="button" 
+                    id="btn-clear-search" 
+                    class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-base focus:outline-none"
+                    aria-label="Limpar campo de busca"
+                >
+                    ✕
+                </button>
+            </div>
+
+            <!-- Anunciador de acessibilidade para leitores de tela -->
+            <div id="search-results-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+            <!-- Container da Lista com Scroll e Grupos por Matéria -->
+            <div 
+                id="topics-scroll-container"
+                role="group" 
+                aria-labelledby="topics-group-label" 
+                class="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl space-y-4 max-h-64 overflow-y-auto"
+            >
+                <!-- Placeholder de Zero Resultados na Busca -->
+                <div id="no-search-results" class="hidden py-8 px-4 text-center">
+                    <span class="text-3xl block mb-2" aria-hidden="true">🔍</span>
+                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Nenhum tema encontrado para "<span id="search-query-display" class="text-indigo-600 dark:text-indigo-400 font-bold break-words"></span>"
+                    </p>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 mb-3">
+                        Tente outro termo ou limpe a busca para visualizar todas as opções.
+                    </p>
+                    <button 
+                        type="button" 
+                        id="btn-reset-search-empty" 
+                        class="text-xs px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-lg font-medium transition"
+                    >
+                        Limpar Busca
+                    </button>
+                </div>
+
                 {% set ns = namespace(has_topics=false) %}
                 {% for item in topics_by_subject %}
                     {% if item.topics and item.topics|length > 0 %}
                         {% set ns.has_topics = true %}
-                        <div>
+                        <div class="subject-group" data-subject-name="{{ item.subject.name }}">
                             <span class="block text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
                                 📚 {{ item.subject.name }}
                             </span>
                             <div class="flex flex-wrap gap-2">
                                 {% for top in item.topics %}
                                     {% set is_selected = (top.id|string in selected_topic_ids) %}
-                                    <label class="topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer select-none transition-all max-w-full break-words break-words-anywhere [overflow-wrap:anywhere] {% if is_selected %}bg-indigo-50 border-indigo-400 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-300 font-medium ring-1 ring-indigo-400{% else %}bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600{% endif %}">
+                                    <label 
+                                        class="topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer select-none transition-all max-w-full break-words break-words-anywhere [overflow-wrap:anywhere] {% if is_selected %}bg-indigo-50 border-indigo-400 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-300 font-medium ring-1 ring-indigo-400{% else %}bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600{% endif %}"
+                                        data-topic-id="{{ top.id }}"
+                                        data-topic-name="{{ top.name }}"
+                                        data-subject-name="{{ item.subject.name }}"
+                                    >
                                         <input 
                                             type="checkbox" 
                                             name="topic_ids" 
@@ -143,13 +221,94 @@
 
 {% block scripts %}
 <script>
-    // Gerenciamento dinâmico da seleção de temas (1 a 5 temas)
+    // Gerenciamento ergonômico de seleção, chips no topo e busca fuzzy
     const checkboxes = document.querySelectorAll('.topic-checkbox');
     const counter = document.getElementById('topic-counter');
     const form = document.getElementById('flashcard-form');
     const alertBox = document.getElementById('topic-alert');
     const alertMsg = document.getElementById('topic-alert-message');
 
+    // Elementos de Chips e Busca
+    const chipsContainer = document.getElementById('selected-chips-container');
+    const noChipsPlaceholder = document.getElementById('no-chips-placeholder');
+    const chipsHeader = document.getElementById('chips-header');
+    const btnClearAll = document.getElementById('btn-clear-all-chips');
+    const searchInput = document.getElementById('topic-search-input');
+    const btnClearSearch = document.getElementById('btn-clear-search');
+    const btnResetSearchEmpty = document.getElementById('btn-reset-search-empty');
+    const noSearchResults = document.getElementById('no-search-results');
+    const searchQueryDisplay = document.getElementById('search-query-display');
+    const searchResultsAnnouncer = document.getElementById('search-results-announcer');
+    const subjectGroups = document.querySelectorAll('.subject-group');
+
+    // Normalizador de texto resiliente a acentos e maiúsculas/minúsculas
+    function normalizeText(str) {
+        return (str || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+    }
+
+    // Renderizador e sincronizador de Chips no Topo
+    function renderChips(checkedBoxes) {
+        if (!chipsContainer) return;
+        const count = checkedBoxes.length;
+
+        if (count === 0) {
+            if (noChipsPlaceholder) noChipsPlaceholder.style.display = 'inline';
+            if (chipsHeader) chipsHeader.style.display = 'none';
+            chipsContainer.querySelectorAll('.selected-chip').forEach(c => c.remove());
+            return;
+        }
+
+        if (noChipsPlaceholder) noChipsPlaceholder.style.display = 'none';
+        if (chipsHeader) chipsHeader.style.display = 'flex';
+
+        const existingChips = new Map();
+        chipsContainer.querySelectorAll('.selected-chip').forEach(c => {
+            existingChips.set(c.dataset.topicId, c);
+        });
+
+        const activeIds = new Set(checkedBoxes.map(cb => cb.value));
+
+        // Remove chips desmarcados
+        existingChips.forEach((chip, id) => {
+            if (!activeIds.has(id)) {
+                chip.remove();
+            }
+        });
+
+        // Adiciona novos chips
+        checkedBoxes.forEach(cb => {
+            const id = cb.value;
+            if (!existingChips.has(id)) {
+                const pill = cb.closest('.topic-pill');
+                const topicName = pill ? (pill.dataset.topicName || cb.nextElementSibling?.textContent?.trim()) : 'Tema';
+                const subjectName = pill ? (pill.dataset.subjectName || '') : '';
+
+                const chip = document.createElement('span');
+                chip.className = 'selected-chip animate-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-sm transition-all';
+                chip.dataset.topicId = id;
+                chip.innerHTML = `
+                    <span class="mr-0.5 text-xs" aria-hidden="true">🏷️</span>
+                    <span class="break-words max-w-[200px] truncate" title="${subjectName ? subjectName + ' • ' : ''}${topicName}">${topicName}</span>
+                    <button 
+                        type="button" 
+                        class="chip-remove-btn w-4 h-4 ml-0.5 rounded-full inline-flex items-center justify-center text-indigo-500 hover:text-white hover:bg-rose-500 dark:text-indigo-400 dark:hover:text-white dark:hover:bg-rose-600 transition-colors focus:outline-none focus:ring-1 focus:ring-rose-500" 
+                        data-topic-id="${id}" 
+                        aria-label="Remover tema ${topicName}"
+                        title="Remover tema"
+                    >
+                        &times;
+                    </button>
+                `;
+                chipsContainer.appendChild(chip);
+            }
+        });
+    }
+
+    // Atualiza estado de contagem, disabled e visual dos checkboxes
     function updateTopicState() {
         const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
         const count = checkedBoxes.length;
@@ -164,35 +323,171 @@
             }
         }
 
-        // Atualiza estilização das pills e trava seleção no limite de 5
+        // Atualiza estilização das pills e trava seleção no teto de 5
         checkboxes.forEach(cb => {
             const pill = cb.closest('.topic-pill');
             if (cb.checked) {
                 cb.disabled = false;
                 if (pill) {
-                    pill.className = 'topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer select-none transition-all bg-indigo-50 border-indigo-400 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-300 font-medium ring-1 ring-indigo-400';
+                    pill.className = 'topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer select-none transition-all max-w-full break-words break-words-anywhere [overflow-wrap:anywhere] bg-indigo-50 border-indigo-400 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-300 font-medium ring-1 ring-indigo-400';
                 }
             } else {
                 if (count >= 5) {
                     cb.disabled = true;
                     if (pill) {
-                        pill.className = 'topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-not-allowed select-none transition-all bg-slate-100 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 opacity-60';
+                        pill.className = 'topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-not-allowed select-none transition-all max-w-full break-words break-words-anywhere [overflow-wrap:anywhere] bg-slate-100 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 opacity-60';
                     }
                 } else {
                     cb.disabled = false;
                     if (pill) {
-                        pill.className = 'topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer select-none transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600';
+                        pill.className = 'topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer select-none transition-all max-w-full break-words break-words-anywhere [overflow-wrap:anywhere] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600';
                     }
                 }
             }
         });
+
+        // Sincroniza chips no topo
+        renderChips(checkedBoxes);
     }
+
+    // Remoção via clique no botão (x) do chip
+    if (chipsContainer) {
+        chipsContainer.addEventListener('click', function(e) {
+            const btn = e.target.closest('.chip-remove-btn');
+            if (!btn) return;
+            const topicId = btn.dataset.topicId;
+            const checkbox = Array.from(checkboxes).find(cb => cb.value === topicId);
+            if (checkbox) {
+                checkbox.checked = false;
+                updateTopicState();
+            }
+        });
+    }
+
+    // Botão Desmarcar Todos
+    if (btnClearAll) {
+        btnClearAll.addEventListener('click', function() {
+            checkboxes.forEach(cb => { cb.checked = false; });
+            updateTopicState();
+        });
+    }
+
+    // Busca Fuzzy / Filtragem Dinâmica
+    function filterTopics(query) {
+        const normQuery = normalizeText(query);
+        const tokens = normQuery.split(/\s+/).filter(Boolean);
+
+        // Toggle do botão limpar campo de busca
+        if (btnClearSearch) {
+            if (normQuery.length > 0) {
+                btnClearSearch.classList.remove('hidden');
+            } else {
+                btnClearSearch.classList.add('hidden');
+            }
+        }
+
+        let totalVisibleTopics = 0;
+
+        subjectGroups.forEach(group => {
+            const subjectName = group.dataset.subjectName || '';
+            const normSubject = normalizeText(subjectName);
+            const pillsInGroup = group.querySelectorAll('.topic-pill');
+            let visibleInGroup = 0;
+
+            const subjectMatches = tokens.length > 0 && tokens.every(tok => normSubject.includes(tok));
+
+            pillsInGroup.forEach(pill => {
+                const topicName = pill.dataset.topicName || '';
+                const normTopic = normalizeText(topicName);
+                const fullText = `${normSubject} ${normTopic}`;
+
+                let isMatch = false;
+                if (tokens.length === 0) {
+                    isMatch = true;
+                } else if (subjectMatches) {
+                    isMatch = true;
+                } else {
+                    isMatch = tokens.every(tok => fullText.includes(tok));
+                }
+
+                if (isMatch) {
+                    pill.classList.remove('hidden');
+                    visibleInGroup++;
+                    totalVisibleTopics++;
+                } else {
+                    pill.classList.add('hidden');
+                }
+            });
+
+            if (visibleInGroup > 0) {
+                group.classList.remove('hidden');
+            } else {
+                group.classList.add('hidden');
+            }
+        });
+
+        // Feedback de resultado vazio
+        if (totalVisibleTopics === 0 && tokens.length > 0) {
+            if (noSearchResults) noSearchResults.classList.remove('hidden');
+            if (searchQueryDisplay) searchQueryDisplay.textContent = query;
+            if (searchResultsAnnouncer) searchResultsAnnouncer.textContent = `Nenhum tema encontrado para ${query}.`;
+        } else {
+            if (noSearchResults) noSearchResults.classList.add('hidden');
+            if (searchResultsAnnouncer && tokens.length > 0) {
+                searchResultsAnnouncer.textContent = `${totalVisibleTopics} temas encontrados.`;
+            }
+        }
+    }
+
+    function clearSearch() {
+        if (!searchInput) return;
+        searchInput.value = '';
+        filterTopics('');
+        searchInput.focus();
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            filterTopics(e.target.value);
+        });
+
+        searchInput.addEventListener('keydown', function(e) {
+            // Escape limpa a busca
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                clearSearch();
+            }
+            // Evita submit acidental com Enter no campo de busca
+            if (e.key === 'Enter') {
+                e.preventDefault();
+            }
+        });
+    }
+
+    if (btnClearSearch) {
+        btnClearSearch.addEventListener('click', clearSearch);
+    }
+
+    if (btnResetSearchEmpty) {
+        btnResetSearchEmpty.addEventListener('click', clearSearch);
+    }
+
+    // Atalho global: tecla '/' foca no campo de busca se não estiver digitando em textarea/input
+    document.addEventListener('keydown', function(e) {
+        if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+            if (searchInput) {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+    });
 
     checkboxes.forEach(cb => {
         cb.addEventListener('change', updateTopicState);
     });
 
-    // Inicializa contador e estado visual
+    // Inicializa contador, chips e estado visual
     updateTopicState();
 
     // Validação preventiva no submit
