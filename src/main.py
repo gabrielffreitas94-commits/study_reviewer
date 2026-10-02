@@ -3,6 +3,9 @@
 import uvicorn
 
 from src.infrastructure.config import settings
+from src.infrastructure.web.app import app
+
+__all__ = ["app"]
 
 if __name__ == "__main__":
     uvicorn.run(
