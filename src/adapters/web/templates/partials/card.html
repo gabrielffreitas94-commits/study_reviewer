@@ -1,6 +1,6 @@
 {% if request and request.headers.get("HX-Request") == "true" %}
 <!-- Sincronização Out-Of-Band do Indicador de Progresso (P0 UX Fix) -->
-<div id="progress-indicator" hx-swap-oob="true" class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center space-x-2 shrink-0">
+<div id="progress-indicator" hx-swap-oob="true" class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center justify-end sm:justify-start space-x-2 shrink-0">
     {% if card %}
         <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
         <span>Card <strong class="text-slate-900 dark:text-white">{{ card.current_index }}</strong> de <strong class="text-slate-900 dark:text-white">{{ card.total_cards }}</strong></span>
@@ -11,10 +11,10 @@
     {% endif %}
 </div>
 
-<!-- Sincronização Out-Of-Band do Dropdown de Temas (P1 UX Fix) -->
+<!-- Sincronização Out-Of-Band do Dropdown de Temas (Zero Layout Shift) -->
 {% if update_filters %}
-<div id="filter-topic-container" hx-swap-oob="true" class="inline-flex items-center">
-    {% if topics and topics|length > 0 %}
+<div id="filter-topic-container" hx-swap-oob="true" class="inline-flex items-center flex-1 sm:flex-initial">
+    {% if selected_subject_id and topics and topics|length > 0 %}
     <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
     <select 
         id="filter-topic" 
@@ -25,15 +25,37 @@
         hx-push-url="true"
         hx-include="#filter-subject"
         hx-trigger="change"
-        class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[240px] sm:max-w-xs truncate transition shadow-sm cursor-pointer"
+        class="text-xs sm:text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 sm:px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-44 lg:w-48 truncate transition shadow-sm cursor-pointer"
         title="Atalho: T para selecionar tema"
     >
-        <option value="">Todos os Temas da Matéria ({{ subject_card_counts.get(selected_subject_id, 0) }} {% if subject_card_counts.get(selected_subject_id, 0) == 1 %}card{% else %}cards{% endif %})</option>
+        <option value="">Todos os Temas ({{ subject_card_counts.get(selected_subject_id, 0) }})</option>
         {% for top in topics %}
             <option value="{{ top.id }}" {% if selected_topic_id == top.id|string %}selected{% endif %}>
-                {{ top.name }} ({{ topic_card_counts.get(top.id|string, 0) }} {% if topic_card_counts.get(top.id|string, 0) == 1 %}card{% else %}cards{% endif %})
+                {{ top.name }} ({{ topic_card_counts.get(top.id|string, 0) }})
             </option>
         {% endfor %}
+    </select>
+    {% elif selected_subject_id %}
+    <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+    <select 
+        id="filter-topic" 
+        name="topic_id" 
+        disabled
+        class="text-xs sm:text-sm bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-lg px-2.5 sm:px-3 py-2 text-slate-400 dark:text-slate-500 cursor-not-allowed w-full sm:w-44 lg:w-48 truncate transition shadow-sm"
+        title="Esta matéria não possui temas cadastrados"
+    >
+        <option value="">Nenhum tema</option>
+    </select>
+    {% else %}
+    <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+    <select 
+        id="filter-topic" 
+        name="topic_id" 
+        disabled
+        class="text-xs sm:text-sm bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-lg px-2.5 sm:px-3 py-2 text-slate-400 dark:text-slate-500 cursor-not-allowed w-full sm:w-44 lg:w-48 truncate transition shadow-sm"
+        title="Selecione uma matéria para filtrar por tema"
+    >
+        <option value="">Todos os Temas</option>
     </select>
     {% endif %}
 </div>
