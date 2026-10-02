@@ -10,7 +10,7 @@ Este documento estabelece as regras inegociáveis para o desenvolvimento de toda
 1. **1 Sprint = 1 Branch de Feature = 1 PR Aberta para Staging:**
    - Nenhuma sprint é concluída sem que uma Pull Request formal seja aberta da branch `feature/sprint-XX-<nome>` para `staging`.
    - O merge de `staging` para `main` é de responsabilidade exclusiva do usuário após validação em ambiente de homologação.
-   - A PR para `staging` deve conter o template oficial completamente preenchido e assinado por todos os 9 especialistas.
+   - A PR para `staging` deve conter o template oficial completamente preenchido e assinado por todos os 10 especialistas.
 
 2. **TDD Estrito (Test-Driven Development — Red, Green, Refactor):**
    - **🔴 RED:** Nenhum código de produção deve ser escrito antes de existir um teste unitário/de integração correspondente que falhe.
@@ -42,8 +42,8 @@ Este documento estabelece as regras inegociáveis para o desenvolvimento de toda
    - Testes de Backend e Frontend devem rodar em processos totalmente isolados.
    - Linters e checagem de tipos estrita (Ruff e Mypy) devem passar sem avisos.
 
-7. **Auditoria Unânime pelos 9 Especialistas:**
-   - Antes da abertura da PR, todas as 9 personas técnicas devem auditar o código e emitir seus pareceres formais:
+7. **Auditoria Unânime pelos 10 Especialistas:**
+   - Antes da abertura da PR, todas as 10 personas técnicas devem auditar o código e emitir seus pareceres formais:
      1. Especialista de Produto
      2. Especialista QA
      3. Especialista Arquiteto
@@ -53,4 +53,5 @@ Este documento estabelece as regras inegociáveis para o desenvolvimento de toda
      7. Especialista de UI
      8. Especialista de DevOps
      9. Especialista de Acessibilidade
+     10. Especialista em LGPD
    - Status válidos para cada parecer: `[APROVADO]` ou `[N/A JUSTIFICADO]`. Nenhum especialista pode ser omitido.

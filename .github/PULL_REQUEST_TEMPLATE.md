@@ -34,7 +34,7 @@
 
 ---
 
-## 🏛️ Bancada dos 9 Especialistas — Auditoria Obrigatória
+## 🏛️ Bancada dos 10 Especialistas — Auditoria Obrigatória
 > **Importante:** Todo especialista deve emitir seu parecer. Status permitidos: `[APROVADO]` ou `[N/A JUSTIFICADO]`.
 
 | # | Especialista | Status | Parecer Técnico / Justificativa |
@@ -48,6 +48,7 @@
 | **7** | **Especialista de UI** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
 | **8** | **Especialista de DevOps** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
 | **9** | **Especialista de Acessibilidade** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **10** | **Especialista em LGPD** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
 
 ---
 
