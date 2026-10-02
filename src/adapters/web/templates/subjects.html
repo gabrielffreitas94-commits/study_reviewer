@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Matérias e Temas — Study Reviewer{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto w-full py-4 space-y-8">
+
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Gerenciamento de Taxonomia</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Cadastre matérias macros e temas para categorizar seus flashcards de estudo.
+        </p>
+    </div>
+
+    <!-- Feedback de Mensagem / Erro -->
+    {% if error %}
+    <div class="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-800 dark:text-rose-300 text-sm flex items-center space-x-2" role="alert">
+        <span class="text-lg" aria-hidden="true">⚠️</span>
+        <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Seção de Cadastro Rápido: Lado a Lado -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Formulário Nova Matéria -->
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+                <span aria-hidden="true">📁</span>
+                <span>Nova Matéria</span>
+            </h2>
+            <form method="POST" action="/subjects" class="space-y-4">
+                <div>
+                    <label for="subject_name" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
+                        Nome da Matéria
+                    </label>
+                    <input 
+                        type="text" 
+                        id="subject_name" 
+                        name="name" 
+                        required 
+                        placeholder="Ex: Direito Constitucional" 
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                </div>
+                <button 
+                    type="submit" 
+                    class="w-full min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition shadow text-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                    <span>Salvar Matéria</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Formulário Novo Tema -->
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+                <span aria-hidden="true">🏷️</span>
+                <span>Novo Tema</span>
+            </h2>
+            <form method="POST" action="/topics" class="space-y-4">
+                <div>
+                    <label for="topic_subject_id" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
+                        Vincular à Matéria
+                    </label>
+                    <select 
+                        id="topic_subject_id" 
+                        name="subject_id" 
+                        required 
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="">Selecione a Matéria...</option>
+                        {% for sub in subjects %}
+                            <option value="{{ sub.id }}">{{ sub.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="topic_name" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
+                        Nome do Tema
+                    </label>
+                    <input 
+                        type="text" 
+                        id="topic_name" 
+                        name="name" 
+                        required 
+                        placeholder="Ex: Direitos Fundamentais" 
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                </div>
+                <button 
+                    type="submit" 
+                    class="w-full min-h-[44px] bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white font-medium rounded-xl transition shadow text-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                    <span>Salvar Tema</span>
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- Lista de Matérias e seus Temas -->
+    <div class="space-y-4">
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white">Matérias Cadastradas</h2>
+        
+        {% if subjects and subjects|length > 0 %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for sub in subjects %}
+                    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-lg font-bold text-slate-900 dark:text-white">{{ sub.name }}</h3>
+                                <a href="/study?subject_id={{ sub.id }}" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                                    Estudar Matéria ➔
+                                </a>
+                            </div>
+
+                            <!-- Temas pertencentes -->
+                            <div class="flex flex-wrap gap-2 mt-3">
+                                {% set sub_topics = topics_by_subject.get(sub.id, []) %}
+                                {% if sub_topics and sub_topics|length > 0 %}
+                                    {% for t in sub_topics %}
+                                        <a href="/study?topic_id={{ t.id }}" class="text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg text-slate-600 dark:text-slate-300 font-medium transition" title="Estudar este tema">
+                                            🏷️ {{ t.name }}
+                                        </a>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-xs text-slate-400 italic">Nenhum tema cadastrado ainda.</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
+                            <span>Criado em {{ sub.created_at.strftime('%d/%m/%Y') if sub.created_at else '' }}</span>
+                            <a href="/flashcards/new?subject_id={{ sub.id }}" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+                                + Adicionar Card
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="bg-white dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center">
+                <span class="text-4xl mb-2 inline-block" aria-hidden="true">📂</span>
+                <p class="text-slate-500 dark:text-slate-400 text-sm">
+                    Nenhuma matéria cadastrada. Utilize o formulário acima para adicionar sua primeira matéria.
+                </p>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

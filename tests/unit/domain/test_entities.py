@@ -1,0 +1,152 @@
+"""Testes unitários para as entidades de domínio e invariantes (ADR-001, ADR-002)."""
+
+from datetime import date, datetime
+from uuid import UUID, uuid4
+
+import pytest
+
+from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
+from src.domain.exceptions import DomainValidationError
+
+
+@pytest.mark.unit
+def test_subject_creation_valid() -> None:
+    """Verifica a instanciação válida de uma Matéria."""
+    sub_id = uuid4()
+    today = date(2026, 10, 2)
+    subject = Subject(id=sub_id, name="  Direito Constitucional  ", created_at=today)
+
+    assert subject.id == sub_id
+    assert subject.name == "Direito Constitucional"  # Trimming validado
+    assert subject.created_at == today
+
+
+@pytest.mark.unit
+def test_subject_default_values() -> None:
+    """Verifica a geração automática de ID e data de criação em Subject."""
+    subject = Subject(name="Matemática")
+    assert isinstance(subject.id, UUID)
+    assert subject.name == "Matemática"
+    assert isinstance(subject.created_at, date)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("invalid_name", ["", "   ", "A", "x" * 101])
+def test_subject_invalid_name_raises_domain_error(invalid_name: str) -> None:
+    """Garante que nomes inválidos para Subject sejam rejeitados."""
+    with pytest.raises(
+        DomainValidationError, match="Nome da matéria deve ter entre 2 e 100 caracteres"
+    ):
+        Subject(name=invalid_name)
+
+
+@pytest.mark.unit
+def test_topic_creation_valid() -> None:
+    """Verifica a instanciação válida de um Tema."""
+    subject_id = uuid4()
+    topic = Topic(subject_id=subject_id, name="  Direitos Fundamentais  ")
+
+    assert isinstance(topic.id, UUID)
+    assert topic.subject_id == subject_id
+    assert topic.name == "Direitos Fundamentais"
+    assert isinstance(topic.created_at, date)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("invalid_name", ["", "   ", "A", "z" * 101])
+def test_topic_invalid_name_raises_domain_error(invalid_name: str) -> None:
+    """Garante que nomes inválidos para Topic sejam rejeitados."""
+    with pytest.raises(
+        DomainValidationError, match="Nome do tema deve ter entre 2 e 100 caracteres"
+    ):
+        Topic(subject_id=uuid4(), name=invalid_name)
+
+
+@pytest.mark.unit
+def test_flashcard_creation_valid() -> None:
+    """Verifica a instanciação válida de um Flashcard com position."""
+    topic_id = uuid4()
+    card = Flashcard(
+        topic_id=topic_id,
+        front="  O que é CF/88?  ",
+        back="  Constituição da República  ",
+        position=100,
+    )
+
+    assert isinstance(card.id, UUID)
+    assert card.topic_id == topic_id
+    assert card.front == "O que é CF/88?"
+    assert card.back == "Constituição da República"
+    assert card.position == 100
+    assert isinstance(card.created_at, date)
+
+
+@pytest.mark.unit
+def test_flashcard_default_position() -> None:
+    """Verifica que a posição padrão é 100."""
+    card = Flashcard(topic_id=uuid4(), front="Pergunta", back="Resposta")
+    assert card.position == 100
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("invalid_front", ["", "   ", "x" * 5001])
+def test_flashcard_invalid_front_raises_error(invalid_front: str) -> None:
+    """Garante que frente vazia ou > 5000 chars seja rejeitada."""
+    with pytest.raises(
+        DomainValidationError, match="Frente do flashcard deve ter entre 1 e 5.000 caracteres"
+    ):
+        Flashcard(topic_id=uuid4(), front=invalid_front, back="Resposta válida")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("invalid_back", ["", "   ", "y" * 10001])
+def test_flashcard_invalid_back_raises_error(invalid_back: str) -> None:
+    """Garante que verso vazio ou > 10000 chars seja rejeitado."""
+    with pytest.raises(
+        DomainValidationError, match="Verso do flashcard deve ter entre 1 e 10.000 caracteres"
+    ):
+        Flashcard(topic_id=uuid4(), front="Pergunta válida", back=invalid_back)
+
+
+@pytest.mark.unit
+def test_flashcard_invalid_position_raises_error() -> None:
+    """Garante que posição <= 0 seja rejeitada."""
+    msg = "Posição do flashcard deve ser um inteiro positivo maior ou igual a 1"
+    with pytest.raises(DomainValidationError, match=msg):
+        Flashcard(topic_id=uuid4(), front="Pergunta", back="Resposta", position=0)
+
+    with pytest.raises(DomainValidationError, match=msg):
+        Flashcard(topic_id=uuid4(), front="Pergunta", back="Resposta", position=-10)
+
+
+@pytest.mark.unit
+def test_flashcard_pool_session_creation_valid() -> None:
+    """Verifica a criação de sessão com valores padrão."""
+    session = FlashcardPoolSession()
+
+    assert isinstance(session.id, UUID)
+    assert session.subject_id_filter is None
+    assert session.topic_id_filter is None
+    assert session.current_position == 0
+    assert session.round_number == 1
+    assert session.is_active is True
+    assert isinstance(session.updated_at, datetime)
+
+
+@pytest.mark.unit
+def test_flashcard_pool_session_invalid_round_raises_error() -> None:
+    """Garante que número de rodada < 1 seja rejeitado."""
+    with pytest.raises(DomainValidationError, match="Número da rodada deve ser maior ou igual a 1"):
+        FlashcardPoolSession(round_number=0)
+
+
+@pytest.mark.unit
+def test_flashcard_pool_session_advance() -> None:
+    """Verifica métodos de transição de estado da sessão."""
+    session = FlashcardPoolSession()
+    session.advance_to(200)
+    assert session.current_position == 200
+
+    session.next_round(initial_position=100)
+    assert session.round_number == 2
+    assert session.current_position == 100

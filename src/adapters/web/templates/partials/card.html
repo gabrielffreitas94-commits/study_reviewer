@@ -1,0 +1,118 @@
+<!-- Card Parcial para estudo ativo HTMX -->
+<div id="flashcard-container" class="w-full flex-1 flex flex-col justify-between" hx-target="#flashcard-container" hx-swap="outerHTML">
+
+    <!-- Notificação Acessível via aria-live para leitores de tela -->
+    <div id="card-announcer" class="sr-only" aria-live="polite" aria-atomic="true">
+        {% if card %}
+            {% if side == 'back' %}
+                Resposta revelada: {{ card.back }}
+            {% else %}
+                {% if card.round_shuffled %}
+                    Nova rodada iniciada.
+                {% endif %}
+                Card número {{ card.current_index }} de {{ card.total_cards }}, Rodada {{ card.round_number }}. Pergunta: {{ card.front }}
+            {% endif %}
+        {% else %}
+            Nenhum card disponível.
+        {% endif %}
+    </div>
+
+    {% if card %}
+        <!-- Alerta de Nova Rodada (se shuffled) -->
+        {% if card.round_shuffled and side != 'back' %}
+        <div class="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between" role="status">
+            <span class="flex items-center space-x-2">
+                <span class="text-base" aria-hidden="true">🔄</span>
+                <span><strong>Nova Rodada Iniciada!</strong> A pool foi reembaralhada em múltiplos de 100.</span>
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- Superfície do Card (Interactive Flip Area) -->
+        <div 
+            id="card-surface"
+            tabindex="0"
+            role="button"
+            aria-label="{% if side == 'back' %}Resposta do card. Pressione espaço ou clique para ver a pergunta.{% else %}Pergunta do card. Pressione espaço ou clique para revelar a resposta.{% endif %}"
+            hx-post="/study/flip"
+            hx-vals='{"card_id": "{{ card.id }}", "side": "{{ side or 'front' }}", "current_index": "{{ card.current_index }}", "total_cards": "{{ card.total_cards }}", "round_number": "{{ card.round_number }}", "position": "{{ card.position }}"}'
+            class="flex-1 min-h-[300px] sm:min-h-[380px] bg-white dark:bg-slate-800 border-2 {% if side == 'back' %}border-indigo-400 dark:border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/20{% else %}border-slate-200 dark:border-slate-700{% endif %} rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer select-none focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+        >
+            <!-- Topo do Card: Badge de Frente/Verso e Posição -->
+            <div class="flex items-center justify-between text-xs font-semibold tracking-wider uppercase mb-4">
+                {% if side == 'back' %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5"></span> Resposta (Verso)
+                    </span>
+                {% else %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span> Pergunta (Frente)
+                    </span>
+                {% endif %}
+
+                <span class="text-slate-400 dark:text-slate-500 font-mono text-[11px]" title="Posição de Gap Indexing">
+                    #{{ card.position }}
+                </span>
+            </div>
+
+            <!-- Corpo Textual do Card -->
+            <div class="my-auto py-4">
+                {% if side == 'back' %}
+                    <div class="text-lg sm:text-2xl text-slate-800 dark:text-slate-100 font-medium whitespace-pre-wrap leading-relaxed">
+                        {{ card.back }}
+                    </div>
+                {% else %}
+                    <div class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white whitespace-pre-wrap leading-relaxed">
+                        {{ card.front }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Rodapé interno do Card: Dica de Atalho -->
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
+                <span>Toque no card ou pressione <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Espaço</kbd> para virar</span>
+                <span class="hidden sm:inline">Avançar: <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Enter</kbd></span>
+            </div>
+        </div>
+
+        <!-- Controles de Ação Abaixo do Card -->
+        <div class="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <button
+                type="button"
+                id="btn-flip"
+                hx-post="/study/flip"
+                hx-vals='{"card_id": "{{ card.id }}", "side": "{{ side or 'front' }}", "current_index": "{{ card.current_index }}", "total_cards": "{{ card.total_cards }}", "round_number": "{{ card.round_number }}", "position": "{{ card.position }}"}'
+                class="min-h-[48px] px-6 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-medium text-slate-700 dark:text-slate-200 transition shadow-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+                <span aria-hidden="true">🔄</span>
+                <span>{% if side == 'back' %}Ver Pergunta (Espaço){% else %}Virar Card (Espaço){% endif %}</span>
+            </button>
+
+            <button
+                type="button"
+                id="btn-next"
+                hx-post="/study/next"
+                hx-vals='{"subject_id": "{{ subject_id or '' }}", "topic_id": "{{ topic_id or '' }}"}'
+                class="min-h-[48px] px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow hover:shadow-md flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+                <span>Próximo Card</span>
+                <span aria-hidden="true">➔</span>
+            </button>
+        </div>
+
+    {% else %}
+        <!-- Estado Vazio (Zero Flashcards Disponíveis) -->
+        <div class="flex-1 min-h-[340px] bg-white dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+            <span class="text-5xl mb-4" aria-hidden="true">📭</span>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Nenhum Flashcard Disponível</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6">
+                Não há flashcards cadastrados para o filtro selecionado. Cadastre o primeiro flashcard para começar a rotação contínua da pool!
+            </p>
+            <a href="/flashcards/new{% if topic_id %}?topic_id={{ topic_id }}{% elif subject_id %}?subject_id={{ subject_id }}{% endif %}" class="min-h-[48px] px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow inline-flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <span aria-hidden="true">➕</span>
+                <span>Cadastrar Primeiro Flashcard</span>
+            </a>
+        </div>
+    {% endif %}
+
+</div>

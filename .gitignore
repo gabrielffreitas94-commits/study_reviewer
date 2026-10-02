@@ -37,6 +37,11 @@ coverage.xml
 .env.local
 *.log
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
 # IDEs & System
 .vscode/
 .idea/

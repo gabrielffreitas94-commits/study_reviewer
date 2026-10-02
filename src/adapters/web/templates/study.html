@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Estudo de Flashcards — Study Reviewer{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col justify-between max-w-3xl mx-auto w-full">
+
+    <!-- Barra de Filtros e Indicador de Progresso -->
+    <div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        
+        <!-- Filtros de Matéria / Tema -->
+        <form method="GET" action="/study" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <label for="filter-subject" class="sr-only">Filtrar por Matéria</label>
+            <select 
+                id="filter-subject" 
+                name="subject_id" 
+                onchange="this.form.submit()"
+                class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+                <option value="">Todas as Matérias (Global)</option>
+                {% for sub in subjects %}
+                    <option value="{{ sub.id }}" {% if selected_subject_id == sub.id|string %}selected{% endif %}>
+                        {{ sub.name }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            {% if topics and topics|length > 0 %}
+            <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+            <select 
+                id="filter-topic" 
+                name="topic_id" 
+                onchange="this.form.submit()"
+                class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+                <option value="">Todos os Temas da Matéria</option>
+                {% for top in topics %}
+                    <option value="{{ top.id }}" {% if selected_topic_id == top.id|string %}selected{% endif %}>
+                        {{ top.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% endif %}
+        </form>
+
+        <!-- Indicador de Progresso (Card X de Y • Rodada Z) -->
+        <div id="progress-indicator" class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center space-x-2">
+            {% if card %}
+                <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                <span>Card <strong class="text-slate-900 dark:text-white">{{ card.current_index }}</strong> de <strong class="text-slate-900 dark:text-white">{{ card.total_cards }}</strong></span>
+                <span>•</span>
+                <span>Rodada <strong class="text-slate-900 dark:text-white">{{ card.round_number }}</strong></span>
+            {% else %}
+                <span>0 cards</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Conteúdo Principal do Card via Partial -->
+    {% include "partials/card.html" %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Gerenciamento ergonômico de atalhos de teclado (Espaço e Enter/Seta Direita)
+    document.addEventListener('keydown', function(e) {
+        // Ignora digitação em campos de entrada/formulários
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            return;
+        }
+
+        // Barra de Espaço: Virar o card
+        if (e.code === 'Space') {
+            e.preventDefault();
+            const flipBtn = document.getElementById('btn-flip');
+            if (flipBtn) {
+                flipBtn.click();
+            }
+        }
+
+        // Enter ou Seta para a Direita: Avançar para o próximo card
+        if (e.code === 'Enter' || e.code === 'ArrowRight') {
+            e.preventDefault();
+            const nextBtn = document.getElementById('btn-next');
+            if (nextBtn) {
+                nextBtn.click();
+            }
+        }
+    });
+
+    // Gestos de toque touch mobile (Swipe para a esquerda avança o card)
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    document.addEventListener('touchend', function(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, { passive: true });
+
+    function handleSwipe() {
+        const threshold = 60; // Limite mínimo de 60px para considerar swipe intencional
+        if (touchStartX - touchEndX > threshold) {
+            // Deslizou para a esquerda -> Próximo Card
+            const nextBtn = document.getElementById('btn-next');
+            if (nextBtn) {
+                nextBtn.click();
+            }
+        }
+    }
+</script>
+{% endblock %}
