@@ -1,39 +1,42 @@
 ---
 name: product-use-cases-generator
-description: Generates a comprehensive matrix of Use Cases and Edge Cases in BDD/Gherkin format for the current sprint based on PRD.md before TDD starts.
+description: Generates a comprehensive matrix of Use Cases and Edge Cases in BDD/Gherkin format for the current sprint based on the active PRD.md before TDD starts.
 ---
 
 # Product Use Cases Generator (Skill do Especialista de Produto)
 
-Esta skill é utilizada pelo **Especialista de Produto** antes do início da implementação em TDD de qualquer sprint. Seu objetivo é dissecar os requisitos da sprint definidos no [PRD.md](file:///c:/Users/Pichau/Desktop/study_reviewer/PRD.md) e transformá-los em uma matriz estruturada e exaustiva de Casos de Uso e Cenários de Borda (Edge Cases).
+Esta skill é utilizada pelo **Especialista de Produto** antes do início da implementação em TDD de qualquer sprint. Seu objetivo é dissecar os requisitos da sprint definidos no documento de requisitos do projeto (`PRD.md`) e transformá-los em uma matriz estruturada e exaustiva de Casos de Uso e Cenários de Borda (Edge Cases).
+
+O funcionamento desta skill é agnóstico a projetos, extraindo as regras de negócio diretamente do `PRD.md` vigente no repositório.
 
 ---
 
 ## 1. Entrada e Gatilho
-* **Arquivo Base:** `PRD.md` (seção da Sprint em execução).
+* **Arquivo Base:** `PRD.md` (seção da Sprint atual).
 * **Entrada Complementar:** Documento SPEC aprovado (`docs/specs/sprint-XX-*-spec.md`) e ADRs vigentes.
-* **Gatilho de Execução:** Fase inicial da Sprint, imediatamente antes da validação pelo QA e da escrita dos testes TDD.
+* **Gatilho de Execução:** Fase inicial da Sprint, imediatamente antes da validação pelo Especialista QA e da escrita dos testes TDD.
 
 ---
 
 ## 2. Categorias Obrigatórias de Cenários
 
-A matriz gerada DEVE cobrir impreterivelmente quatro categorias para cada funcionalidade:
+A matriz gerada DEVE cobrir impreterivelmente quatro categorias para cada funcionalidade descrita no PRD:
 
 1. **Caminho Feliz (Happy Path):**
-   * Fluxo ideal onde entradas válidas geram transições de estado bem-sucedidas.
+   * Fluxo ideal onde entradas válidas geram transições de estado bem-sucedidas e os resultados esperados são alcançados.
 2. **Cenários de Borda (Edge Cases):**
-   * Limites matemáticos e coleções especiais (lista com 0 itens, 1 item, 2 itens).
-   * Arredondamento do cálculo dos primeiros 10% da pool: $\max(1, \lfloor 0.1 \times N \rfloor)$.
-   * Transições de fronteira (ex: último card da pool provocando shuffle automático, nível 6 do SRS regredindo ao nível 2).
-   * Datas de virada de mês/ano no formato puramente calendários `YYYY-MM-DD`.
+   * Limites matemáticos, extremos de intervalos, valores mínimos e máximos permitidos.
+   * Coleções especiais (listas vazias, com 1 elemento, coleções cheias).
+   * Transições de estado nos nós de fronteira do ciclo de vida das entidades.
+   * Formatação de dados no padrão especificado pelo PRD (ex: formatos de data, códigos, chaves).
 3. **Validações de Entrada e Rejeição:**
    * Textos vazios, campos nulos onde não é permitido, strings com apenas espaços em branco.
-   * Chaves estrangeiras inexistentes (ex: criar card para tema inexistente).
-   * Valores numéricos fora da escala (ex: score < 0 ou score > 100).
+   * Chaves e relacionamentos com identificadores inexistentes.
+   * Valores numéricos fora das faixas válidas especificadas no PRD.
+   * Tipos de dados incompatíveis.
 4. **Falhas e Inconsistências de Negócio:**
-   * Tentativas de operação em entidades inativas ou excluídas.
-   * Conflitos de estado concorrente.
+   * Tentativas de operação em entidades em estados inválidos conforme as regras do PRD.
+   * Violações de invariantes de domínio e restrições de unicidade.
 
 ---
 
@@ -50,7 +53,7 @@ Cada use case deve ser estruturado com:
     Quando [ação ou comando executado pelo usuário/sistema com entradas explícitas]
     Então [resultado esperado, mutação de estado e resposta da camada]
   ```
-- **Camada Alvo da Clean Architecture:** `Entities/Domain Service` | `Use Case` | `Interface Adapter/Controller`
+- **Camada Alvo da Arquitetura:** Camada correspondente segundo os padrões do projeto (ex: Domínio, Aplicação, Adaptadores).
 
 ---
 
