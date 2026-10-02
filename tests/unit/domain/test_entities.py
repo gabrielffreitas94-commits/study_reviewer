@@ -89,6 +89,43 @@ def test_flashcard_default_position() -> None:
 
 
 @pytest.mark.unit
+def test_flashcard_multi_topic_support() -> None:
+    """Valida suporte a múltiplos temas, conversão de lista para tupla e primary_topic_id."""
+    t1, t2, t3 = uuid4(), uuid4(), uuid4()
+    card = Flashcard(topic_ids=[t1, t2, t3], front="Pergunta", back="Resposta")
+    assert card.topic_ids == (t1, t2, t3)
+    assert card.primary_topic_id == t1
+    assert card.topic_id == t1
+
+
+@pytest.mark.unit
+def test_flashcard_empty_topics_raises_error() -> None:
+    """Flashcard sem nenhum tema dispara DomainValidationError."""
+    with pytest.raises(
+        DomainValidationError, match="Flashcard deve estar associado a pelo menos 1 tema."
+    ):
+        Flashcard(topic_ids=(), front="P", back="R")
+
+
+@pytest.mark.unit
+def test_flashcard_more_than_five_topics_raises_error() -> None:
+    """Flashcard com mais de 5 temas dispara DomainValidationError (teto defensivo)."""
+    topics = [uuid4() for _ in range(6)]
+    with pytest.raises(
+        DomainValidationError, match="Flashcard pode estar associado a no máximo 5 temas."
+    ):
+        Flashcard(topic_ids=topics, front="P", back="R")
+
+
+@pytest.mark.unit
+def test_flashcard_duplicate_topics_raises_error() -> None:
+    """Flashcard com temas duplicados dispara DomainValidationError."""
+    dup_id = uuid4()
+    with pytest.raises(DomainValidationError, match="Flashcard não pode conter temas duplicados."):
+        Flashcard(topic_ids=[dup_id, dup_id], front="P", back="R")
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("invalid_front", ["", "   ", "x" * 5001])
 def test_flashcard_invalid_front_raises_error(invalid_front: str) -> None:
     """Garante que frente vazia ou > 5000 chars seja rejeitada."""

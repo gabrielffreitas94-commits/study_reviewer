@@ -241,3 +241,49 @@ def test_study_view_with_empty_or_invalid_query_params(client: TestClient) -> No
 
     resp4 = client.get(f"/flashcards/new?subject_id={sub['id']}&topic_id=")
     assert resp4.status_code == 200
+
+
+@pytest.mark.integration
+def test_create_flashcard_web_multi_topic_and_single_button(client: TestClient) -> None:
+    """Valida cadastro web de flashcard com múltiplos temas e botão único (ADR-004)."""
+    sub = client.post("/api/v1/subjects", json={"name": "Ciência Política"}).json()
+    t1 = client.post(
+        "/api/v1/topics", json={"subject_id": sub["id"], "name": "Sistemas de Governo"}
+    ).json()
+    t2 = client.post(
+        "/api/v1/topics", json={"subject_id": sub["id"], "name": "Poder Executivo"}
+    ).json()
+
+    # 1. Envio de flashcard com 2 temas e sem 'action' (padrão botão único 'Salvar')
+    resp_create = client.post(
+        "/flashcards",
+        data={
+            "topic_ids": [t1["id"], t2["id"]],
+            "front": "Diferença entre Presidencialismo e Parlamentarismo?",
+            "back": "No presidencialismo o chefe de Estado é também chefe de governo.",
+        },
+        follow_redirects=False,
+    )
+    assert resp_create.status_code == 303
+    loc = resp_create.headers["location"]
+    assert "success=1" in loc
+    assert f"topic_ids={t1['id']}" in loc
+    assert f"topic_ids={t2['id']}" in loc
+
+    # 2. Tela de estudo deve exibir os badges dos temas
+    resp_study = client.get(f"/study?topic_id={t1['id']}")
+    assert resp_study.status_code == 200
+    assert "Sistemas de Governo" in resp_study.text
+    assert "Poder Executivo" in resp_study.text
+
+    # 3. Tentativa de cadastro com dados inválidos (sem temas) deve retornar erro 400
+    resp_err = client.post(
+        "/flashcards",
+        data={
+            "front": "Pergunta sem tema",
+            "back": "Resposta sem tema",
+        },
+        follow_redirects=False,
+    )
+    assert resp_err.status_code == 400
+    assert "Flashcard deve estar associado a pelo menos 1 tema" in resp_err.text

@@ -52,13 +52,14 @@ class TopicMapper:
 
 
 class FlashcardMapper:
-    """Conversor para Flashcard."""
+    """Conversor para Flashcard (ADR-004)."""
 
     @staticmethod
     def to_domain(model: FlashcardModel) -> Flashcard:
+        topic_ids = tuple(t.id for t in model.topics) if model.topics else ()
         return Flashcard(
             id=model.id,
-            topic_id=model.topic_id,
+            topic_ids=topic_ids,
             front=model.front,
             back=model.back,
             position=model.position,
@@ -69,7 +70,6 @@ class FlashcardMapper:
     def to_model(entity: Flashcard) -> FlashcardModel:
         return FlashcardModel(
             id=entity.id,
-            topic_id=entity.topic_id,
             front=entity.front,
             back=entity.back,
             position=entity.position,

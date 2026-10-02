@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.adapters.persistence.mappers import (
@@ -93,14 +93,33 @@ class SqlAlchemyFlashcardRepository(IFlashcardRepository):
         self._session = session
 
     def save(self, flashcard: Flashcard) -> None:
-        model = FlashcardMapper.to_model(flashcard)
-        self._session.merge(model)
+        model = self._session.get(FlashcardModel, flashcard.id)
+        if model is None:
+            model = FlashcardMapper.to_model(flashcard)
+            self._session.add(model)
+        else:
+            model.front = flashcard.front
+            model.back = flashcard.back
+            model.position = flashcard.position
+            model.created_at = flashcard.created_at
+
+        if flashcard.topic_ids:
+            topics = (
+                self._session.query(TopicModel).filter(TopicModel.id.in_(flashcard.topic_ids)).all()
+            )
+            model.topics = topics
+
         self._session.commit()
 
     def save_all(self, flashcards: list[Flashcard]) -> None:
         for card in flashcards:
-            model = FlashcardMapper.to_model(card)
-            self._session.merge(model)
+            model = self._session.get(FlashcardModel, card.id)
+            if model is not None:
+                model.position = card.position
+                model.front = card.front
+                model.back = card.back
+            else:
+                self.save(card)
         self._session.commit()
 
     def get_by_id(self, flashcard_id: UUID) -> Flashcard | None:
@@ -109,28 +128,41 @@ class SqlAlchemyFlashcardRepository(IFlashcardRepository):
         return FlashcardMapper.to_domain(model) if model else None
 
     def delete(self, flashcard_id: UUID) -> None:
-        stmt = delete(FlashcardModel).where(FlashcardModel.id == flashcard_id)
-        self._session.execute(stmt)
-        self._session.commit()
+        model = self._session.get(FlashcardModel, flashcard_id)
+        if model is not None:
+            self._session.delete(model)
+            self._session.commit()
 
     def list_pool(self, subject_id: UUID | None, topic_id: UUID | None) -> list[Flashcard]:
         stmt = select(FlashcardModel).order_by(FlashcardModel.position.asc())
 
         if topic_id is not None:
-            stmt = stmt.where(FlashcardModel.topic_id == topic_id)
+            stmt = stmt.join(FlashcardModel.topics).where(TopicModel.id == topic_id)
         elif subject_id is not None:
-            stmt = stmt.join(TopicModel).where(TopicModel.subject_id == subject_id)
+            stmt = (
+                stmt.join(FlashcardModel.topics)
+                .where(TopicModel.subject_id == subject_id)
+                .distinct()
+            )
 
         models = self._session.scalars(stmt).all()
         return [FlashcardMapper.to_domain(m) for m in models]
 
     def count_pool(self, subject_id: UUID | None, topic_id: UUID | None) -> int:
-        stmt = select(func.count(FlashcardModel.id))
-
         if topic_id is not None:
-            stmt = stmt.where(FlashcardModel.topic_id == topic_id)
+            stmt = (
+                select(func.count(func.distinct(FlashcardModel.id)))
+                .join(FlashcardModel.topics)
+                .where(TopicModel.id == topic_id)
+            )
         elif subject_id is not None:
-            stmt = stmt.join(TopicModel).where(TopicModel.subject_id == subject_id)
+            stmt = (
+                select(func.count(func.distinct(FlashcardModel.id)))
+                .join(FlashcardModel.topics)
+                .where(TopicModel.subject_id == subject_id)
+            )
+        else:
+            stmt = select(func.count(FlashcardModel.id))
 
         count = self._session.scalar(stmt)
         return count or 0

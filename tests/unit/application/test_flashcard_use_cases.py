@@ -4,13 +4,14 @@ from uuid import uuid4
 
 import pytest
 
-from src.application.dto.flashcard_dto import CreateFlashcardDTO
+from src.application.dto.flashcard_dto import CreateFlashcardDTO, FlashcardDTO
+from src.application.dto.study_dto import StudyCardDTO
 from src.application.use_cases.flashcard_use_cases import (
     CreateFlashcardUseCase,
     DeleteFlashcardUseCase,
 )
 from src.domain.entities import Flashcard, FlashcardPoolSession, Topic
-from src.domain.exceptions import EntityNotFoundError
+from src.domain.exceptions import DomainValidationError, EntityNotFoundError
 from tests.unit.application.fakes import (
     FakeFlashcardRepository,
     FakeRandomGenerator,
@@ -255,3 +256,81 @@ def test_delete_flashcard_only_card_clears_session() -> None:
     updated_session = session_repo.get_active_session(None, t_id)
     assert updated_session is not None
     assert updated_session.current_position == 0
+
+
+@pytest.mark.unit
+def test_create_flashcard_empty_topics_raises_error() -> None:
+    """CreateFlashcardUseCase com lista vazia de temas dispara DomainValidationError."""
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+    session_repo = FakeSessionRepository()
+    rng = FakeRandomGenerator()
+
+    use_case = CreateFlashcardUseCase(card_repo, topic_repo, session_repo, rng)
+    with pytest.raises(
+        DomainValidationError, match="Flashcard deve estar associado a pelo menos 1 tema."
+    ):
+        use_case.execute(CreateFlashcardDTO(topic_ids=[], front="P", back="R"))
+
+
+@pytest.mark.unit
+def test_flashcard_dto_backward_compatibility() -> None:
+    """Valida propriedades de compatibilidade bidirecional de FlashcardDTO."""
+    from datetime import date
+
+    t1, t2 = uuid4(), uuid4()
+
+    # Passando apenas topic_id (antigo)
+    dto_legacy = FlashcardDTO(
+        id=uuid4(), front="P", back="R", position=100, created_at=date.today(), topic_id=t1
+    )
+    assert dto_legacy.topic_ids == [t1]
+    assert dto_legacy.topic_id == t1
+
+    # Passando apenas topic_ids (novo)
+    dto_new = FlashcardDTO(
+        id=uuid4(),
+        front="P",
+        back="R",
+        position=100,
+        created_at=date.today(),
+        topic_ids=[t1, t2],
+    )
+    assert dto_new.topic_ids == [t1, t2]
+    assert dto_new.topic_id == t1
+
+
+@pytest.mark.unit
+def test_study_card_dto_backward_compatibility() -> None:
+    """Valida propriedades de compatibilidade bidirecional de StudyCardDTO."""
+    t1 = uuid4()
+
+    # Passando apenas topic_id (antigo)
+    dto_legacy = StudyCardDTO(
+        id=uuid4(),
+        front="P",
+        back="R",
+        position=100,
+        current_index=1,
+        total_cards=1,
+        round_number=1,
+        round_shuffled=False,
+        topic_id=t1,
+    )
+    assert dto_legacy.topic_ids == [t1]
+    assert dto_legacy.topic_id == t1
+
+    # Passando topic_ids (novo) sem topic_id
+    dto_new = StudyCardDTO(
+        id=uuid4(),
+        front="P",
+        back="R",
+        position=100,
+        current_index=1,
+        total_cards=1,
+        round_number=1,
+        round_shuffled=False,
+        topic_ids=[t1],
+    )
+    assert dto_new.topic_ids == [t1]
+    assert dto_new.topic_id == t1

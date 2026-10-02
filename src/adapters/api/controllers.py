@@ -49,9 +49,10 @@ class CreateTopicRequest(BaseModel):
 
 
 class CreateFlashcardRequest(BaseModel):
-    topic_id: UUID
     front: str = Field(..., min_length=1, max_length=5000)
     back: str = Field(..., min_length=1, max_length=10000)
+    topic_ids: list[UUID] = Field(default_factory=list)
+    topic_id: UUID | None = None
 
 
 def _parse_uuid(val: str | None) -> UUID | None:
@@ -87,7 +88,7 @@ def get_next_study_card_api(
 def create_flashcard_api(
     payload: CreateFlashcardRequest, db: Session = Depends(get_db)
 ) -> FlashcardDTO:
-    """Criação de flashcard via JSON."""
+    """Criação de flashcard via JSON (ADR-004)."""
     card_repo = SqlAlchemyFlashcardRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
     session_repo = SqlAlchemySessionRepository(db)
@@ -95,11 +96,15 @@ def create_flashcard_api(
     clean_front = sanitize_html_content(payload.front)
     clean_back = sanitize_html_content(payload.back)
 
+    target_topic_ids = payload.topic_ids or (
+        [payload.topic_id] if payload.topic_id is not None else []
+    )
+
     try:
         use_case = CreateFlashcardUseCase(card_repo, topic_repo, session_repo, default_rng)
         return use_case.execute(
             CreateFlashcardDTO(
-                topic_id=payload.topic_id,
+                topic_ids=target_topic_ids,
                 front=clean_front,
                 back=clean_back,
             )

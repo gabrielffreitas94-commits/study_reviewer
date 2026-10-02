@@ -9,7 +9,7 @@ from src.application.ports.repositories import (
     ITopicRepository,
 )
 from src.domain.entities import Flashcard
-from src.domain.exceptions import EntityNotFoundError
+from src.domain.exceptions import DomainValidationError, EntityNotFoundError
 from src.domain.protocols import IRandomGenerator
 from src.domain.services import FlashcardPoolService
 
@@ -30,11 +30,19 @@ class CreateFlashcardUseCase:
         self._rng = rng
 
     def execute(self, input_dto: CreateFlashcardDTO) -> FlashcardDTO:
-        topic = self._topic_repo.get_by_id(input_dto.topic_id)
-        if topic is None:
-            raise EntityNotFoundError("Tema não encontrado.")
+        target_topic_ids = input_dto.topic_ids or (
+            [input_dto.topic_id] if input_dto.topic_id else []
+        )
+        if not target_topic_ids:
+            raise DomainValidationError("Flashcard deve estar associado a pelo menos 1 tema.")
 
-        pool = self._card_repo.list_pool(None, input_dto.topic_id)
+        for t_id in target_topic_ids:
+            topic = self._topic_repo.get_by_id(t_id)
+            if topic is None:
+                raise EntityNotFoundError("Tema não encontrado.")
+
+        primary_topic_id = target_topic_ids[0]
+        pool = self._card_repo.list_pool(None, primary_topic_id)
         target_idx = FlashcardPoolService.calculate_target_index(len(pool), self._rng)
 
         if target_idx == 0:
@@ -49,7 +57,7 @@ class CreateFlashcardUseCase:
 
         new_position = FlashcardPoolService.calculate_new_position(prev_pos, next_pos)
         card = Flashcard(
-            topic_id=input_dto.topic_id,
+            topic_ids=tuple(target_topic_ids),
             front=input_dto.front,
             back=input_dto.back,
             position=new_position,
@@ -62,21 +70,23 @@ class CreateFlashcardUseCase:
             saved_card = next(c for c in rebalanced if c.id == card.id)
             return FlashcardDTO(
                 id=saved_card.id,
-                topic_id=saved_card.topic_id,
                 front=saved_card.front,
                 back=saved_card.back,
                 position=saved_card.position,
                 created_at=saved_card.created_at,
+                topic_ids=list(saved_card.topic_ids),
+                topic_id=saved_card.primary_topic_id,
             )
 
         self._card_repo.save(card)
         return FlashcardDTO(
             id=card.id,
-            topic_id=card.topic_id,
             front=card.front,
             back=card.back,
             position=card.position,
             created_at=card.created_at,
+            topic_ids=list(card.topic_ids),
+            topic_id=card.primary_topic_id,
         )
 
 

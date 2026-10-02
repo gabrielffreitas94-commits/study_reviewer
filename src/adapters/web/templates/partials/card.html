@@ -38,17 +38,27 @@
             hx-vals='{"card_id": "{{ card.id }}", "side": "{{ side or 'front' }}", "current_index": "{{ card.current_index }}", "total_cards": "{{ card.total_cards }}", "round_number": "{{ card.round_number }}", "position": "{{ card.position }}"}'
             class="flex-1 min-h-[300px] sm:min-h-[380px] bg-white dark:bg-slate-800 border-2 {% if side == 'back' %}border-indigo-400 dark:border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/20{% else %}border-slate-200 dark:border-slate-700{% endif %} rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer select-none focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
         >
-            <!-- Topo do Card: Badge de Frente/Verso e Posição -->
-            <div class="flex items-center justify-between text-xs font-semibold tracking-wider uppercase mb-4">
-                {% if side == 'back' %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
-                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5"></span> Resposta (Verso)
-                    </span>
-                {% else %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span> Pergunta (Frente)
-                    </span>
-                {% endif %}
+            <!-- Topo do Card: Badge de Frente/Verso, Temas e Posição -->
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold tracking-wider uppercase mb-4">
+                <div class="flex flex-wrap items-center gap-1.5">
+                    {% if side == 'back' %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5"></span> Resposta (Verso)
+                        </span>
+                    {% else %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span> Pergunta (Frente)
+                        </span>
+                    {% endif %}
+
+                    {% if card.topic_names %}
+                        {% for tname in card.topic_names %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                                🏷️ {{ tname }}
+                            </span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
 
                 <span class="text-slate-400 dark:text-slate-500 font-mono text-[11px]" title="Posição de Gap Indexing">
                     #{{ card.position }}

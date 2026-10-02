@@ -171,3 +171,62 @@ def test_session_repository(db_session: Session) -> None:
     assert loaded.current_position == 100
     assert loaded.round_number == 2
     assert loaded.is_active is True
+
+
+@pytest.mark.integration
+def test_flashcard_repository_multi_topic_operations(db_session: Session) -> None:
+    """Verifica persistência de flashcard com múltiplos temas e deduplicação no pool (ADR-004)."""
+    sub_repo = SqlAlchemySubjectRepository(db_session)
+    topic_repo = SqlAlchemyTopicRepository(db_session)
+    card_repo = SqlAlchemyFlashcardRepository(db_session)
+
+    sub = Subject(name="Direito Constitucional")
+    sub_repo.save(sub)
+
+    t1 = Topic(subject_id=sub.id, name="Controle de Constitucionalidade")
+    t2 = Topic(subject_id=sub.id, name="Ações Diretas")
+    topic_repo.save(t1)
+    topic_repo.save(t2)
+
+    # Flashcard associado a dois temas da mesma matéria
+    card = Flashcard(
+        topic_ids=[t1.id, t2.id],
+        front="O que é ADI?",
+        back="Ação Direta de Inconstitucionalidade",
+        position=100,
+    )
+    card_repo.save(card)
+
+    # Carrega por ID
+    loaded = card_repo.get_by_id(card.id)
+    assert loaded is not None
+    assert set(loaded.topic_ids) == {t1.id, t2.id}
+
+    # Deve aparecer ao consultar pool do tema 1
+    pool_t1 = card_repo.list_pool(None, t1.id)
+    assert len(pool_t1) == 1
+    assert pool_t1[0].id == card.id
+
+    # Deve aparecer ao consultar pool do tema 2
+    pool_t2 = card_repo.list_pool(None, t2.id)
+    assert len(pool_t2) == 1
+    assert pool_t2[0].id == card.id
+
+    # Ao consultar por matéria, não deve duplicar o card mesmo pertencendo a 2 temas
+    pool_sub = card_repo.list_pool(sub.id, None)
+    assert len(pool_sub) == 1
+    assert pool_sub[0].id == card.id
+    assert card_repo.count_pool(sub.id, None) == 1
+
+    # Atualiza temas do card para conter apenas t1
+    updated_card = Flashcard(
+        id=card.id,
+        topic_ids=[t1.id],
+        front=card.front,
+        back=card.back,
+        position=card.position,
+    )
+    card_repo.save(updated_card)
+    reloaded = card_repo.get_by_id(card.id)
+    assert reloaded is not None
+    assert reloaded.topic_ids == (t1.id,)

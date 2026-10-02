@@ -48,25 +48,43 @@ class TopicModel(Base):
 
     subject: Mapped["SubjectModel"] = relationship("SubjectModel", back_populates="topics")
     flashcards: Mapped[list["FlashcardModel"]] = relationship(
-        "FlashcardModel", back_populates="topic", cascade="all, delete-orphan"
+        "FlashcardModel",
+        secondary="flashcard_topics",
+        back_populates="topics",
+        lazy="selectin",
+    )
+
+
+class FlashcardTopicModel(Base):
+    """Tabela associativa N:N entre Flashcards e Temas (ADR-004)."""
+
+    __tablename__ = "flashcard_topics"
+
+    flashcard_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("flashcards.id", ondelete="CASCADE"), primary_key=True
+    )
+    topic_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), primary_key=True, index=True
     )
 
 
 class FlashcardModel(Base):
-    """Tabela de Flashcards com campo de posição para Gap Indexing."""
+    """Tabela de Flashcards com campo de posição para Gap Indexing (ADR-004)."""
 
     __tablename__ = "flashcards"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    topic_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
-    )
     front: Mapped[str] = mapped_column(Text, nullable=False)
     back: Mapped[str] = mapped_column(Text, nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False, index=True, default=100)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
-    topic: Mapped["TopicModel"] = relationship("TopicModel", back_populates="flashcards")
+    topics: Mapped[list["TopicModel"]] = relationship(
+        "TopicModel",
+        secondary="flashcard_topics",
+        back_populates="flashcards",
+        lazy="selectin",
+    )
 
 
 class PoolSessionModel(Base):

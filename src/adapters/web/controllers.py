@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request, Response
+from fastapi import APIRouter, Depends, Form, Query, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -80,7 +80,7 @@ def study_view(
 
     card: StudyCardDTO | None = None
     try:
-        get_current_uc = GetCurrentStudyCardUseCase(card_repo, session_repo)
+        get_current_uc = GetCurrentStudyCardUseCase(card_repo, session_repo, topic_repo)
         card = get_current_uc.execute(GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid))
     except EmptyPoolError:
         card = None
@@ -114,6 +114,7 @@ def flip_card(
 ) -> HTMLResponse:
     """Endpoint HTMX para alternar entre pergunta e resposta sem recarregar a tela."""
     card_repo = SqlAlchemyFlashcardRepository(db)
+    topic_repo = SqlAlchemyTopicRepository(db)
     card = card_repo.get_by_id(card_id)
 
     if card is None:
@@ -123,10 +124,17 @@ def flip_card(
             context={"card": None, "side": "front"},
         )
 
+    topic_names: list[str] = []
+    for t_id in card.topic_ids:
+        t = topic_repo.get_by_id(t_id)
+        if t:
+            topic_names.append(t.name)
+
     new_side = "back" if side == "front" else "front"
     study_dto = StudyCardDTO(
         id=card.id,
-        topic_id=card.topic_id,
+        topic_ids=list(card.topic_ids),
+        topic_names=topic_names,
         front=card.front,
         back=card.back,
         position=position,
@@ -156,10 +164,11 @@ def next_card(
 
     card_repo = SqlAlchemyFlashcardRepository(db)
     session_repo = SqlAlchemySessionRepository(db)
+    topic_repo = SqlAlchemyTopicRepository(db)
 
     card: StudyCardDTO | None = None
     try:
-        get_next_uc = GetNextFlashcardUseCase(card_repo, session_repo, default_rng)
+        get_next_uc = GetNextFlashcardUseCase(card_repo, session_repo, default_rng, topic_repo)
         card = get_next_uc.execute(GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid))
     except EmptyPoolError:
         card = None
@@ -181,30 +190,32 @@ def new_flashcard_view(
     request: Request,
     subject_id: str | None = None,
     topic_id: str | None = None,
+    topic_ids: Annotated[list[str] | None, Query()] = None,
     success: bool = False,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    """Tela de cadastro ágil de flashcards com atalhos."""
-    sub_uuid = _parse_uuid(subject_id)
+    """Tela de cadastro ágil de flashcards com seleção de múltiplos temas (ADR-004)."""
     top_uuid = _parse_uuid(topic_id)
+    subject_repo = SqlAlchemySubjectRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
-    topics = topic_repo.list_by_subject(sub_uuid) if sub_uuid else []
-    if not topics:
-        # Se não filtrou por matéria, lista todos os temas existentes
-        from sqlalchemy import select
 
-        from src.adapters.persistence.mappers import TopicMapper
-        from src.adapters.persistence.models import TopicModel
+    subjects = subject_repo.list_all()
+    topics_by_subject = [
+        {"subject": s, "topics": topic_repo.list_by_subject(s.id)} for s in subjects
+    ]
 
-        all_models = db.scalars(select(TopicModel).order_by(TopicModel.name.asc())).all()
-        topics = [TopicMapper.to_domain(m) for m in all_models]
+    selected: list[str] = list(topic_ids) if topic_ids else []
+    if top_uuid and str(top_uuid) not in selected:
+        selected.append(str(top_uuid))
 
     return templates.TemplateResponse(
         request=request,
         name="flashcards_new.html",
         context={
-            "topics": topics,
-            "selected_topic_id": str(top_uuid) if top_uuid else None,
+            "topics_by_subject": topics_by_subject,
+            "selected_topic_ids": selected,
+            "front": "",
+            "back": "",
             "success": success,
             "error": None,
         },
@@ -214,49 +225,61 @@ def new_flashcard_view(
 @web_router.post("/flashcards", response_model=None)
 def create_flashcard_web(
     request: Request,
-    topic_id: Annotated[UUID, Form()],
+    topic_ids: Annotated[list[UUID] | None, Form()] = None,
+    topic_id: Annotated[UUID | None, Form()] = None,
     front: Annotated[str, Form()] = "",
     back: Annotated[str, Form()] = "",
-    action: Annotated[str, Form()] = "save_and_study",
+    action: Annotated[str, Form()] = "save",
     db: Session = Depends(get_db),
 ) -> Response:
-    """Processa o cadastro ágil de flashcard e redireciona conforme a ação."""
+    """Processa o cadastro ágil de flashcard e redireciona (ADR-004 e Botão Único)."""
     card_repo = SqlAlchemyFlashcardRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
     session_repo = SqlAlchemySessionRepository(db)
+    subject_repo = SqlAlchemySubjectRepository(db)
 
     clean_front = sanitize_html_content(front)
     clean_back = sanitize_html_content(back)
 
+    target_topic_ids = (topic_ids or []) or ([topic_id] if topic_id is not None else [])
+
     try:
         use_case = CreateFlashcardUseCase(card_repo, topic_repo, session_repo, default_rng)
-        use_case.execute(CreateFlashcardDTO(topic_id=topic_id, front=clean_front, back=clean_back))
+        use_case.execute(
+            CreateFlashcardDTO(
+                topic_ids=target_topic_ids,
+                front=clean_front,
+                back=clean_back,
+            )
+        )
     except DomainException as exc:
-        from sqlalchemy import select
-
-        from src.adapters.persistence.mappers import TopicMapper
-        from src.adapters.persistence.models import TopicModel
-
-        all_models = db.scalars(select(TopicModel).order_by(TopicModel.name.asc())).all()
-        all_topics = [TopicMapper.to_domain(m) for m in all_models]
+        subjects = subject_repo.list_all()
+        topics_by_subject = [
+            {"subject": s, "topics": topic_repo.list_by_subject(s.id)} for s in subjects
+        ]
         return templates.TemplateResponse(
             request=request,
             name="flashcards_new.html",
             context={
-                "topics": all_topics,
-                "selected_topic_id": str(topic_id),
+                "topics_by_subject": topics_by_subject,
+                "selected_topic_ids": [str(t) for t in target_topic_ids],
+                "front": front,
+                "back": back,
                 "success": False,
                 "error": str(exc),
             },
             status_code=400,
         )
 
-    if action == "save_and_new":
-        return RedirectResponse(
-            url=f"/flashcards/new?topic_id={topic_id}&success=1", status_code=303
-        )
+    if action == "save_and_study":
+        first_topic = str(target_topic_ids[0]) if target_topic_ids else ""
+        return RedirectResponse(url=f"/study?topic_id={first_topic}", status_code=303)
 
-    return RedirectResponse(url=f"/study?topic_id={topic_id}", status_code=303)
+    query_params = "&".join(f"topic_ids={tid}" for tid in target_topic_ids)
+    redirect_url = (
+        f"/flashcards/new?success=1&{query_params}" if query_params else "/flashcards/new?success=1"
+    )
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @web_router.get("/subjects", response_class=HTMLResponse)

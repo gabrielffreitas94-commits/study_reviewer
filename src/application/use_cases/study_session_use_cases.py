@@ -1,7 +1,11 @@
 """Casos de uso para Estudo e Gestão da Pool de Flashcards (Clean Architecture - Camada 2)."""
 
 from src.application.dto.study_dto import GetNextCardDTO, StudyCardDTO
-from src.application.ports.repositories import IFlashcardRepository, ISessionRepository
+from src.application.ports.repositories import (
+    IFlashcardRepository,
+    ISessionRepository,
+    ITopicRepository,
+)
 from src.domain.entities import FlashcardPoolSession
 from src.domain.exceptions import EmptyPoolError
 from src.domain.protocols import IRandomGenerator
@@ -16,10 +20,12 @@ class GetNextFlashcardUseCase:
         card_repo: IFlashcardRepository,
         session_repo: ISessionRepository,
         rng: IRandomGenerator,
+        topic_repo: ITopicRepository | None = None,
     ) -> None:
         self._card_repo = card_repo
         self._session_repo = session_repo
         self._rng = rng
+        self._topic_repo = topic_repo
 
     def execute(self, input_dto: GetNextCardDTO) -> StudyCardDTO:
         cards = self._card_repo.list_pool(input_dto.subject_id, input_dto.topic_id)
@@ -61,9 +67,15 @@ class GetNextFlashcardUseCase:
                 current_index = idx + 1
                 break
 
+        topic_names: list[str] = []
+        if self._topic_repo is not None:
+            for t_id in next_card.topic_ids:
+                t = self._topic_repo.get_by_id(t_id)
+                if t:
+                    topic_names.append(t.name)
+
         return StudyCardDTO(
             id=next_card.id,
-            topic_id=next_card.topic_id,
             front=next_card.front,
             back=next_card.back,
             position=next_card.position,
@@ -71,6 +83,9 @@ class GetNextFlashcardUseCase:
             total_cards=len(active_cards),
             round_number=session.round_number,
             round_shuffled=round_shuffled,
+            topic_ids=list(next_card.topic_ids),
+            topic_names=topic_names,
+            topic_id=next_card.primary_topic_id,
         )
 
 
@@ -81,9 +96,11 @@ class GetCurrentStudyCardUseCase:
         self,
         card_repo: IFlashcardRepository,
         session_repo: ISessionRepository,
+        topic_repo: ITopicRepository | None = None,
     ) -> None:
         self._card_repo = card_repo
         self._session_repo = session_repo
+        self._topic_repo = topic_repo
 
     def execute(self, input_dto: GetNextCardDTO) -> StudyCardDTO:
         cards = self._card_repo.list_pool(input_dto.subject_id, input_dto.topic_id)
@@ -121,9 +138,15 @@ class GetCurrentStudyCardUseCase:
                 current_index = idx + 1
                 break
 
+        topic_names: list[str] = []
+        if self._topic_repo is not None:
+            for t_id in active_card.topic_ids:
+                t = self._topic_repo.get_by_id(t_id)
+                if t:
+                    topic_names.append(t.name)
+
         return StudyCardDTO(
             id=active_card.id,
-            topic_id=active_card.topic_id,
             front=active_card.front,
             back=active_card.back,
             position=active_card.position,
@@ -131,4 +154,7 @@ class GetCurrentStudyCardUseCase:
             total_cards=len(cards),
             round_number=session.round_number,
             round_shuffled=False,
+            topic_ids=list(active_card.topic_ids),
+            topic_names=topic_names,
+            topic_id=active_card.primary_topic_id,
         )
