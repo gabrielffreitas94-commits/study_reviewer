@@ -3,7 +3,7 @@
 {% block title %}Estudo de Flashcards — Study Reviewer{% endblock %}
 
 {% block content %}
-<div class="flex-1 flex flex-col justify-between max-w-3xl mx-auto w-full">
+<div class="flex-1 flex flex-col justify-between max-w-3xl mx-auto w-full min-w-0">
 
     <!-- Barra de Filtros e Indicador de Progresso -->
     <div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
@@ -15,7 +15,7 @@
                 id="filter-subject" 
                 name="subject_id" 
                 onchange="const top = this.form.querySelector('#filter-topic'); if (top) top.value = ''; this.form.submit()"
-                class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[200px] sm:max-w-xs truncate"
             >
                 <option value="">Todas as Matérias (Global)</option>
                 {% for sub in subjects %}
@@ -31,7 +31,7 @@
                 id="filter-topic" 
                 name="topic_id" 
                 onchange="this.form.submit()"
-                class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                class="text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[200px] sm:max-w-xs truncate"
             >
                 <option value="">Todos os Temas da Matéria</option>
                 {% for top in topics %}
@@ -44,7 +44,7 @@
         </form>
 
         <!-- Indicador de Progresso (Card X de Y • Rodada Z) -->
-        <div id="progress-indicator" class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center space-x-2">
+        <div id="progress-indicator" class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center space-x-2 shrink-0">
             {% if card %}
                 <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
                 <span>Card <strong class="text-slate-900 dark:text-white">{{ card.current_index }}</strong> de <strong class="text-slate-900 dark:text-white">{{ card.total_cards }}</strong></span>

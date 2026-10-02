@@ -108,9 +108,9 @@
                 {% for sub in subjects %}
                     <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
                         <div>
-                            <div class="flex items-center justify-between mb-3">
-                                <h3 class="text-lg font-bold text-slate-900 dark:text-white">{{ sub.name }}</h3>
-                                <a href="/study?subject_id={{ sub.id }}" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                            <div class="flex items-center justify-between mb-3 gap-2">
+                                <h3 class="text-lg font-bold text-slate-900 dark:text-white break-words break-words-anywhere [overflow-wrap:anywhere] min-w-0">{{ sub.name }}</h3>
+                                <a href="/study?subject_id={{ sub.id }}" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline shrink-0 whitespace-nowrap">
                                     Estudar Matéria ➔
                                 </a>
                             </div>
@@ -120,7 +120,7 @@
                                 {% set sub_topics = topics_by_subject.get(sub.id, []) %}
                                 {% if sub_topics and sub_topics|length > 0 %}
                                     {% for t in sub_topics %}
-                                        <a href="/study?topic_id={{ t.id }}" class="text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg text-slate-600 dark:text-slate-300 font-medium transition" title="Estudar este tema">
+                                        <a href="/study?topic_id={{ t.id }}" class="text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg text-slate-600 dark:text-slate-300 font-medium transition break-words break-words-anywhere max-w-full" title="Estudar este tema">
                                             🏷️ {{ t.name }}
                                         </a>
                                     {% endfor %}

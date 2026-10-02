@@ -44,6 +44,13 @@ html.dark body {
   padding-right: 1rem;
 }
 
+/* Safe word break for long unbroken strings, hashes, and URLs */
+.break-words-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  word-wrap: break-word;
+}
+
 /* 3D Flashcard Flip Mechanics */
 .perspective-1000 {
   perspective: 1000px;

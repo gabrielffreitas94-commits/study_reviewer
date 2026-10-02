@@ -67,15 +67,15 @@
                             <div class="flex flex-wrap gap-2">
                                 {% for top in item.topics %}
                                     {% set is_selected = (top.id|string in selected_topic_ids) %}
-                                    <label class="topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer select-none transition-all {% if is_selected %}bg-indigo-50 border-indigo-400 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-300 font-medium ring-1 ring-indigo-400{% else %}bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600{% endif %}">
+                                    <label class="topic-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer select-none transition-all max-w-full break-words break-words-anywhere [overflow-wrap:anywhere] {% if is_selected %}bg-indigo-50 border-indigo-400 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-300 font-medium ring-1 ring-indigo-400{% else %}bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600{% endif %}">
                                         <input 
                                             type="checkbox" 
                                             name="topic_ids" 
                                             value="{{ top.id }}" 
-                                            class="topic-checkbox rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                                            class="topic-checkbox rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer shrink-0"
                                             {% if is_selected %}checked{% endif %}
                                         >
-                                        <span>{{ top.name }}</span>
+                                        <span class="break-words break-words-anywhere [overflow-wrap:anywhere]">{{ top.name }}</span>
                                     </label>
                                 {% endfor %}
                             </div>

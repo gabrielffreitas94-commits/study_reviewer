@@ -1,5 +1,5 @@
 <!-- Card Parcial para estudo ativo HTMX -->
-<div id="flashcard-container" class="w-full flex-1 flex flex-col justify-between" hx-target="#flashcard-container" hx-swap="outerHTML">
+<div id="flashcard-container" class="w-full min-w-0 flex-1 flex flex-col justify-between" hx-target="#flashcard-container" hx-swap="outerHTML">
 
     <!-- Notificação Acessível via aria-live para leitores de tela -->
     <div id="card-announcer" class="sr-only" aria-live="polite" aria-atomic="true">
@@ -36,48 +36,49 @@
             aria-label="{% if side == 'back' %}Resposta do card. Pressione espaço ou clique para ver a pergunta.{% else %}Pergunta do card. Pressione espaço ou clique para revelar a resposta.{% endif %}"
             hx-post="/study/flip"
             hx-vals='{"card_id": "{{ card.id }}", "side": "{{ side or 'front' }}", "current_index": "{{ card.current_index }}", "total_cards": "{{ card.total_cards }}", "round_number": "{{ card.round_number }}", "position": "{{ card.position }}"}'
-            class="flex-1 min-h-[300px] sm:min-h-[380px] bg-white dark:bg-slate-800 border-2 {% if side == 'back' %}border-indigo-400 dark:border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/20{% else %}border-slate-200 dark:border-slate-700{% endif %} rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer select-none focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+            class="w-full min-w-0 max-w-full flex-1 min-h-[300px] sm:min-h-[380px] bg-white dark:bg-slate-800 border-2 {% if side == 'back' %}border-indigo-400 dark:border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/20{% else %}border-slate-200 dark:border-slate-700{% endif %} rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer select-none focus:outline-none focus:ring-4 focus:ring-indigo-500/20 overflow-hidden"
         >
-            <!-- Topo do Card: Badge de Frente/Verso, Temas e Posição -->
-            <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold tracking-wider uppercase mb-4">
-                <div class="flex flex-wrap items-center gap-1.5">
+            <!-- Topo do Card: Badge de Frente/Verso, Temas e Posição Pinned -->
+            <div class="flex items-start justify-between gap-3 text-xs font-semibold tracking-wider uppercase mb-4 w-full min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
                     {% if side == 'back' %}
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0">
                             <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5"></span> Resposta (Verso)
                         </span>
                     {% else %}
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0">
                             <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span> Pergunta (Frente)
                         </span>
                     {% endif %}
 
                     {% if card.topic_names %}
                         {% for tname in card.topic_names %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
-                                🏷️ {{ tname }}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 max-w-full break-words break-words-anywhere [overflow-wrap:anywhere]" title="{{ tname }}">
+                                <span class="mr-1 shrink-0" aria-hidden="true">🏷️</span>
+                                <span class="break-words break-words-anywhere [overflow-wrap:anywhere]">{{ tname }}</span>
                             </span>
                         {% endfor %}
                     {% endif %}
                 </div>
 
-                <span class="text-slate-400 dark:text-slate-500 font-mono text-[11px]" title="Posição de Gap Indexing">
+                <span class="text-slate-400 dark:text-slate-500 font-mono text-[11px] shrink-0 whitespace-nowrap pt-1" title="Posição de Gap Indexing">
                     #{{ card.position }}
                 </span>
             </div>
 
-            <!-- Corpo Textual do Card -->
-            <div class="my-auto py-6 flex flex-col justify-center items-center text-center">
+            <!-- Corpo Textual do Card com Word Break Seguro -->
+            <div class="w-full min-w-0 my-auto py-6 flex flex-col justify-center items-center text-center">
                 {% if side == 'back' %}
-                    <div class="text-lg sm:text-2xl text-slate-800 dark:text-slate-100 font-medium whitespace-pre-wrap leading-relaxed text-center max-w-2xl mx-auto">{{ card.back }}</div>
+                    <div class="w-full min-w-0 text-lg sm:text-2xl text-slate-800 dark:text-slate-100 font-medium whitespace-pre-wrap break-words break-words-anywhere [overflow-wrap:anywhere] leading-relaxed text-center max-w-2xl mx-auto">{{ card.back }}</div>
                 {% else %}
-                    <div class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white whitespace-pre-wrap leading-relaxed text-center max-w-2xl mx-auto">{{ card.front }}</div>
+                    <div class="w-full min-w-0 text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white whitespace-pre-wrap break-words break-words-anywhere [overflow-wrap:anywhere] leading-relaxed text-center max-w-2xl mx-auto">{{ card.front }}</div>
                 {% endif %}
             </div>
 
             <!-- Rodapé interno do Card: Dica de Atalho -->
-            <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
-                <span>Toque no card ou pressione <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Espaço</kbd> para virar</span>
-                <span class="hidden sm:inline">Avançar: <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Enter</kbd></span>
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500 w-full min-w-0">
+                <span class="truncate sm:overflow-visible">Toque no card ou pressione <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Espaço</kbd> para virar</span>
+                <span class="hidden sm:inline shrink-0 ml-2">Avançar: <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Enter</kbd></span>
             </div>
         </div>
 
