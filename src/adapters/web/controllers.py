@@ -229,10 +229,9 @@ def create_flashcard_web(
     topic_id: Annotated[UUID | None, Form()] = None,
     front: Annotated[str, Form()] = "",
     back: Annotated[str, Form()] = "",
-    action: Annotated[str, Form()] = "save",
     db: Session = Depends(get_db),
 ) -> Response:
-    """Processa o cadastro ágil de flashcard e redireciona (ADR-004 e Botão Único)."""
+    """Processa o cadastro ágil de flashcard e redireciona continuamente (Botão Único Salvar)."""
     card_repo = SqlAlchemyFlashcardRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
     session_repo = SqlAlchemySessionRepository(db)
@@ -270,10 +269,6 @@ def create_flashcard_web(
             },
             status_code=400,
         )
-
-    if action == "save_and_study":
-        first_topic = str(target_topic_ids[0]) if target_topic_ids else ""
-        return RedirectResponse(url=f"/study?topic_id={first_topic}", status_code=303)
 
     query_params = "&".join(f"topic_ids={tid}" for tid in target_topic_ids)
     redirect_url = (

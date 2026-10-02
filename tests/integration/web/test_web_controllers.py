@@ -90,35 +90,33 @@ def test_full_web_flashcard_flow(client: TestClient) -> None:
     assert resp_new.status_code == 200
     assert "Cadastrar Flashcard" in resp_new.text
 
-    # 4. Cadastra Card no modo 'save_and_new'
+    # 4. Cadastra primeiro card com o botão único Salvar Flashcard
     resp_card1 = client.post(
         "/flashcards",
         data={
             "topic_id": top_id,
             "front": "O que é habeas corpus?",
             "back": "Remédio constitucional que protege a liberdade de locomoção.",
-            "action": "save_and_new",
         },
         follow_redirects=False,
     )
     assert resp_card1.status_code == 303
     assert "success=1" in resp_card1.headers["location"]
 
-    # 5. Cadastra Card no modo 'save_and_study'
+    # 5. Cadastra segundo card mantendo fluxo ágil contínuo
     resp_card2 = client.post(
         "/flashcards",
         data={
             "topic_id": top_id,
             "front": "O que é mandado de segurança?",
             "back": "Protege direito líquido e certo não amparado por HC ou HD.",
-            "action": "save_and_study",
         },
         follow_redirects=False,
     )
     assert resp_card2.status_code == 303
-    assert "/study" in resp_card2.headers["location"]
+    assert "success=1" in resp_card2.headers["location"]
 
-    # 6. Acessa /study com o tema selecionado
+    # 6. Usuário acessa aba /study para iniciar o estudo
     resp_study = client.get(f"/study?topic_id={top_id}")
     assert resp_study.status_code == 200
     assert "Card" in resp_study.text
