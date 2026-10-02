@@ -22,41 +22,60 @@ O funcionamento desta skill é agnóstico a projetos, extraindo as regras de neg
 
 A matriz gerada DEVE cobrir impreterivelmente uma taxonomia completa de cenários para cada funcionalidade descrita no PRD:
 
-1. **Caminho Feliz (Happy Path & Variações Válidas):**
-   * Fluxo nominal principal com entradas típicas e sucesso absoluto.
-   * Variações válidas secundárias (ex: ações com parâmetros opcionais omitidos vs preenchidos).
-   * Persistência correta do estado final e integridade dos dados retornados.
+1. **Caminho Feliz & Variações Válidas (Happy Path & Valid Variations):**
+   * **Fluxo Nominal Primário:** Fluxo ideal completo, do acionamento inicial à confirmação e persistência íntegra do estado final.
+   * **Variações de Parâmetros:** Execução com todos os campos opcionais preenchidos vs. execução com apenas os campos obrigatórios.
+   * **Valores Padrão (*Defaults*):** Aplicação correta de valores padrão quando o usuário/sistema não os informa explicitamente.
+   * **Operação Unitária vs. Operação em Lote:** Comportamento ao processar uma única entidade vs. múltiplas entidades simultaneamente (quando aplicável pelo PRD).
+   * **Ordenação Padrão Determinística:** Garantia de que listagens e coleções retornam na ordenação de negócio estipulada (ex: por data de criação, ordem alfabética ou prioridade).
 
 2. **Cenários de Borda e Fronteiras Matemáticas (Edge Cases & Boundary Values):**
-   * **Limites de Coleções:** Listas vazias (0 elementos), coleções unitárias (1 elemento), coleções no tamanho exato de corte/página, coleções extensas.
-   * **Fronteiras Numéricas e Fórmulas:** Valores no limite exato inferior, limite exato superior, imediatamente abaixo e imediatamente acima dos limites permitidos pelo PRD.
-   * **Arredondamento e Frações:** Comportamento diante de divisão inteira, arredondamento para cima/baixo (`ceil`/`floor`), valores decimais e proporções percentuais.
-   * **Fronteiras Temporais:** Transições de início e fim de período, viradas de dia, mês e ano, anos bissextos e datas no formato estrito exigido pelo PRD.
+   * **Limites de Coleções:** Listas vazias (estado zero / *empty state*), coleções com 1 elemento, coleções exatamente no tamanho de corte de página/lote, coleções cheias ou volumosas.
+   * **Fronteiras Numéricas:** Valor mínimo permitido, valor máximo permitido, valor imediatamente inferior ao mínimo e imediatamente superior ao máximo.
+   * **Fórmulas e Arredondamentos:** Comportamento diante de divisão inteira, arredondamento para cima/baixo (`floor`, `ceil`, `round`), proporções percentuais e precisão decimal.
+   * **Fronteiras Temporais e Calendário:**
+     * Transições de início e fim de período (23:59:59 para 00:00:00).
+     * Viradas de dia, mês e ano.
+     * Anos bissextos (ex: 29 de fevereiro).
+     * Datas puramente calendárias (`YYYY-MM-DD`) e independência estrita de fuso horário / horário de verão.
+   * **Ciclos e Contadores:** Comportamento no primeiro ciclo/rodada, na virada de ciclo e quando contadores atingem limites de saturação.
 
 3. **Validação de Entrada e Rejeição de Payloads (Input & Schema Validation):**
-   * **Campos de Texto:** Strings vazias, strings compostas exclusivamente por espaços em branco, limites mínimos e máximos de caracteres permitidos.
-   * **Tipagem e Formatação:** Valores de tipos incompatíveis (ex: texto em campo numérico), formatos de data inválidos, valores fora de listas permitidas (enums).
-   * **Identificadores e Chaves:** UUIDs malformados, referências a identificadores inexistentes no banco/sistema.
-   * **Campos Obrigatórios vs Opcionais:** Omissão de atributos requeridos e tentativa de envio de campos extras não mapeados.
+   * **Strings e Textos:** Strings vazias (`""`), strings compostas exclusivamente por espaços em branco (`"   "`), strings com espaços nas extremidades (exigindo *trimming*), limites mínimos de caracteres e limite máximo excedido por 1 caractere.
+   * **Caracteres Especiais e Internacionalização:** Strings contendo caracteres acentuados (UTF-8 completo), emojis, símbolos tipográficos, quebras de linha (`\n`, `\r\n`) e caracteres com necessidade de escape.
+   * **Tipagem Estrita:** Envio de texto em campos numéricos, booleanos representados como texto, números com ponto flutuante em campos inteiros e valores negativos onde se exigem números naturais.
+   * **Formatação de Dados:** Datas fora do formato exigido (ex: `DD/MM/YYYY`), datas calendárias inexistentes (ex: 31 de abril, 30 de fevereiro), formatos de chaves inválidos.
+   * **Identificadores e Chaves:** UUIDs com formato incorreto, strings aleatórias em campos de ID e referências a entidades inexistentes.
+   * **Integridade do Payload:** Omissão de atributos obrigatórios e envio de atributos não mapeados (*payload pollution* ou campos desconhecidos).
 
-4. **Invariantes de Domínio e Regras de Negócio (Business Rules & Invariants):**
-   * Violação direta de restrições expressas no PRD (ex: notas fora de escala, operações fora da janela permitida, violações de precedência).
-   * Restrições de unicidade (tentativas de duplicidade de chaves, nomes únicos ou vínculos exclusivos).
-   * Integridade de relacionamento (ex: exclusão de entidades pai com filhos ativos, consistência de dados históricos).
+4. **Invariantes de Domínio e Regras de Negócio (Business Rules & Domain Invariants):**
+   * **Restrições Estritas do PRD:** Tentativas diretas de violar qualquer regra, fórmula, cálculo ou trava explícita documentada no PRD.
+   * **Restrições de Unicidade:** Tentativa de duplicar nomes, títulos, chaves de negócio ou combinações que devem ser únicas dentro do mesmo escopo.
+   * **Integridade Referencial Negocial:** Tentativa de vincular recursos a entidades que não pertencem ao mesmo proprietário/contexto.
+   * **Imutabilidade de Registros:** Tentativas de mutação em campos que devem permanecer congelados após a criação (ex: data de criação, autor, valores históricos).
+   * **Regras de Bloqueio:** Bloqueio de exclusão ou alteração de entidades que possuam dependentes ativos ou dados históricos protegidos.
 
-5. **Ciclo de Vida e Transições de Estado (State Lifecycle & Transitions):**
-   * Operações válidas permitidas apenas em estados específicos da entidade.
-   * Tentativas de transição de estado proibidas (ex: pular etapas obrigatórias ou reverter estados terminais).
-   * Operações sobre entidades arquivadas, canceladas ou inativas.
+5. **Ciclo de Vida, Histórico e Transições de Estado (State Lifecycle & Historical Traceability):**
+   * **Operações por Estado:** Ações permitidas exclusivamente em determinado estado da entidade (ex: ativo, inativo, rascunho, publicado, arquivado).
+   * **Transições Proibidas:** Tentativas de pular etapas obrigatórias de um fluxo ou reverter transições irreversíveis/terminais.
+   * **Entidades Arquivadas / Soft-delete:** Comportamento de leitura, listagem e mutação ao interagir com entidades desativadas ou marcadas como excluídas.
+   * **Congelamento Histórico:** Garantia de que alterações no nome ou atributos de uma entidade pai não modifiquem os registros históricos desnormalizados já gravados no passado.
 
-6. **Concorrência, Idempotência e Repetição de Ações (Idempotency & Concurrency):**
-   * Repetição imediata da mesma requisição/ação (garantindo comportamento idempotente quando esperado).
-   * Tentativas de submissão duplicada (ex: duplo clique ou envios consecutivos rápidos).
-   * Consistência do estado diante de operações em sequência na mesma entidade.
+6. **Concorrência, Idempotência e Comportamento de Fila (Concurrency, Idempotency & Queue Mechanics):**
+   * **Repetição Imediata da Mesma Ação:** Envio repetido da mesma requisição (duplo clique do usuário ou retry de rede), garantindo idempotência sem duplicar registros ou efeitos colaterais.
+   * **Concorrência sobre a Mesma Entidade:** Atualizações quase simultâneas sobre o mesmo recurso, garantindo que o estado final seja íntegro.
+   * **Mecânica de Fila:** Inserção em posições específicas, consumo ordenado (FIFO / prioridade), esvaziamento total da fila e reinício ordenado de ciclos.
 
-7. **Tratamento de Falhas e Mensagens de Feedback (Error Handling & User Feedback):**
-   * Garantia de que falhas de negócio retornam mensagens semânticas, claras e acionáveis para o usuário, sem expor dados internos de infraestrutura ou stack traces.
-   * Preservação da atomicidade (se a operação falhar no meio, nenhuma alteração parcial de estado deve persistir).
+7. **Busca, Filtros, Ordenação e Paginação (Search, Filtering, Sorting & Pagination):**
+   * **Busca Textual:** Busca por termo exato, busca por prefixo/termo parcial e insensibilidade a maiúsculas/minúsculas (*case-insensitivity*).
+   * **Busca Vazia:** Busca por termo inexistente retornando lista vazia sem erros.
+   * **Filtros Combinados:** Aplicação de múltiplos filtros simultâneos (ex: status + data + categoria) e filtros com valores mutuamente exclusivos.
+   * **Paginação:** Acesso à primeira página, páginas intermediárias, última página, solicitação de página além do total disponível e alteração da quantidade de itens por página.
+
+8. **Tratamento de Falhas, Resiliência e Feedback ao Usuário (Error Handling, Resilience & User Feedback):**
+   * **Mensagens Semânticas e Polidas:** Toda falha de negócio deve retornar mensagens claras, amigáveis e explicativas, sem jargões de banco de dados, stack traces ou vazamento de arquitetura interna.
+   * **Atomicidade Negocial:** Em caso de erro no meio de uma operação que envolva múltiplos passos, o sistema deve reverter integralmente o estado, sem deixar dados órfãos ou inconsistentes.
+   * **Recurso Não Encontrado:** Tratamento claro e semântico quando uma entidade requisitada não existe (ex: resposta 404 semântica de negócio).
 
 ---
 
@@ -65,7 +84,7 @@ A matriz gerada DEVE cobrir impreterivelmente uma taxonomia completa de cenário
 Cada use case deve ser estruturado com:
 - **ID:** `UC-S<Sprint>-<Numero>` (ex: `UC-S01-01`)
 - **Título do Cenário:** Claro e autoexplicativo.
-- **Categoria:** `Caminho Feliz` | `Edge Case & Limites` | `Validação de Entrada` | `Invariante de Domínio` | `Transição de Estado` | `Concorrência & Idempotência` | `Tratamento de Falhas` | `Segurança`
+- **Categoria:** `Caminho Feliz & Variações` | `Edge Case & Limites` | `Validação de Entrada` | `Invariante de Domínio` | `Transição de Estado & Histórico` | `Concorrência & Idempotência` | `Busca & Filtros` | `Tratamento de Falhas` | `Segurança`
 - **Especificação BDD:**
   ```gherkin
   Cenário: [Título]

@@ -5,7 +5,7 @@
 ## 1. Identidade e Propósito
 O **Especialista de Produto** é o guardião da visão do produto, da entrega de valor ao usuário e da conformidade estrita com o documento de requisitos do projeto (`PRD.md`).
 
-Sua atuação é genérica e reutilizável em qualquer produto de software, operando sob o princípio de que o `PRD.md` vigente é a única fonte da verdade (*single source of truth*) para todas as regras de negócio, restrições e critérios de aceitação.
+O `PRD.md` vigente é a única fonte da verdade (*single source of truth*) para todas as regras de negócio, restrições e critérios de aceitação.
 
 ---
 
