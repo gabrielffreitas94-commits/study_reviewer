@@ -20,7 +20,10 @@ from src.application.dto.study_dto import GetNextCardDTO, StudyCardDTO
 from src.application.dto.subject_dto import CreateSubjectDTO
 from src.application.dto.topic_dto import CreateTopicDTO
 from src.application.use_cases.flashcard_use_cases import CreateFlashcardUseCase
-from src.application.use_cases.study_session_use_cases import GetNextFlashcardUseCase
+from src.application.use_cases.study_session_use_cases import (
+    GetCurrentStudyCardUseCase,
+    GetNextFlashcardUseCase,
+)
 from src.application.use_cases.subject_use_cases import (
     CreateSubjectUseCase,
     ListSubjectsUseCase,
@@ -77,8 +80,8 @@ def study_view(
 
     card: StudyCardDTO | None = None
     try:
-        get_next_uc = GetNextFlashcardUseCase(card_repo, session_repo, default_rng)
-        card = get_next_uc.execute(GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid))
+        get_current_uc = GetCurrentStudyCardUseCase(card_repo, session_repo)
+        card = get_current_uc.execute(GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid))
     except EmptyPoolError:
         card = None
 

@@ -72,3 +72,63 @@ class GetNextFlashcardUseCase:
             round_number=session.round_number,
             round_shuffled=round_shuffled,
         )
+
+
+class GetCurrentStudyCardUseCase:
+    """Caso de uso para obter o flashcard atual da sessão de estudo sem avançar."""
+
+    def __init__(
+        self,
+        card_repo: IFlashcardRepository,
+        session_repo: ISessionRepository,
+    ) -> None:
+        self._card_repo = card_repo
+        self._session_repo = session_repo
+
+    def execute(self, input_dto: GetNextCardDTO) -> StudyCardDTO:
+        cards = self._card_repo.list_pool(input_dto.subject_id, input_dto.topic_id)
+        if not cards:
+            raise EmptyPoolError(
+                "Nenhum flashcard disponível para estudo com os filtros selecionados."
+            )
+
+        session = self._session_repo.get_active_session(input_dto.subject_id, input_dto.topic_id)
+        if session is None:
+            first_card = cards[0]
+            session = FlashcardPoolSession(
+                subject_id_filter=input_dto.subject_id,
+                topic_id_filter=input_dto.topic_id,
+                current_position=first_card.position,
+                round_number=1,
+            )
+            self._session_repo.save_session(session)
+            active_card = first_card
+        else:
+            matching_card = next((c for c in cards if c.position == session.current_position), None)
+            if matching_card is not None:
+                active_card = matching_card
+            else:
+                fallback_card = next(
+                    (c for c in cards if c.position >= session.current_position), cards[0]
+                )
+                session.advance_to(fallback_card.position)
+                self._session_repo.save_session(session)
+                active_card = fallback_card
+
+        current_index = 1
+        for idx, c in enumerate(cards):
+            if c.id == active_card.id:
+                current_index = idx + 1
+                break
+
+        return StudyCardDTO(
+            id=active_card.id,
+            topic_id=active_card.topic_id,
+            front=active_card.front,
+            back=active_card.back,
+            position=active_card.position,
+            current_index=current_index,
+            total_cards=len(cards),
+            round_number=session.round_number,
+            round_shuffled=False,
+        )
