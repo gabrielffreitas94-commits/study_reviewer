@@ -66,15 +66,11 @@
             </div>
 
             <!-- Corpo Textual do Card -->
-            <div class="my-auto py-4">
+            <div class="my-auto py-6 flex flex-col justify-center items-center text-center">
                 {% if side == 'back' %}
-                    <div class="text-lg sm:text-2xl text-slate-800 dark:text-slate-100 font-medium whitespace-pre-wrap leading-relaxed">
-                        {{ card.back }}
-                    </div>
+                    <div class="text-lg sm:text-2xl text-slate-800 dark:text-slate-100 font-medium whitespace-pre-wrap leading-relaxed text-center max-w-2xl mx-auto">{{ card.back }}</div>
                 {% else %}
-                    <div class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white whitespace-pre-wrap leading-relaxed">
-                        {{ card.front }}
-                    </div>
+                    <div class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white whitespace-pre-wrap leading-relaxed text-center max-w-2xl mx-auto">{{ card.front }}</div>
                 {% endif %}
             </div>
 
