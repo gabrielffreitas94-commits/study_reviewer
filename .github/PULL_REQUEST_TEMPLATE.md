@@ -1,0 +1,58 @@
+<!-- Template Oficial de Pull Request — Study Reviewer -->
+## 📋 Identificação da Sprint
+* **Sprint:** `Sprint XX — [Nome da Sprint]`
+* **Branch de Origem:** `feature/sprint-XX-[nome]`
+* **Branch de Destino:** `main`
+* **Documento SPEC:** `docs/specs/sprint-XX-[nome]-spec.md`
+* **ADRs Relacionados:** `docs/adrs/ADR-XXX-...`
+
+---
+
+## 🎯 Resumo da Entrega & Objetivo
+<!-- Descreva sucintamente o objetivo da sprint e o valor entregue ao produto -->
+
+---
+
+## 🧪 Metodologia TDD & Cobertura de Testes (100% Obrigatório)
+- [ ] **TDD Aplicado:** Testes unitários e de integração foram escritos antes da implementação (Red-Green-Refactor).
+- [ ] **Casos de Uso e Edge Cases:** Matriz completa gerada e validada autonomamente antes da codificação.
+- [ ] **Cobertura Backend:** 100% de cobertura confirmada via `pytest --cov=src --cov-fail-under=100`.
+- [ ] **Cobertura Frontend:** Testes de UI/Templates executados e validados em processo isolado.
+
+```bash
+# Cole aqui o resumo da execução do pytest com coverage
+```
+
+---
+
+## 🛡️ Governança de Testes de Segurança
+- [ ] Todos os testes que validam segurança ou vulnerabilidades foram decorados com `@pytest.mark.security`.
+- [ ] Todas as docstrings de testes de segurança contêm:
+  - `Vulnerabilidade prevenida:`
+  - `Garantia de segurança:`
+- [ ] O meta-teste de AST (`tests/governance/test_security_governance.py`) passou com 100% de sucesso.
+
+---
+
+## 🏛️ Bancada dos 9 Especialistas — Auditoria Obrigatória
+> **Importante:** Todo especialista deve emitir seu parecer. Status permitidos: `[APROVADO]` ou `[N/A JUSTIFICADO]`.
+
+| # | Especialista | Status | Parecer Técnico / Justificativa |
+| :-: | :--- | :---: | :--- |
+| **1** | **Especialista de Produto** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **2** | **Especialista QA** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **3** | **Especialista Arquiteto** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **4** | **Especialista de Segurança** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **5** | **Especialista de Telemetria** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **6** | **Especialista de UX** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **7** | **Especialista de UI** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **8** | **Especialista de DevOps** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **9** | **Especialista de Acessibilidade** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+
+---
+
+## 🚀 Checklist Pré-Merge
+- [ ] CI/CD no GitHub Actions 100% verde (processos de backend e frontend passaram).
+- [ ] Linter (Ruff) e checagem de tipos (Mypy) sem nenhum aviso.
+- [ ] Sem dados sensíveis ou segredos commitados (`.env.example` atualizado).
+- [ ] Paridade Docker verificada localmente (`docker compose up`).
