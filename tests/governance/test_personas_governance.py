@@ -128,3 +128,16 @@ def test_parallel_audit_protocol_document_exists() -> None:
     assert "Cluster 2: Segurança & Compliance" in content
     assert "Cluster 3: Experiência & Interface" in content
     assert "Cluster 4: Engenharia, Dados & Ops" in content
+
+
+def test_prd_documents_all_13_specialists() -> None:
+    """Garante que o PRD.md documente formalmente a bancada dos 13 especialistas."""
+    prd_path = Path("PRD.md")
+    assert prd_path.exists(), "PRD.md não encontrado!"
+
+    content = prd_path.read_text(encoding="utf-8")
+    assert "Bancada dos 13 Especialistas" in content
+    for _, specialist_name in EXPECTED_PERSONAS:
+        assert specialist_name.lower() in content.lower(), (
+            f"Especialista '{specialist_name}' não mencionado no PRD.md!"
+        )
