@@ -8,7 +8,6 @@
   * `docs/adrs/ADR-002-flashcard-gap-indexing-pool.md`
   * `docs/adrs/ADR-003-docker-dev-prod-parity-and-migrations.md`
   * `docs/adrs/ADR-004-flashcard-many-to-many-topics.md`
-  * `docs/adrs/ADR-005-performance-specialists-and-modular-cicd.md`
 
 ---
 
@@ -28,8 +27,12 @@ Implementação do pacote de melhorias estruturais de engenharia, governança t�
      - `ci-frontend-assets.yml`: Ambiente Node.js isolado para compilação estática do Tailwind CSS (`npm run build:css`).
      - `ci-frontend-quality.yml`: Validação sintática e integridade de todos os templates Jinja2 e componentes HTML/HTMX.
      - `cd-docker-parity.yml`: Build de contêiner multi-stage e teste de paridade sob usuário não-root `appuser`.
-3. **Governança Automatizada e Integridade de Templates:**
-   - Novo teste de governança AST (`tests/governance/test_personas_governance.py`) para validar programaticamente a completude documental e técnica dos 13 especialistas e seus workflows.
+3. **Protocolo de Auditoria Concorrente por Clusters (Opção A — Multi-Agente):**
+   - Formalização do protocolo de paralelização em `docs/personas/00-parallel-audit-protocol.md`.
+   - Criação da skill de orquestração `.gemini/skills/parallel-audit-orchestrator/SKILL.md`.
+   - Distribuição dos 13 especialistas em 4 clusters de competência executados simultaneamente via `invoke_subagent`.
+4. **Governança Automatizada e Integridade de Templates:**
+   - Novo teste de governança AST (`tests/governance/test_personas_governance.py`) para validar programaticamente a completude documental e técnica dos 13 especialistas, workflows e protocolo paralelo.
    - Novo teste de frontend (`tests/unit/web/test_frontend_templates.py`) validando sintaxe de templates Jinja2 e presença de assets estáticos compilados.
    - Atualização do ciclo de vida em `.gemini/rules/sprint-development-lifecycle.md`, `.github/PULL_REQUEST_TEMPLATE.md` e `PRD.md`.
    - Adição do arquivo de lock determinístico `package-lock.json`.
@@ -91,7 +94,6 @@ Required test coverage of 100% reached. Total coverage: 100.00%
   - [x] **ADR-002 (Gap Indexing na Pool):** Posições em múltiplos de 100, ponto médio nos 10% e rebalanceamento preventivo.
   - [x] **ADR-003 (Docker & Migrações):** Multi-stage build com usuário não-root e compose com healthchecks.
   - [x] **ADR-004 (Relacionamento N:N):** Vínculo muitos-para-muitos entre Flashcards e Topics via tabela associativa declarativa.
-  - [x] **ADR-005 (Especialistas de Performance e CI/CD Modular):** Expansão para 13 especialistas e separação atômica dos workflows de CI/CD.
 
 ---
 

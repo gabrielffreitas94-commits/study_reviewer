@@ -36,6 +36,7 @@ EXPECTED_SKILLS = [
     "python-performance-auditor",
     "frontend-performance-auditor",
     "database-performance-auditor",
+    "parallel-audit-orchestrator",
 ]
 
 EXPECTED_WORKFLOWS = [
@@ -115,3 +116,15 @@ def test_all_modular_ci_cd_workflows_exist() -> None:
         content = wf_path.read_text(encoding="utf-8")
         assert "name:" in content
         assert "runs-on: ubuntu-latest" in content
+
+
+def test_parallel_audit_protocol_document_exists() -> None:
+    """Garante que o protocolo de auditoria concorrente por clusters esteja formalizado."""
+    protocol_path = Path("docs/personas/00-parallel-audit-protocol.md")
+    assert protocol_path.exists(), "docs/personas/00-parallel-audit-protocol.md não encontrado!"
+
+    content = protocol_path.read_text(encoding="utf-8")
+    assert "Cluster 1: Core & Arquitetura" in content
+    assert "Cluster 2: Segurança & Compliance" in content
+    assert "Cluster 3: Experiência & Interface" in content
+    assert "Cluster 4: Engenharia, Dados & Ops" in content
