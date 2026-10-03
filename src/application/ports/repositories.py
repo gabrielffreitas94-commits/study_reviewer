@@ -25,6 +25,10 @@ class ISubjectRepository(Protocol):
         """Verifica se já existe matéria com o nome informado."""
         ...
 
+    def list_all_with_topics(self) -> list[tuple[Subject, list[Topic]]]:
+        """Lista todas as matérias acompanhadas de seus respectivos temas em lote (sem N+1)."""
+        ...
+
 
 class ITopicRepository(Protocol):
     """Porta de persistência para Temas."""
@@ -65,12 +69,26 @@ class IFlashcardRepository(Protocol):
         """Exclui permanentemente um flashcard."""
         ...
 
-    def list_pool(self, subject_id: UUID | None, topic_id: UUID | None) -> list[Flashcard]:
-        """Lista os cards da pool ordenados por position ASC com filtros opcionais."""
+    def list_pool(
+        self,
+        subject_id: UUID | None,
+        topic_id: UUID | None,
+        limit: int | None = None,
+        min_position: int | None = None,
+    ) -> list[Flashcard]:
+        """Lista os cards da pool ordenados por position ASC com filtros opcionais e paginação."""
         ...
 
     def count_pool(self, subject_id: UUID | None, topic_id: UUID | None) -> int:
         """Retorna o total de cards na pool sob os filtros fornecidos."""
+        ...
+
+    def count_by_subjects(self) -> dict[UUID, int]:
+        """Retorna contagem de cards agrupados por subject_id em uma única query com GROUP BY."""
+        ...
+
+    def count_by_topics(self) -> dict[UUID, int]:
+        """Retorna contagem de cards agrupados por topic_id em uma única query com GROUP BY."""
         ...
 
 

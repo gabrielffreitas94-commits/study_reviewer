@@ -188,3 +188,81 @@ def test_api_study_next_with_empty_or_invalid_query_params(client: TestClient) -
 
     resp2 = client.get("/api/v1/study/next?subject_id=invalid&topic_id=not-a-uuid")
     assert resp2.status_code == 404
+
+
+@pytest.mark.integration
+def test_api_study_batch_lifecycle(client: TestClient) -> None:
+    """Verifica consulta de lote paginado de flashcards via API REST."""
+    # Pool vazia -> 404
+    empty_batch = client.get("/api/v1/study/batch")
+    assert empty_batch.status_code == 404
+    assert "Nenhum flashcard disponível" in empty_batch.json()["detail"]
+
+    # Cria matéria, tema e flashcard
+    sub = client.post("/api/v1/subjects", json={"name": "Direito Constitucional"}).json()
+    top = client.post(
+        "/api/v1/topics", json={"subject_id": sub["id"], "name": "Direitos Fundamentais"}
+    ).json()
+    card_resp = client.post(
+        "/api/v1/flashcards",
+        json={
+            "topic_id": top["id"],
+            "front": "O que é o Habeas Corpus?",
+            "back": "Remédio constitucional para proteger liberdade de locomoção.",
+        },
+    )
+    assert card_resp.status_code == 201
+    card_data = card_resp.json()
+
+    # Consulta lote por topic_id
+    batch_resp = client.get(f"/api/v1/study/batch?topic_id={top['id']}&limit=50")
+    assert batch_resp.status_code == 200
+    batch_data = batch_resp.json()
+    assert batch_data["total_cards"] == 1
+    assert batch_data["round_number"] == 1
+    assert batch_data["has_more"] is False
+    assert len(batch_data["cards"]) == 1
+    assert batch_data["cards"][0]["id"] == card_data["id"]
+
+    # Consulta lote por subject_id
+    batch_sub = client.get(f"/api/v1/study/batch?subject_id={sub['id']}")
+    assert batch_sub.status_code == 200
+    assert batch_sub.json()["total_cards"] == 1
+
+
+@pytest.mark.integration
+def test_api_mark_card_read(client: TestClient) -> None:
+    """Verifica endpoint de marcar card lido e avançar sessão de estudo."""
+    # Card inexistente -> 404
+    missing_resp = client.post(f"/api/v1/study/read/{uuid4()}")
+    assert missing_resp.status_code == 404
+    assert "Card não encontrado" in missing_resp.json()["detail"]
+
+    # Cria matéria, tema e flashcard
+    sub = client.post("/api/v1/subjects", json={"name": "Informática"}).json()
+    top = client.post(
+        "/api/v1/topics", json={"subject_id": sub["id"], "name": "Redes de Computadores"}
+    ).json()
+    card = client.post(
+        "/api/v1/flashcards",
+        json={
+            "topic_id": top["id"],
+            "front": "O que é TCP?",
+            "back": "Transmission Control Protocol",
+        },
+    ).json()
+
+    # Leitura sem sessão ativa (não quebra, retorna ok)
+    read_no_session = client.post(f"/api/v1/study/read/{card['id']}")
+    assert read_no_session.status_code == 200
+    assert read_no_session.json() == {"status": "ok"}
+
+    # Inicia sessão com subject_id e topic_id
+    client.get(f"/api/v1/study/next?topic_id={top['id']}&subject_id={sub['id']}")
+
+    # Marca lido com sessão ativa
+    read_resp = client.post(
+        f"/api/v1/study/read/{card['id']}?topic_id={top['id']}&subject_id={sub['id']}"
+    )
+    assert read_resp.status_code == 200
+    assert read_resp.json() == {"status": "ok"}

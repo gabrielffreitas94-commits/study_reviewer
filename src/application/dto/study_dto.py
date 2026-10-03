@@ -33,3 +33,13 @@ class StudyCardDTO:
             object.__setattr__(self, "topic_ids", [self.topic_id])
         elif self.topic_ids and self.topic_id is None:
             object.__setattr__(self, "topic_id", self.topic_ids[0])
+
+
+@dataclass(frozen=True)
+class StudyBatchDTO:
+    """Lote paginado de flashcards para estudo (ex: 100 cards por requisição)."""
+
+    cards: list[StudyCardDTO]
+    total_cards: int
+    round_number: int
+    has_more: bool

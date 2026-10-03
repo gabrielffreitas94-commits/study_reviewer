@@ -47,6 +47,9 @@ class FakeSubjectRepository(ISubjectRepository):
         norm = name.strip().lower()
         return any(s.name.lower() == norm for s in self._subjects.values())
 
+    def list_all_with_topics(self) -> list[tuple[Subject, list[Topic]]]:
+        return [(s, []) for s in self.list_all()]
+
 
 class FakeTopicRepository(ITopicRepository):
     """Implementação em memória de ITopicRepository."""
@@ -94,20 +97,50 @@ class FakeFlashcardRepository(IFlashcardRepository):
     def delete(self, flashcard_id: UUID) -> None:
         self._cards.pop(flashcard_id, None)
 
-    def list_pool(self, subject_id: UUID | None, topic_id: UUID | None) -> list[Flashcard]:
+    def list_pool(
+        self,
+        subject_id: UUID | None,
+        topic_id: UUID | None,
+        limit: int | None = None,
+        min_position: int | None = None,
+    ) -> list[Flashcard]:
         cards = list(self._cards.values())
 
         if topic_id is not None:
-            cards = [c for c in cards if c.topic_id == topic_id]
+            cards = [c for c in cards if topic_id in c.topic_ids or c.topic_id == topic_id]
         elif subject_id is not None and self._topic_repo is not None:
             topics = self._topic_repo.list_by_subject(subject_id)
             valid_topic_ids = {t.id for t in topics}
-            cards = [c for c in cards if c.topic_id in valid_topic_ids]
+            cards = [c for c in cards if any(tid in valid_topic_ids for tid in c.topic_ids)]
 
-        return sorted(cards, key=lambda c: c.position)
+        sorted_cards = sorted(cards, key=lambda c: c.position)
+        if min_position is not None:
+            sorted_cards = [c for c in sorted_cards if c.position > min_position]
+
+        if limit is not None:
+            sorted_cards = sorted_cards[:limit]
+
+        return sorted_cards
 
     def count_pool(self, subject_id: UUID | None, topic_id: UUID | None) -> int:
         return len(self.list_pool(subject_id, topic_id))
+
+    def count_by_subjects(self) -> dict[UUID, int]:
+        counts: dict[UUID, int] = {}
+        if self._topic_repo is not None:
+            for card in self._cards.values():
+                for tid in card.topic_ids:
+                    t = self._topic_repo.get_by_id(tid)
+                    if t and t.subject_id:
+                        counts[t.subject_id] = counts.get(t.subject_id, 0) + 1
+        return counts
+
+    def count_by_topics(self) -> dict[UUID, int]:
+        counts: dict[UUID, int] = {}
+        for card in self._cards.values():
+            for tid in card.topic_ids:
+                counts[tid] = counts.get(tid, 0) + 1
+        return counts
 
 
 class FakeSessionRepository(ISessionRepository):

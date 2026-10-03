@@ -8,6 +8,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -23,13 +24,14 @@ class SubjectModel(Base):
     """Tabela de Matérias."""
 
     __tablename__ = "subjects"
+    __table_args__ = (Index("ix_subjects_id_include_name", "id", postgresql_include=["name"]),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
     topics: Mapped[list["TopicModel"]] = relationship(
-        "TopicModel", back_populates="subject", cascade="all, delete-orphan"
+        "TopicModel", back_populates="subject", cascade="all, delete-orphan", lazy="selectin"
     )
 
 
@@ -37,7 +39,14 @@ class TopicModel(Base):
     """Tabela de Temas."""
 
     __tablename__ = "topics"
-    __table_args__ = (UniqueConstraint("subject_id", "name", name="uq_topic_subject_name"),)
+    __table_args__ = (
+        UniqueConstraint("subject_id", "name", name="uq_topic_subject_name"),
+        Index(
+            "ix_topics_subject_id_include_id_name",
+            "subject_id",
+            postgresql_include=["id", "name"],
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     subject_id: Mapped[UUID] = mapped_column(

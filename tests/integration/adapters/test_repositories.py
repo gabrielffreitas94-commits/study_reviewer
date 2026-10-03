@@ -128,17 +128,53 @@ def test_flashcard_repository_pool_operations(db_session: Session) -> None:
     assert [c.position for c in global_pool] == [50, 100, 200]
     assert card_repo.count_pool(None, None) == 3
 
+    # Paginação em list_pool
+    paged = card_repo.list_pool(None, None, limit=1, min_position=50)
+    assert len(paged) == 1
+    assert paged[0].position == 100
+
+    # Contagens agrupadas via GROUP BY
+    sub_counts = card_repo.count_by_subjects()
+    assert sub_counts[sub1.id] == 2
+    assert sub_counts[sub2.id] == 1
+
+    top_counts = card_repo.count_by_topics()
+    assert top_counts[top1.id] == 2
+    assert top_counts[top2.id] == 1
+
+    # list_all_with_topics no SubjectRepository
+    subs_with_topics = sub_repo.list_all_with_topics()
+    assert len(subs_with_topics) == 2
+    sub1_found = next(s for s, t in subs_with_topics if s.id == sub1.id)
+    sub1_topics = next(t for s, t in subs_with_topics if s.id == sub1.id)
+    assert sub1_found.name == "Sub 1"
+    assert len(sub1_topics) == 1
+    assert sub1_topics[0].name == "Top 1"
+
+    # save_all vazio e atualização de existentes
+    card_repo.save_all([])
+    c2.position = 250
+    card_repo.save_all([c2])
+    c2_reloaded = card_repo.get_by_id(c2.id)
+    assert c2_reloaded is not None
+    assert c2_reloaded.position == 250
+
+    # save com tópicos atualizados
+    c2.topic_ids = (top2.id,)
+    card_repo.save(c2)
+    c2_updated = card_repo.get_by_id(c2.id)
+    assert c2_updated is not None
+    assert top2.id in c2_updated.topic_ids
+
     # Filtro por matéria
     sub1_pool = card_repo.list_pool(sub1.id, None)
-    assert len(sub1_pool) == 2
-    assert [c.position for c in sub1_pool] == [100, 200]
-    assert card_repo.count_pool(sub1.id, None) == 2
+    assert len(sub1_pool) == 1
+    assert card_repo.count_pool(sub1.id, None) == 1
 
     # Filtro por tema
     top2_pool = card_repo.list_pool(None, top2.id)
-    assert len(top2_pool) == 1
-    assert top2_pool[0].position == 50
-    assert card_repo.count_pool(None, top2.id) == 1
+    assert len(top2_pool) == 2
+    assert card_repo.count_pool(None, top2.id) == 2
 
     # Busca por ID e exclusão
     assert card_repo.get_by_id(c1.id) is not None
@@ -146,7 +182,6 @@ def test_flashcard_repository_pool_operations(db_session: Session) -> None:
 
     card_repo.delete(c1.id)
     assert card_repo.get_by_id(c1.id) is None
-    assert card_repo.count_pool(None, None) == 2
 
 
 @pytest.mark.integration

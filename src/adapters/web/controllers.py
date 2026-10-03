@@ -44,12 +44,12 @@ web_router = APIRouter()
 
 
 def _parse_uuid(val: str | None) -> UUID | None:
-    """Converte string para UUID com segurança, tratando valores vazios como None."""
-    if val and val.strip():
-        try:
-            return UUID(val.strip())
-        except ValueError:
-            return None
+    """Converte string para UUID com segurança, tratando valores vazios ou inválidos como None."""
+    try:
+        if val is not None and str(val).strip():
+            return UUID(str(val).strip())
+    except (ValueError, AttributeError, TypeError):
+        return None
     return None
 
 
@@ -78,14 +78,14 @@ def study_view(
     subjects = ListSubjectsUseCase(subject_repo).execute()
     topics = ListTopicsBySubjectUseCase(topic_repo).execute(sub_uuid) if sub_uuid else []
 
-    # Information Scent: Contagem em tempo real de cards disponíveis por matéria/tema
+    # Information Scent: Contagem de cards disponíveis por matéria/tema via GROUP BY
     global_card_count = card_repo.count_pool(None, None)
+    subject_counts = card_repo.count_by_subjects()
     subject_card_counts: dict[str, int] = {
-        str(sub.id): card_repo.count_pool(sub.id, None) for sub in subjects
+        str(sub.id): subject_counts.get(sub.id, 0) for sub in subjects
     }
-    topic_card_counts: dict[str, int] = {
-        str(top.id): card_repo.count_pool(None, top.id) for top in topics
-    }
+    topic_counts = card_repo.count_by_topics()
+    topic_card_counts: dict[str, int] = {str(top.id): topic_counts.get(top.id, 0) for top in topics}
 
     card: StudyCardDTO | None = None
     try:
@@ -304,12 +304,10 @@ def create_flashcard_web(
 def subjects_view(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     """Gerenciamento de Matérias e Temas."""
     subject_repo = SqlAlchemySubjectRepository(db)
-    topic_repo = SqlAlchemyTopicRepository(db)
 
-    subjects = ListSubjectsUseCase(subject_repo).execute()
-    topics_by_subject = {
-        s.id: ListTopicsBySubjectUseCase(topic_repo).execute(s.id) for s in subjects
-    }
+    subjects_with_topics = subject_repo.list_all_with_topics()
+    subjects = [sub for sub, _ in subjects_with_topics]
+    topics_by_subject = {sub.id: topics for sub, topics in subjects_with_topics}
 
     return templates.TemplateResponse(
         request=request,
@@ -333,11 +331,17 @@ def create_subject_web(
     try:
         CreateSubjectUseCase(subject_repo).execute(CreateSubjectDTO(name=name))
     except DomainException as exc:
-        subjects = ListSubjectsUseCase(subject_repo).execute()
+        subjects_with_topics = subject_repo.list_all_with_topics()
+        subjects = [sub for sub, _ in subjects_with_topics]
+        topics_by_subject = {sub.id: topics for sub, topics in subjects_with_topics}
         return templates.TemplateResponse(
             request=request,
             name="subjects.html",
-            context={"subjects": subjects, "topics_by_subject": {}, "error": str(exc)},
+            context={
+                "subjects": subjects,
+                "topics_by_subject": topics_by_subject,
+                "error": str(exc),
+            },
             status_code=400,
         )
     return RedirectResponse(url="/subjects", status_code=303)
@@ -358,11 +362,17 @@ def create_topic_web(
             CreateTopicDTO(subject_id=subject_id, name=name)
         )
     except DomainException as exc:
-        subjects = ListSubjectsUseCase(subject_repo).execute()
+        subjects_with_topics = subject_repo.list_all_with_topics()
+        subjects = [sub for sub, _ in subjects_with_topics]
+        topics_by_subject = {sub.id: topics for sub, topics in subjects_with_topics}
         return templates.TemplateResponse(
             request=request,
             name="subjects.html",
-            context={"subjects": subjects, "topics_by_subject": {}, "error": str(exc)},
+            context={
+                "subjects": subjects,
+                "topics_by_subject": topics_by_subject,
+                "error": str(exc),
+            },
             status_code=400,
         )
     return RedirectResponse(url="/subjects", status_code=303)

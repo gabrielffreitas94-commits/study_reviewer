@@ -8,6 +8,7 @@ from src.application.dto.study_dto import GetNextCardDTO
 from src.application.use_cases.study_session_use_cases import (
     GetCurrentStudyCardUseCase,
     GetNextFlashcardUseCase,
+    GetStudyBatchUseCase,
 )
 from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
 from src.domain.exceptions import EmptyPoolError
@@ -237,3 +238,82 @@ def test_get_current_card_fallback_when_card_deleted() -> None:
     assert dto.id == c2.id
     assert dto.position == 200
     assert dto.round_shuffled is False
+
+
+@pytest.mark.unit
+def test_get_study_batch_empty_pool_raises_empty_pool_error() -> None:
+    """GetStudyBatchUseCase dispara EmptyPoolError quando a pool está vazia."""
+    card_repo = FakeFlashcardRepository()
+    session_repo = FakeSessionRepository()
+    use_case = GetStudyBatchUseCase(card_repo, session_repo)
+
+    with pytest.raises(EmptyPoolError):
+        use_case.execute(GetNextCardDTO())
+
+
+@pytest.mark.unit
+def test_get_study_batch_success_with_topics_and_pagination() -> None:
+    """GetStudyBatchUseCase retorna lote de cards com metadados de tópicos e paginação."""
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+    session_repo = FakeSessionRepository()
+
+    t = Topic(subject_id=uuid4(), name="Direito Tributário")
+    topic_repo.save(t)
+
+    c1 = Flashcard(topic_id=t.id, front="F1", back="V1", position=100)
+    c2 = Flashcard(topic_id=t.id, front="F2", back="V2", position=200)
+    card_repo.save(c1)
+    card_repo.save(c2)
+
+    use_case = GetStudyBatchUseCase(card_repo, session_repo, topic_repo)
+
+    # 1. Busca lote inicial com limite 1
+    batch1 = use_case.execute(GetNextCardDTO(topic_id=t.id), limit=1)
+    assert len(batch1.cards) == 1
+    assert batch1.cards[0].id == c1.id
+    assert batch1.cards[0].topic_names == ["Direito Tributário"]
+    assert batch1.total_cards == 2
+    assert batch1.has_more is True
+
+    # 2. Simula avanço na sessão e busca próximo lote
+    session = session_repo.get_active_session(None, t.id)
+    assert session is not None
+    session.advance_to(100)
+    session_repo.save_session(session)
+
+    batch2 = use_case.execute(GetNextCardDTO(topic_id=t.id), limit=100)
+    assert len(batch2.cards) == 1
+    assert batch2.cards[0].id == c2.id
+    assert batch2.has_more is False
+
+    # 3. Quando não há mais cards após a posição atual, busca do início
+    session.advance_to(300)
+    session_repo.save_session(session)
+    batch3 = use_case.execute(GetNextCardDTO(topic_id=t.id), limit=100)
+    assert len(batch3.cards) == 2
+
+
+@pytest.mark.unit
+def test_get_next_and_current_card_with_topic_repo() -> None:
+    """Verifica resolução de nomes de temas em GetNextFlashcardUseCase
+    e GetCurrentStudyCardUseCase.
+    """
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+    session_repo = FakeSessionRepository()
+    rng = FakeRandomGenerator()
+
+    t = Topic(subject_id=uuid4(), name="Direito Penal")
+    topic_repo.save(t)
+
+    card = Flashcard(topic_id=t.id, front="Crime", back="Fato típico", position=100)
+    card_repo.save(card)
+
+    next_uc = GetNextFlashcardUseCase(card_repo, session_repo, rng, topic_repo)
+    dto_next = next_uc.execute(GetNextCardDTO(topic_id=t.id))
+    assert dto_next.topic_names == ["Direito Penal"]
+
+    curr_uc = GetCurrentStudyCardUseCase(card_repo, session_repo, topic_repo)
+    dto_curr = curr_uc.execute(GetNextCardDTO(topic_id=t.id))
+    assert dto_curr.topic_names == ["Direito Penal"]
