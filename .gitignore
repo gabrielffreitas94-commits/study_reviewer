@@ -37,6 +37,11 @@ coverage.xml
 .env.local
 *.log
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
 # IDEs & System
 .vscode/
 .idea/
@@ -44,3 +49,7 @@ coverage.xml
 *.swo
 .DS_Store
 Thumbs.db
+
+# Node
+node_modules/
+

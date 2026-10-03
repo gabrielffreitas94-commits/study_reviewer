@@ -1,0 +1,12 @@
+{
+  "name": "study-reviewer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/adapters/web/static/css/input.css -o ./src/adapters/web/static/css/tailwind.css --minify",
+    "watch:css": "tailwindcss -i ./src/adapters/web/static/css/input.css -o ./src/adapters/web/static/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

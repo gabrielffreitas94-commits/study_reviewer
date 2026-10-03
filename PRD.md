@@ -1,4 +1,4 @@
-# Product Requirements Document (PRD) — v5.2
+# Product Requirements Document (PRD) — v6.0
 ## Study Reviewer — Sistema Inteligente de Revisão Ativa e Repetição Espaçada
 
 ---
@@ -18,7 +18,7 @@ O **Study Reviewer** é uma aplicação focada em aprendizado contínuo e reten�
 * **Evolução Segura de Schema com Migrações Versionadas:** Requisito não-funcional de controle automatizado de versões de banco de dados, garantindo migrações contínuas sem quebras ou perda de dados.
 * **Datas Puramente Calendárias:** Todo o agendamento de perguntas abertas opera no formato `YYYY-MM-DD` (sem horas, minutos ou desvios de fuso horário).
 * **Segurança e Criptografia em Repouso com AES-256-GCM:** Autenticação segura na borda por sessão/cookie, sanitização estrita de inputs contra XSS (via biblioteca de sanitização como `nh3`) e proteção de segredos/tokens armazenados utilizando Criptografia Autenticada **AES-256-GCM (AEAD)**.
-* **Auditoria Histórica e Privacidade por Design (LGPD):** Auditoria exclusiva para perguntas abertas ligada à Matéria (`subject_id`) e ao Tema (`topic_id`) com colunas desnormalizadas congeladas (`historical_subject_name`, `historical_topic_name`). Suporte a exportação de dados em JSON e diretriz de efemeridade estrita para áudios gravados na Sprint 8 (descarte imediato pós-transcrição).
+* **Auditoria Histórica e Privacidade por Design (LGPD):** Auditoria exclusiva para perguntas abertas ligada à Matéria (`subject_id`) e ao Tema (`topic_id`) com colunas desnormalizadas congeladas (`historical_subject_name`, `historical_topic_name`). Suporte a exportação de dados em JSON e diretriz de efemeridade estrita para áudios gravados na Sprint 9 (descarte imediato pós-transcrição).
 * **Design System e Dark Mode Nativo:** Interface responsiva Mobile-First com TailwindCSS, suporte nativo a Tema Claro e Escuro (via seletor de classe, sem cintilação visual de carregamento/FOUC e com respeito ao `prefers-color-scheme`).
 
 ---
@@ -96,16 +96,16 @@ $$\text{Intervalos} = [1, 7, 15, 30, 60, 90, 180] \text{ dias}$$
 | **6** | 180 dias | Permanece no **Nível 6** (`hoje + 180d`) | ⚠️ **Regride para o Nível 2** (Reagenda estritamente para `hoje + 15d`) |
 
 ### 3.2 Fases das Perguntas Abertas:
-* **Fase 1 (MVP — Sprint 2):** Usuário visualiza a pergunta, elabora mentalmente a resposta, clica em "Ver Resposta Esperada" e atribui sua nota de 0 a 100 (sem digitação nem áudio).
-* **Fase 2 (Planejamento de IA, RAG de Livros & Bancada de Avaliação — Sprint 6):** Concepção da base de livros digitalizados e arquitetura de múltiplos avaliadores.
-* **Fase 3 (IA com Texto — Sprint 7):** Digitação da resposta e correção automática por IA com nota e feedback detalhado.
-* **Fase 4 (IA com Voz — Sprint 8):** Gravação de voz com envio direto para o Gemini Flash para transcrição e avaliação semântica. O arquivo de áudio é estritamente efêmero, sendo descartado imediatamente após a resposta da IA para proteção da privacidade biométrica (LGPD).
+* **Fase 1 (MVP — Sprint 3):** Usuário visualiza a pergunta, elabora mentalmente a resposta, clica em "Ver Resposta Esperada" e atribui sua nota de 0 a 100 (sem digitação nem áudio).
+* **Fase 2 (Planejamento de IA, RAG de Livros & Bancada de Avaliação — Sprint 7):** Concepção da base de livros digitalizados e arquitetura de múltiplos avaliadores.
+* **Fase 3 (IA com Texto — Sprint 8):** Digitação da resposta e correção automática por IA com nota e feedback detalhado.
+* **Fase 4 (IA com Voz — Sprint 9):** Gravação de voz com envio direto para o Gemini Flash para transcrição e avaliação semântica. O arquivo de áudio é estritamente efêmero, sendo descartado imediatamente após a resposta da IA para proteção da privacidade biométrica (LGPD).
 
 ---
 
 ## 4. Auditoria Completa de Performance (Perguntas Abertas)
 
-A partir da Sprint 3, cada tentativa de revisão de pergunta aberta registra um log imutável:
+A partir da Sprint 4, cada tentativa de revisão de pergunta aberta registra um log imutável:
 
 ```mermaid
 erDiagram
@@ -223,16 +223,17 @@ Para que qualquer Sprint seja considerada concluída e receba autorização de m
 
 ```mermaid
 flowchart TD
-    S1["Sprint 1: MVP Flashcards em Produção (Docker + Pool por Rodada com Gaps de 100)"] --> S2["Sprint 2: MVP Perguntas Abertas (SRS Manual)"]
-    S2 --> S3["Sprint 3: Sistema de Auditoria Completa"]
-    S3 --> S4["Sprint 4: App Mobile Dedicado em Flutter"]
-    S4 --> S5["Sprint 5: Dashboard Analítico de Performance"]
-    S5 --> S6["Sprint 6: Pesquisa, Arquitetura e Planejamento da IA & RAG de Livros"]
-    S6 --> S7["Sprint 7: IA com Resposta Escrita (Gemini Flash)"]
-    S7 --> S8["Sprint 8: IA com Resposta em Voz Efêmera (Gemini Multimodal)"]
+    S1["Sprint 1: MVP Flashcards em Produção (Docker + Pool por Rodada com Gaps de 100)"] --> S2["Sprint 2: Autenticação & Multi-tenancy com Google (OAuth2 / OIDC)"]
+    S2 --> S3["Sprint 3: MVP Perguntas Abertas (SRS Manual)"]
+    S3 --> S4["Sprint 4: Sistema de Auditoria Completa"]
+    S4 --> S5["Sprint 5: App Mobile Dedicado em Flutter"]
+    S5 --> S6["Sprint 6: Dashboard Analítico de Performance"]
+    S6 --> S7["Sprint 7: Pesquisa, Arquitetura e Planejamento da IA & RAG de Livros"]
+    S7 --> S8["Sprint 8: IA com Resposta Escrita (Gemini Flash)"]
+    S8 --> S9["Sprint 9: IA com Resposta em Voz Efêmera (Gemini Multimodal)"]
 ```
 
-### 🎯 Sprint 1: MVP Flashcards em Produção (Foco Imediato)
+### 🎯 Sprint 1: MVP Flashcards em Produção (Concluída / Em Validação)
 * **Objetivo:** Sistema de flashcards funcional em produção na nuvem, rodando localmente via Docker, com suporte a estudo global ou por matéria/tema selecionado.
 * **Escopo:**
   * Setup Docker Compose com PostgreSQL e FastAPI.
@@ -247,3 +248,46 @@ flowchart TD
   * Autenticação de sessão na borda e criptografia AES-256-GCM para dados protegidos.
   * Deploy do banco no Neon e do app no Render.
 * **Entregável:** Link de produção ativo no Render com Docker, sem auditoria analítica e 100% funcional.
+
+---
+
+### 🎯 Sprint 2: Autenticação & Multi-tenancy com Google (OAuth2 / OIDC) (Próxima Sprint)
+* **Objetivo:** Implementar autenticação centralizada via Google OAuth2 / OpenID Connect (OIDC), gestão de sessões seguras no backend (Web Jinja2/HTMX e API REST desacoplada para mobile) e isolamento multi-inquilino (*multi-tenancy*) dos dados de estudo por usuário, preparando o alicerce para futuros grupos e compartilhamento.
+* **Escopo:**
+  * **Clean Architecture & Domínio (Camada 1):**
+    * Entidade `User` rica (`id: UUID`, `email: str`, `name: str`, `avatar_url: str | None`, `google_sub: str`, `created_at: date`) com validação de formato e invariantes.
+    * Atualização das entidades `Subject` (adição de `owner_id: UUID`) e `FlashcardPoolSession` (adição de `user_id: UUID`).
+  * **Casos de Uso e Portas Agnósticas (Camada 2):**
+    * `AuthenticateWithGoogleUseCase`: recebe credencial/código OIDC, valida integridade da assinatura via porta, busca ou provisiona o usuário (JIT Provisioning) e emite a sessão autenticada.
+    * `GetCurrentUserUseCase`: resolve a entidade do usuário ativo a partir do token de sessão.
+    * `LogoutUseCase`: revoga e invalida a sessão ativa.
+    * Adequação dos use cases de flashcards/matérias para exigir e validar a titularidade do usuário logado (`user_id`).
+    * Contratos abstratos (`typing.Protocol`): `IUserRepository`, `IGoogleAuthClient`, `ISessionTokenService`.
+  * **Adaptadores de Interface & Persistência (Camada 3):**
+    * Implementação de `SqlAlchemyUserRepository`.
+    * Atualização de `SqlAlchemySubjectRepository`, `SqlAlchemyFlashcardRepository` e `SqlAlchemySessionRepository` com filtros estritos por `user_id` (prevenção contra vulnerabilidade IDOR).
+    * Controladores Web (`/auth/login`, `/auth/google`, `/auth/callback`, `/auth/logout`) e API REST (`/api/v1/auth/*`).
+    * Modelos ORM atualizados (`UserModel`, FKs em `subjects` e `flashcard_pool_sessions`).
+  * **Frameworks, Infraestrutura & Segurança (Camada 4):**
+    * Migração versionada via Alembic criando tabela `users` e associando foreign keys com `ondelete="CASCADE"`.
+    * Cookies de sessão seguros com flags `HttpOnly`, `SameSite=Lax`, `Secure` e payload encriptado via **AES-256-GCM**.
+    * Middleware / Dependency Injection no FastAPI (`get_current_user`) para proteção de rotas privadas.
+  * **Interface Web & UX/UI (Jinja2 + HTMX + TailwindCSS):**
+    * Página de boas-vindas/login com botão padrão "Continuar com o Google" (Google Identity Services compliant).
+    * Header com indicador do usuário autenticado (avatar, nome, menu dropdown com atalho de logout).
+    * Redirecionamento amigável e preservação da rota de destino pós-login.
+  * **LGPD & Governança de Segurança:**
+    * Minimização Estrita de Dados (apenas `sub`, `email` e `name`, sem escopos excessivos na Google API).
+    * Testes de segurança decorados com `@pytest.mark.security` cobrindo validação de token, proteção contra CSRF no fluxo OAuth via parâmetro `state` assinado, expiração de sessão e prevenção de IDOR multi-tenant.
+* **Entregável:** Sistema protegido por login Google em produção, sessões seguras, dados estritamente isolados por usuário e 100% de cobertura de testes.
+
+---
+
+### 📋 Sprints Futuras Subsequentes
+* **Sprint 3:** MVP Perguntas Abertas (Mecânica SRS Manual com Níveis 0 a 6).
+* **Sprint 4:** Sistema de Auditoria Completa de Performance (Logs Imutáveis).
+* **Sprint 5:** App Mobile Dedicado em Flutter.
+* **Sprint 6:** Dashboard Analítico de Performance.
+* **Sprint 7:** Pesquisa, Arquitetura e Planejamento da IA & RAG de Livros.
+* **Sprint 8:** IA com Resposta Escrita (Gemini Flash).
+* **Sprint 9:** IA com Resposta em Voz Efêmera (Gemini Multimodal).

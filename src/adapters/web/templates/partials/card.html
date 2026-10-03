@@ -1,0 +1,189 @@
+{% if request and request.headers.get("HX-Request") == "true" %}
+<!-- Sincronização Out-Of-Band do Indicador de Progresso (P0 UX Fix) -->
+<div id="progress-indicator" hx-swap-oob="true" class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center justify-end sm:justify-start space-x-2 shrink-0">
+    {% if card %}
+        <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+        <span>Card <strong class="text-slate-900 dark:text-white">{{ card.current_index }}</strong> de <strong class="text-slate-900 dark:text-white">{{ card.total_cards }}</strong></span>
+        <span>•</span>
+        <span>Rodada <strong class="text-slate-900 dark:text-white">{{ card.round_number }}</strong></span>
+    {% else %}
+        <span>0 cards</span>
+    {% endif %}
+</div>
+
+<!-- Sincronização Out-Of-Band do Dropdown de Temas (Zero Layout Shift) -->
+{% if update_filters %}
+<div id="filter-topic-container" hx-swap-oob="true" class="inline-flex items-center flex-1 sm:flex-initial">
+    {% if selected_subject_id and topics and topics|length > 0 %}
+    <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+    <select 
+        id="filter-topic" 
+        name="topic_id" 
+        hx-get="/study"
+        hx-target="#flashcard-container"
+        hx-swap="outerHTML"
+        hx-push-url="true"
+        hx-include="#filter-subject"
+        hx-trigger="change"
+        class="text-xs sm:text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 sm:px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-44 lg:w-48 truncate transition shadow-sm cursor-pointer"
+        title="Atalho: T para selecionar tema"
+    >
+        <option value="">Todos os Temas ({{ subject_card_counts.get(selected_subject_id, 0) }})</option>
+        {% for top in topics %}
+            <option value="{{ top.id }}" {% if selected_topic_id == top.id|string %}selected{% endif %}>
+                {{ top.name }} ({{ topic_card_counts.get(top.id|string, 0) }})
+            </option>
+        {% endfor %}
+    </select>
+    {% elif selected_subject_id %}
+    <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+    <select 
+        id="filter-topic" 
+        name="topic_id" 
+        disabled
+        class="text-xs sm:text-sm bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-lg px-2.5 sm:px-3 py-2 text-slate-400 dark:text-slate-500 cursor-not-allowed w-full sm:w-44 lg:w-48 truncate transition shadow-sm"
+        title="Esta matéria não possui temas cadastrados"
+    >
+        <option value="">Nenhum tema</option>
+    </select>
+    {% else %}
+    <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+    <select 
+        id="filter-topic" 
+        name="topic_id" 
+        disabled
+        class="text-xs sm:text-sm bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-lg px-2.5 sm:px-3 py-2 text-slate-400 dark:text-slate-500 cursor-not-allowed w-full sm:w-44 lg:w-48 truncate transition shadow-sm"
+        title="Selecione uma matéria para filtrar por tema"
+    >
+        <option value="">Todos os Temas</option>
+    </select>
+    {% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+<!-- Card Parcial para estudo ativo HTMX -->
+<div id="flashcard-container" class="w-full min-w-0 flex-1 flex flex-col justify-between" hx-target="#flashcard-container" hx-swap="outerHTML">
+
+    <!-- Notificação Acessível via aria-live para leitores de tela -->
+    <div id="card-announcer" class="sr-only" aria-live="polite" aria-atomic="true">
+        {% if card %}
+            {% if side == 'back' %}
+                Resposta revelada: {{ card.back }}
+            {% else %}
+                {% if card.round_shuffled %}
+                    Nova rodada iniciada.
+                {% endif %}
+                Card número {{ card.current_index }} de {{ card.total_cards }}, Rodada {{ card.round_number }}. Pergunta: {{ card.front }}
+            {% endif %}
+        {% else %}
+            Nenhum card disponível.
+        {% endif %}
+    </div>
+
+    {% if card %}
+        <!-- Alerta de Nova Rodada (se shuffled) -->
+        {% if card.round_shuffled and side != 'back' %}
+        <div class="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between" role="status">
+            <span class="flex items-center space-x-2">
+                <span class="text-base" aria-hidden="true">🔄</span>
+                <span><strong>Nova Rodada Iniciada!</strong></span>
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- Superfície do Card (Interactive Flip Area) -->
+        <div 
+            id="card-surface"
+            tabindex="0"
+            role="button"
+            aria-label="{% if side == 'back' %}Resposta do card. Pressione espaço ou clique para ver a pergunta.{% else %}Pergunta do card. Pressione espaço ou clique para revelar a resposta.{% endif %}"
+            hx-post="/study/flip"
+            hx-vals='{"card_id": "{{ card.id }}", "side": "{{ side or 'front' }}", "current_index": "{{ card.current_index }}", "total_cards": "{{ card.total_cards }}", "round_number": "{{ card.round_number }}", "position": "{{ card.position }}"}'
+            class="w-full min-w-0 max-w-full flex-1 min-h-[300px] sm:min-h-[380px] bg-white dark:bg-slate-800 border-2 {% if side == 'back' %}border-indigo-400 dark:border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/20{% else %}border-slate-200 dark:border-slate-700{% endif %} rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer select-none focus:outline-none focus:ring-4 focus:ring-indigo-500/20 overflow-hidden"
+        >
+            <!-- Topo do Card: Badge de Frente/Verso, Temas e Posição Pinned -->
+            <div class="flex items-start justify-between gap-3 text-xs font-semibold tracking-wider uppercase mb-4 w-full min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+                    {% if side == 'back' %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5"></span> Resposta (Verso)
+                        </span>
+                    {% else %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span> Pergunta (Frente)
+                        </span>
+                    {% endif %}
+
+                    {% if card.topic_names %}
+                        {% for tname in card.topic_names %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 max-w-full break-words break-words-anywhere [overflow-wrap:anywhere]" title="{{ tname }}">
+                                <span class="mr-1 shrink-0" aria-hidden="true">🏷️</span>
+                                <span class="break-words break-words-anywhere [overflow-wrap:anywhere]">{{ tname }}</span>
+                            </span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                <span class="text-slate-400 dark:text-slate-500 font-mono text-[11px] shrink-0 whitespace-nowrap pt-1" title="Posição de Gap Indexing">
+                    #{{ card.position }}
+                </span>
+            </div>
+
+            <!-- Corpo Textual do Card com Word Break Seguro -->
+            <div class="w-full min-w-0 my-auto py-6 flex flex-col justify-center items-center text-center">
+                {% if side == 'back' %}
+                    <div class="w-full min-w-0 text-lg sm:text-2xl text-slate-800 dark:text-slate-100 font-medium whitespace-pre-wrap break-words break-words-anywhere [overflow-wrap:anywhere] leading-relaxed text-center max-w-2xl mx-auto">{{ card.back }}</div>
+                {% else %}
+                    <div class="w-full min-w-0 text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white whitespace-pre-wrap break-words break-words-anywhere [overflow-wrap:anywhere] leading-relaxed text-center max-w-2xl mx-auto">{{ card.front }}</div>
+                {% endif %}
+            </div>
+
+            <!-- Rodapé interno do Card: Dica de Atalho -->
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500 w-full min-w-0">
+                <span class="truncate sm:overflow-visible">Toque no card ou pressione <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Espaço</kbd> para virar</span>
+                <span class="hidden sm:inline shrink-0 ml-2">Avançar: <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Enter</kbd></span>
+            </div>
+        </div>
+
+        <!-- Controles de Ação Abaixo do Card -->
+        <div class="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <button
+                type="button"
+                id="btn-flip"
+                hx-post="/study/flip"
+                hx-vals='{"card_id": "{{ card.id }}", "side": "{{ side or 'front' }}", "current_index": "{{ card.current_index }}", "total_cards": "{{ card.total_cards }}", "round_number": "{{ card.round_number }}", "position": "{{ card.position }}"}'
+                class="min-h-[48px] px-6 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-medium text-slate-700 dark:text-slate-200 transition shadow-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+                <span aria-hidden="true">🔄</span>
+                <span>{% if side == 'back' %}Ver Pergunta (Espaço){% else %}Virar Card (Espaço){% endif %}</span>
+            </button>
+
+            <button
+                type="button"
+                id="btn-next"
+                hx-post="/study/next"
+                hx-vals='{"subject_id": "{{ subject_id or '' }}", "topic_id": "{{ topic_id or '' }}"}'
+                class="min-h-[48px] px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow hover:shadow-md flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+                <span>Próximo Card</span>
+                <span aria-hidden="true">➔</span>
+            </button>
+        </div>
+
+    {% else %}
+        <!-- Estado Vazio (Zero Flashcards Disponíveis) -->
+        <div class="flex-1 min-h-[340px] bg-white dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+            <span class="text-5xl mb-4" aria-hidden="true">📭</span>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Nenhum Flashcard Disponível</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6">
+                Não há flashcards cadastrados para o filtro selecionado. Cadastre o primeiro flashcard para começar a rotação contínua da pool!
+            </p>
+            <a href="/flashcards/new{% if topic_id %}?topic_id={{ topic_id }}{% elif subject_id %}?subject_id={{ subject_id }}{% endif %}" class="min-h-[48px] px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow inline-flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <span aria-hidden="true">➕</span>
+                <span>Cadastrar Primeiro Flashcard</span>
+            </a>
+        </div>
+    {% endif %}
+
+</div>

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Estudo de Flashcards — Study Reviewer{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col justify-between max-w-3xl mx-auto w-full min-w-0">
+
+    <!-- Barra de Filtros e Indicador de Progresso com Zero Layout Shift -->
+    <div class="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4 min-h-[52px]">
+        
+        <!-- Filtros de Matéria / Tema com Layout Fixo Lado a Lado (Zero Quebra Vertical) -->
+        <form 
+            id="study-filter-form" 
+            method="GET" 
+            action="/study" 
+            class="flex items-center gap-2 w-full sm:w-auto shrink-0"
+            onsubmit="return false;"
+        >
+            <label for="filter-subject" class="sr-only">Filtrar por Matéria</label>
+            <select 
+                id="filter-subject" 
+                name="subject_id" 
+                hx-get="/study"
+                hx-target="#flashcard-container"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+                hx-trigger="change"
+                onchange="const top = document.getElementById('filter-topic'); if (top) top.value = '';"
+                class="text-xs sm:text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 sm:px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1 sm:flex-initial sm:w-44 lg:w-48 truncate transition shadow-sm cursor-pointer"
+                title="Atalho: M para selecionar matéria"
+            >
+                <option value="">Todas as Matérias ({{ global_card_count }})</option>
+                {% for sub in subjects %}
+                    <option value="{{ sub.id }}" {% if selected_subject_id == sub.id|string %}selected{% endif %}>
+                        {{ sub.name }} ({{ subject_card_counts.get(sub.id|string, 0) }})
+                    </option>
+                {% endfor %}
+            </select>
+
+            <div id="filter-topic-container" class="inline-flex items-center flex-1 sm:flex-initial">
+                {% if selected_subject_id and topics and topics|length > 0 %}
+                <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+                <select 
+                    id="filter-topic" 
+                    name="topic_id" 
+                    hx-get="/study"
+                    hx-target="#flashcard-container"
+                    hx-swap="outerHTML"
+                    hx-push-url="true"
+                    hx-include="#filter-subject"
+                    hx-trigger="change"
+                    class="text-xs sm:text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 sm:px-3 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-44 lg:w-48 truncate transition shadow-sm cursor-pointer"
+                    title="Atalho: T para selecionar tema"
+                >
+                    <option value="">Todos os Temas ({{ subject_card_counts.get(selected_subject_id, 0) }})</option>
+                    {% for top in topics %}
+                        <option value="{{ top.id }}" {% if selected_topic_id == top.id|string %}selected{% endif %}>
+                            {{ top.name }} ({{ topic_card_counts.get(top.id|string, 0) }})
+                        </option>
+                    {% endfor %}
+                </select>
+                {% elif selected_subject_id %}
+                <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+                <select 
+                    id="filter-topic" 
+                    name="topic_id" 
+                    disabled
+                    class="text-xs sm:text-sm bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-lg px-2.5 sm:px-3 py-2 text-slate-400 dark:text-slate-500 cursor-not-allowed w-full sm:w-44 lg:w-48 truncate transition shadow-sm"
+                    title="Esta matéria não possui temas cadastrados"
+                >
+                    <option value="">Nenhum tema</option>
+                </select>
+                {% else %}
+                <label for="filter-topic" class="sr-only">Filtrar por Tema</label>
+                <select 
+                    id="filter-topic" 
+                    name="topic_id" 
+                    disabled
+                    class="text-xs sm:text-sm bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-lg px-2.5 sm:px-3 py-2 text-slate-400 dark:text-slate-500 cursor-not-allowed w-full sm:w-44 lg:w-48 truncate transition shadow-sm"
+                    title="Selecione uma matéria para filtrar por tema"
+                >
+                    <option value="">Todos os Temas</option>
+                </select>
+                {% endif %}
+            </div>
+        </form>
+
+        <!-- Indicador de Progresso (Card X de Y • Rodada Z) -->
+        <div id="progress-indicator" class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center justify-end sm:justify-start space-x-2 shrink-0">
+            {% if card %}
+                <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                <span>Card <strong class="text-slate-900 dark:text-white">{{ card.current_index }}</strong> de <strong class="text-slate-900 dark:text-white">{{ card.total_cards }}</strong></span>
+                <span>•</span>
+                <span>Rodada <strong class="text-slate-900 dark:text-white">{{ card.round_number }}</strong></span>
+            {% else %}
+                <span>0 cards</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Conteúdo Principal do Card via Partial -->
+    {% include "partials/card.html" %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Gerenciamento ergonômico de atalhos de teclado (Espaço, Enter/Seta Direita, M e T)
+    document.addEventListener('keydown', function(e) {
+        // Ignora atalhos de navegação se estiver em campo de entrada/textarea/select
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            return;
+        }
+
+        // Barra de Espaço: Virar o card
+        if (e.code === 'Space') {
+            e.preventDefault();
+            const flipBtn = document.getElementById('btn-flip');
+            if (flipBtn) {
+                flipBtn.click();
+            }
+        }
+
+        // Enter ou Seta para a Direita: Avançar para o próximo card
+        if (e.code === 'Enter' || e.code === 'ArrowRight') {
+            e.preventDefault();
+            const nextBtn = document.getElementById('btn-next');
+            if (nextBtn) {
+                nextBtn.click();
+            }
+        }
+
+        // Atalho 'm' ou 'M': Foca no seletor de matéria
+        if (e.key === 'm' || e.key === 'M') {
+            const subjectSelect = document.getElementById('filter-subject');
+            if (subjectSelect) {
+                e.preventDefault();
+                subjectSelect.focus();
+            }
+        }
+
+        // Atalho 't' ou 'T': Foca no seletor de tema (se visível)
+        if (e.key === 't' || e.key === 'T') {
+            const topicSelect = document.getElementById('filter-topic');
+            if (topicSelect) {
+                e.preventDefault();
+                topicSelect.focus();
+            }
+        }
+    });
+
+    // Gestos de toque touch mobile (Swipe para a esquerda avança o card)
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    document.addEventListener('touchend', function(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, { passive: true });
+
+    function handleSwipe() {
+        const threshold = 60; // Limite mínimo de 60px para considerar swipe intencional
+        if (touchStartX - touchEndX > threshold) {
+            // Deslizou para a esquerda -> Próximo Card
+            const nextBtn = document.getElementById('btn-next');
+            if (nextBtn) {
+                nextBtn.click();
+            }
+        }
+    }
+</script>
+{% endblock %}
