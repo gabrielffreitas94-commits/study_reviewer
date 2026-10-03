@@ -213,7 +213,7 @@ Para que qualquer Sprint seja considerada concluída e receba autorização de m
 4. [ ] **Governança de Testes de Segurança:** Testes com impacto de segurança decorados com `@pytest.mark.security`, docstring estruturada contendo `"Vulnerabilidade prevenida:"` e `"Garantia de segurança:"`, e meta-teste AST 100% aprovado.
 5. [ ] **Qualidade Estática de Código:** Linters e checagem de tipos (Ruff format/check e Mypy strict) passando com zero alertas e sem supressões artificiais.
 6. [ ] **Aderência à Clean Architecture:** Núcleo de domínio Python puro (sem dependência de frameworks/ORM), use cases agnósticos e inversão de dependência via Protocols.
-7. [ ] **Auditoria Unânime da Bancada:** Pareceres formais assinados pelos **10 Especialistas** no template oficial de PR (`[APROVADO]` ou `[N/A JUSTIFICADO]`).
+7. [ ] **Auditoria Unânime da Bancada:** Pareceres formais assinados pelos **13 Especialistas** no template oficial de PR (`[APROVADO]` ou `[N/A JUSTIFICADO]`).
 8. [ ] **Paridade Docker Comprovada:** Aplicação e banco executando perfeitamente via `docker compose up`.
 9. [ ] **Pull Request Aberta para Staging:** PR devidamente aberta com documentação e histórico rastreável.
 

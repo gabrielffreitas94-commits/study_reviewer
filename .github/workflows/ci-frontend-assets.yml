@@ -1,0 +1,40 @@
+name: CI — Frontend Assets & Tailwind CSS Build
+
+on:
+  push:
+    branches: [ "main", "staging" ]
+  pull_request:
+    branches: [ "main", "staging" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-assets:
+    name: Frontend Static Assets Compilation (Node / Tailwind)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Compile and Minify Tailwind CSS
+        run: npm run build:css
+
+      - name: Verify Output CSS Asset
+        run: |
+          if [ ! -s src/adapters/web/static/css/tailwind.css ]; then
+            echo "Error: tailwind.css was not generated or is empty!"
+            exit 1
+          fi
+          echo "Tailwind CSS generated successfully: $(wc -c < src/adapters/web/static/css/tailwind.css) bytes."
