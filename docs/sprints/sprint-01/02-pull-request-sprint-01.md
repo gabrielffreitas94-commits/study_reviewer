@@ -8,16 +8,17 @@
   * `docs/adrs/ADR-001-clean-architecture-layering.md`
   * `docs/adrs/ADR-002-flashcard-gap-indexing-pool.md`
   * `docs/adrs/ADR-003-docker-dev-prod-parity-and-migrations.md`
+  * `docs/adrs/ADR-004-flashcard-many-to-many-topics.md`
 
 ---
 
 ## 🎯 Resumo da Entrega & Objetivo
 Implementação completa e em padrão de produção do subsistema de **Flashcards** para o **Study Reviewer** conforme PRD v5.2 e especificações da Sprint 01:
-1. **Núcleo de Domínio:** Entidades puras (`Subject`, `Topic`, `Flashcard`, `FlashcardPoolSession`) com validação de invariantes, tratamento defensivo de Unicode/espaços e datas UTC.
+1. **Núcleo de Domínio:** Entidades puras (`Subject`, `Topic`, `Flashcard`, `FlashcardPoolSession`) com validação de invariantes, tratamento defensivo de Unicode/espaços e datas UTC. Suporte a múltiplos tópicos por flashcard (ADR-004).
 2. **Motor Matemático de Gap Indexing (`FlashcardPoolService`):** Inserção dinâmica no ponto médio dos primeiros 10% da pool ($\mathcal{O}(1)$), rebalanceamento preventivo automático quando o gap atinge $\le 1$, e embaralhamento Fisher-Yates ao final da rodada com gerador criptográfico seguro.
 3. **Casos de Uso da Aplicação:** Criação e listagem de matérias e temas com checagem de duplicidade insensível a maiúsculas/minúsculas e acentos, cadastro ágil de flashcards e avanço contínuo de rodadas de estudo.
-4. **Interface Web & API REST:** Telas e parciais HTMX responsivas com TailwindCSS, alternância de card com flip 3D e hotkeys (`Space`/`Enter`), anúncios acessíveis via `aria-live="polite"`, suporte a gestos touch swipe em mobile e endpoints JSON desacoplados prontos para consumo por mobile/Flutter.
-5. **Infraestrutura & Dev/Prod Parity:** Dockerfile multi-stage com usuário não-root `appuser`, `docker-compose.yml` orquestrando PostgreSQL 16 Alpine com healthcheck e volume persistente, e migrações versionadas com Alembic (`001_sprint_01_flashcards`).
+4. **Interface Web & API REST:** Telas e parciais HTMX responsivas com TailwindCSS, alternância de card com flip 3D e hotkeys (`Space`/`Enter`), anúncios acessíveis via `aria-live="polite"`, suporte a gestos touch swipe em mobile, busca instantânea e paginação de DOM de matérias/temas e endpoints JSON desacoplados prontos para consumo por mobile/Flutter.
+5. **Infraestrutura & Dev/Prod Parity:** Dockerfile multi-stage com usuário não-root `appuser`, `docker-compose.yml` orquestrando PostgreSQL 16 Alpine com healthcheck e volume persistente, e migrações versionadas com Alembic (`001_sprint_01_flashcards` e `1b9d1d8e2245_flashcard_topics_many_to_many`).
 6. **Segurança:** Criptografia autenticada AES-256-GCM AEAD com HKDF, sanitização defensiva via `nh3`, e middleware de headers de segurança HTTP (HSTS, CSP, X-Frame-Options, X-Content-Type-Options).
 
 ---
@@ -31,21 +32,21 @@ Implementação completa e em padrão de produção do subsistema de **Flashcard
 ```text
 Name                                                   Stmts   Miss  Cover
 --------------------------------------------------------------------------
-src/adapters/api/controllers.py                           73      0   100%
-src/adapters/persistence/mappers.py                       30      0   100%
-src/adapters/persistence/models.py                        38      0   100%
-src/adapters/persistence/repositories.py                  94      0   100%
-src/adapters/web/controllers.py                          120      0   100%
-src/application/dto/flashcard_dto.py                       7      0   100%
-src/application/dto/study_dto.py                           8      0   100%
+src/adapters/api/controllers.py                           85      0   100%
+src/adapters/persistence/mappers.py                       31      0   100%
+src/adapters/persistence/models.py                        41      0   100%
+src/adapters/persistence/repositories.py                 108      0   100%
+src/adapters/web/controllers.py                          141      0   100%
+src/application/dto/flashcard_dto.py                      19      0   100%
+src/application/dto/study_dto.py                          16      0   100%
 src/application/dto/subject_dto.py                         7      0   100%
 src/application/dto/topic_dto.py                           7      0   100%
 src/application/ports/repositories.py                     23      0   100%
-src/application/use_cases/flashcard_use_cases.py          60      0   100%
-src/application/use_cases/study_session_use_cases.py      36      0   100%
+src/application/use_cases/flashcard_use_cases.py          65      0   100%
+src/application/use_cases/study_session_use_cases.py      77      0   100%
 src/application/use_cases/subject_use_cases.py            20      0   100%
 src/application/use_cases/topic_use_cases.py              25      0   100%
-src/domain/entities.py                                    53      0   100%
+src/domain/entities.py                                    50      0   100%
 src/domain/exceptions.py                                   5      0   100%
 src/domain/protocols.py                                    4      0   100%
 src/domain/services.py                                    50      0   100%
@@ -55,11 +56,11 @@ src/infrastructure/rng.py                                 11      0   100%
 src/infrastructure/security/crypto.py                     31      0   100%
 src/infrastructure/security/middleware.py                 13      0   100%
 src/infrastructure/security/sanitization.py                6      0   100%
-src/infrastructure/web/app.py                             19      0   100%
+src/infrastructure/web/app.py                             24      0   100%
 --------------------------------------------------------------------------
-TOTAL                                                    768      0   100%
+TOTAL                                                    887      0   100%
 Required test coverage of 100% reached. Total coverage: 100.00%
-97 passed, 2 warnings in 2.73s
+112 passed, 2 warnings in 2.95s
 ```
 
 ---
