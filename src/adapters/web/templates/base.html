@@ -15,29 +15,11 @@
         }
     </script>
 
+    <!-- Tailwind CSS Compilado Estático -->
+    <link rel="stylesheet" href="/static/css/tailwind.css">
+
     <!-- CSS Base Local e Mecânicas 3D -->
     <link rel="stylesheet" href="/static/css/app.css">
-
-    <!-- Tailwind CSS com suporte nativo a class selector para Dark Mode -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f5f7ff',
-                            100: '#ebedff',
-                            500: '#4f46e5',
-                            600: '#4338ca',
-                            700: '#3730a3',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
 
     <!-- HTMX para interações ágeis sem recarregar a tela -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>

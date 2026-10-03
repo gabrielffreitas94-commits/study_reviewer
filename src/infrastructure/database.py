@@ -3,7 +3,8 @@
 from collections.abc import Generator
 from typing import Any
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from src.infrastructure.config import settings
@@ -11,6 +12,13 @@ from src.infrastructure.config import settings
 
 class Base(DeclarativeBase):
     """Classe base declarativa para os modelos ORM."""
+
+
+@event.listens_for(Engine, "connect")
+def _setup_sqlite_functions(dbapi_connection: Any, connection_record: Any) -> None:
+    """Configura funções personalizadas em conexões SQLite (ex: suporte a lower Unicode)."""
+    if hasattr(dbapi_connection, "create_function"):
+        dbapi_connection.create_function("lower", 1, str.lower)
 
 
 def get_engine_args(url: str) -> dict[str, Any]:

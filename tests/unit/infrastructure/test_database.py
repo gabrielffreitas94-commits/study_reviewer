@@ -1,8 +1,10 @@
 """Testes unitários para a configuração de banco de dados (Camada 4 - Infraestrutura)."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
-from src.infrastructure.database import get_db, get_engine_args
+from src.infrastructure.database import _setup_sqlite_functions, get_db, get_engine_args
 
 
 @pytest.mark.unit
@@ -29,3 +31,18 @@ def test_get_db_generator() -> None:
     # Conclui o gerador para disparar o bloco finally com db.close()
     with pytest.raises(StopIteration):
         next(gen)
+
+
+@pytest.mark.unit
+def test_setup_sqlite_functions_with_sqlite_connection() -> None:
+    """Verifica registro da função lower quando a conexão suporta create_function."""
+    conn = MagicMock()
+    _setup_sqlite_functions(conn, None)
+    conn.create_function.assert_called_once_with("lower", 1, str.lower)
+
+
+@pytest.mark.unit
+def test_setup_sqlite_functions_without_create_function() -> None:
+    """Verifica comportamento gracioso quando a conexão não possui create_function (PostgreSQL)."""
+    conn = object()
+    _setup_sqlite_functions(conn, None)

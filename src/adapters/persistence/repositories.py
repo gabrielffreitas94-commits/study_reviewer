@@ -48,10 +48,12 @@ class SqlAlchemySubjectRepository(ISubjectRepository):
         return [SubjectMapper.to_domain(m) for m in models]
 
     def exists_by_name(self, name: str) -> bool:
-        stmt = select(SubjectModel.name)
-        names = self._session.scalars(stmt).all()
-        norm = name.strip().lower()
-        return any(n.strip().lower() == norm for n in names)
+        stmt = (
+            select(SubjectModel.id)
+            .where(func.lower(func.trim(SubjectModel.name)) == name.strip().lower())
+            .limit(1)
+        )
+        return self._session.scalar(stmt) is not None
 
 
 class SqlAlchemyTopicRepository(ITopicRepository):
@@ -80,10 +82,15 @@ class SqlAlchemyTopicRepository(ITopicRepository):
         return [TopicMapper.to_domain(m) for m in models]
 
     def exists_by_name(self, subject_id: UUID, name: str) -> bool:
-        stmt = select(TopicModel.name).where(TopicModel.subject_id == subject_id)
-        names = self._session.scalars(stmt).all()
-        norm = name.strip().lower()
-        return any(n.strip().lower() == norm for n in names)
+        stmt = (
+            select(TopicModel.id)
+            .where(
+                TopicModel.subject_id == subject_id,
+                func.lower(func.trim(TopicModel.name)) == name.strip().lower(),
+            )
+            .limit(1)
+        )
+        return self._session.scalar(stmt) is not None
 
 
 class SqlAlchemyFlashcardRepository(IFlashcardRepository):

@@ -28,6 +28,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Instala binário standalone do Tailwind CSS CLI (leve, sem Node.js em produção)
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then \
+        TAILWIND_BIN="tailwindcss-linux-arm64"; \
+    else \
+        TAILWIND_BIN="tailwindcss-linux-x64"; \
+    fi && \
+    curl -sLo /usr/local/bin/tailwindcss "https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.17/${TAILWIND_BIN}" && \
+    chmod +x /usr/local/bin/tailwindcss
+
 # Cria usuário não-root dedicado
 RUN useradd -m -u 1000 appuser
 
@@ -35,11 +45,15 @@ RUN useradd -m -u 1000 appuser
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Copia código-fonte e migrações
+# Copia configurações, código-fonte e migrações
+COPY tailwind.config.js /app/tailwind.config.js
 COPY src/ /app/src/
 COPY alembic/ /app/alembic/
 COPY alembic.ini /app/alembic.ini
 COPY entrypoint.sh /app/entrypoint.sh
+
+# Compila CSS estático do Tailwind em build time
+RUN tailwindcss -i /app/src/adapters/web/static/css/input.css -o /app/src/adapters/web/static/css/tailwind.css --minify
 
 RUN chmod +x /app/entrypoint.sh && chown -R appuser:appuser /app
 
