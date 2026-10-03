@@ -27,7 +27,7 @@ Implementação do pacote de melhorias estruturais de engenharia, governança t�
      - `ci-frontend-assets.yml`: Ambiente Node.js isolado para compilação estática do Tailwind CSS (`npm run build:css`).
      - `ci-frontend-quality.yml`: Validação sintática e integridade de todos os templates Jinja2 e componentes HTML/HTMX.
      - `cd-docker-parity.yml`: Build de contêiner multi-stage e teste de paridade sob usuário não-root `appuser`.
-3. **Protocolo de Auditoria Concorrente por Clusters (Opção A — Multi-Agente):**
+3. **Protocolo de Auditoria Concorrente por Clusters (Multi-Agente):**
    - Formalização do protocolo de paralelização em `docs/personas/00-parallel-audit-protocol.md`.
    - Criação da skill de orquestração `.gemini/skills/parallel-audit-orchestrator/SKILL.md`.
    - Distribuição dos 13 especialistas em 4 clusters de competência executados simultaneamente via `invoke_subagent`.

@@ -60,7 +60,7 @@ Este documento estabelece as regras inegociáveis para o desenvolvimento de toda
      13. Especialista de Performance de Banco de Dados
    - Status válidos para cada parecer: `[APROVADO]` ou `[N/A JUSTIFICADO]`. Nenhum especialista pode ser omitido.
 
-8. **Protocolo de Auditoria Concorrente por Clusters (Opção A — `invoke_subagent`):**
+8. **Protocolo de Auditoria Concorrente por Clusters (`invoke_subagent`):**
    - Na fase de auditoria final da PR, a avaliação dos 13 especialistas é realizada de forma **estritamente paralela** via multi-agente, agrupados em 4 clusters de competência afins:
      - **Cluster 1 (Core & Arquitetura):** Especialistas #1 (Produto), #2 (QA) e #3 (Arquiteto).
      - **Cluster 2 (Segurança & Compliance):** Especialistas #4 (Segurança), #5 (Telemetria) e #10 (LGPD).

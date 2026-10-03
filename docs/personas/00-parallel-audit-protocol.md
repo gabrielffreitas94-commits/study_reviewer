@@ -1,7 +1,7 @@
-# Protocolo de Auditoria Concorrente por Clusters (Opção A — Multi-Agente)
+# Protocolo de Auditoria Concorrente por Clusters Multi-Agente
 # Projeto: Study Reviewer
 
-Este documento formaliza o **Protocolo de Auditoria Concorrente por Clusters Multi-Agente (Opção A)** para o encerramento de todas as Sprints do **Study Reviewer**.
+Este documento formaliza o **Protocolo de Auditoria Concorrente por Clusters Multi-Agente** para o encerramento de todas as Sprints do **Study Reviewer**.
 
 ---
 
