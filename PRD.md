@@ -213,9 +213,26 @@ Para que qualquer Sprint seja considerada concluída e receba autorização de m
 4. [ ] **Governança de Testes de Segurança:** Testes com impacto de segurança decorados com `@pytest.mark.security`, docstring estruturada contendo `"Vulnerabilidade prevenida:"` e `"Garantia de segurança:"`, e meta-teste AST 100% aprovado.
 5. [ ] **Qualidade Estática de Código:** Linters e checagem de tipos (Ruff format/check e Mypy strict) passando com zero alertas e sem supressões artificiais.
 6. [ ] **Aderência à Clean Architecture:** Núcleo de domínio Python puro (sem dependência de frameworks/ORM), use cases agnósticos e inversão de dependência via Protocols.
-7. [ ] **Auditoria Unânime da Bancada:** Pareceres formais assinados pelos **10 Especialistas** no template oficial de PR (`[APROVADO]` ou `[N/A JUSTIFICADO]`).
+7. [ ] **Auditoria Unânime da Bancada:** Pareceres formais assinados pelos **13 Especialistas** no template oficial de PR (`[APROVADO]` ou `[N/A JUSTIFICADO]`).
 8. [ ] **Paridade Docker Comprovada:** Aplicação e banco executando perfeitamente via `docker compose up`.
 9. [ ] **Pull Request Aberta para Staging:** PR devidamente aberta com documentação e histórico rastreável.
+
+### 7.1 Bancada dos 13 Especialistas de Auditoria e Qualidade
+
+Para assegurar excelência em todas as dimensões de entrega e confiabilidade, cada Pull Request para `staging` deve ser auditada e aprovada formalmente pelos 13 especialistas:
+1. **Especialista de Produto (PO):** Aderência aos requisitos e valor de entrega do PRD sem escopo fantasma.
+2. **Especialista QA:** Testabilidade, integridade de cenários BDD e barreira de 100% de cobertura.
+3. **Especialista Arquiteto:** Preservação das fronteiras da Clean Architecture, regra de dependência e inversão via Protocols.
+4. **Especialista de Segurança:** Auditoria contra OWASP Top 10, sanitização defensiva, zero credenciais no repositório e testes de segurança AST.
+5. **Especialista de Telemetria:** Structured logging com correlation IDs, rastreabilidade e integridade operacional.
+6. **Especialista de UX:** Ergonomia de estudo, atalhos de teclado ágeis, feedback imediato e navegação touch em mobile.
+7. **Especialista de UI:** Design System consistente com Tailwind CSS, dark mode nativo e ausência de FOUC.
+8. **Especialista de DevOps:** Paridade Dev/Prod via Docker Compose, contêiner multi-stage sob usuário não-root e esteiras modulares de CI/CD.
+9. **Especialista de Acessibilidade:** Conformidade estrita com WCAG 2.1 nível AA, navegação completa por teclado e semântica WAI-ARIA.
+10. **Especialista em LGPD:** Princípio da minimização de dados, proteção de privacidade e transparência.
+11. **Especialista de Performance de Programação Python:** Eficiência algorítmica assintótica Big-O (tempo e espaço), uso de geradores, lookup O(1) e ausência de loops redundantes no backend.
+12. **Especialista de Performance de Frontend:** Core Web Vitals (LCP, INP, CLS), Tailwind CSS estático minificado, ausência de layout thrashing e fragmentos HTMX parciais enxutos.
+13. **Especialista de Performance de Banco de Dados:** Eliminação do antipadrão N+1 queries via eager loading (selectinload), cobertura de índices B-tree/covering, persistência em lote atômica e ciclos curtos de transação.
 
 ---
 
