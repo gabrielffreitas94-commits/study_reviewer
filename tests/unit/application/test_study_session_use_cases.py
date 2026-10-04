@@ -11,7 +11,7 @@ from src.application.use_cases.study_session_use_cases import (
     GetStudyBatchUseCase,
 )
 from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
-from src.domain.exceptions import EmptyPoolError
+from src.domain.exceptions import EmptyPoolError, ResourceOwnershipError
 from tests.unit.application.fakes import (
     FakeFlashcardRepository,
     FakeRandomGenerator,
@@ -317,3 +317,89 @@ def test_get_next_and_current_card_with_topic_repo() -> None:
     curr_uc = GetCurrentStudyCardUseCase(card_repo, session_repo, topic_repo)
     dto_curr = curr_uc.execute(GetNextCardDTO(topic_id=t.id))
     assert dto_curr.topic_names == ["Direito Penal"]
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_get_next_card_private_subject_raises_ownership_error() -> None:
+    """Impede que estudante acesse card de matéria privada pertencente a outrem.
+
+    Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) e quebra de privacidade.
+    Garantia de segurança: Lança ResourceOwnershipError ao tentar estudar matéria privada de outro.
+    """
+    subject_repo = FakeSubjectRepository()
+    card_repo = FakeFlashcardRepository(FakeTopicRepository())
+    session_repo = FakeSessionRepository()
+    rng = FakeRandomGenerator()
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+    subject = Subject(name="Privada", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+
+    use_case = GetNextFlashcardUseCase(
+        card_repo=card_repo,
+        session_repo=session_repo,
+        rng=rng,
+        subject_repo=subject_repo,
+    )
+
+    with pytest.raises(ResourceOwnershipError, match="Você não tem acesso a esta matéria privada"):
+        use_case.execute(GetNextCardDTO(subject_id=subject.id), user_id=intruder_id)
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_get_study_batch_private_subject_raises_ownership_error() -> None:
+    """Impede que estudante solicite lote de revisão de matéria privada pertencente a outrem.
+
+    Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) e vazamento de dados.
+    Garantia de segurança: Lança ResourceOwnershipError ao solicitar batch
+    de matéria privada alheia.
+    """
+    subject_repo = FakeSubjectRepository()
+    card_repo = FakeFlashcardRepository(FakeTopicRepository())
+    session_repo = FakeSessionRepository()
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+    subject = Subject(name="Privada Batch", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+
+    use_case = GetStudyBatchUseCase(
+        card_repo=card_repo,
+        session_repo=session_repo,
+        subject_repo=subject_repo,
+    )
+
+    with pytest.raises(ResourceOwnershipError, match="Você não tem acesso a esta matéria privada"):
+        use_case.execute(GetNextCardDTO(subject_id=subject.id), user_id=intruder_id)
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_get_current_study_card_private_subject_raises_ownership_error() -> None:
+    """Impede leitura de card corrente de matéria privada pertencente a outrem.
+
+    Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) e quebra
+    de confidencialidade.
+    Garantia de segurança: Lança ResourceOwnershipError ao inspecionar card corrente
+    de matéria privada alheia.
+    """
+    subject_repo = FakeSubjectRepository()
+    card_repo = FakeFlashcardRepository(FakeTopicRepository())
+    session_repo = FakeSessionRepository()
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+    subject = Subject(name="Privada Current", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+
+    use_case = GetCurrentStudyCardUseCase(
+        card_repo=card_repo,
+        session_repo=session_repo,
+        subject_repo=subject_repo,
+    )
+
+    with pytest.raises(ResourceOwnershipError, match="Você não tem acesso a esta matéria privada"):
+        use_case.execute(GetNextCardDTO(subject_id=subject.id), user_id=intruder_id)

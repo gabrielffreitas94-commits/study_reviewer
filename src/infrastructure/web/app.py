@@ -40,6 +40,38 @@ def create_app() -> FastAPI:
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     # Registra rotas web (Jinja2 / HTMX) e API REST (JSON)
+    from fastapi import Request
+    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+
+    from src.adapters.api.auth_controllers import api_auth_router
+    from src.adapters.web.auth_controllers import auth_router
+    from src.domain.exceptions import ResourceOwnershipError, UnauthorizedError
+
+    @app.exception_handler(ResourceOwnershipError)
+    async def resource_ownership_handler(request: Request, exc: ResourceOwnershipError) -> Response:
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(status_code=403, content={"detail": str(exc)})
+        html_content = (
+            "<!DOCTYPE html><html><body>"
+            "<h1>403 Proibido</h1>"
+            f"<p>{exc}</p>"
+            "<a href='/study'>Voltar ao Estudo</a>"
+            "</body></html>"
+        )
+        return HTMLResponse(status_code=403, content=html_content)
+
+    @app.exception_handler(UnauthorizedError)
+    async def unauthorized_handler(request: Request, exc: UnauthorizedError) -> Response:
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": str(exc)},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return RedirectResponse(url="/auth/login", status_code=303)
+
+    app.include_router(auth_router)
+    app.include_router(api_auth_router)
     app.include_router(web_router)
     app.include_router(api_router)
 

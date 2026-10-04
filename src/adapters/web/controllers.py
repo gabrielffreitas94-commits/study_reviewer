@@ -19,6 +19,7 @@ from src.application.dto.flashcard_dto import CreateFlashcardDTO
 from src.application.dto.study_dto import GetNextCardDTO, StudyCardDTO
 from src.application.dto.subject_dto import CreateSubjectDTO
 from src.application.dto.topic_dto import CreateTopicDTO
+from src.application.use_cases.auth_use_cases import ToggleSubjectPublicUseCase
 from src.application.use_cases.flashcard_use_cases import CreateFlashcardUseCase
 from src.application.use_cases.study_session_use_cases import (
     GetCurrentStudyCardUseCase,
@@ -32,9 +33,11 @@ from src.application.use_cases.topic_use_cases import (
     CreateTopicUseCase,
     ListTopicsBySubjectUseCase,
 )
+from src.domain.entities import User
 from src.domain.exceptions import DomainException, EmptyPoolError
 from src.infrastructure.database import get_db
 from src.infrastructure.rng import default_rng
+from src.infrastructure.security.dependencies import get_current_user
 from src.infrastructure.security.sanitization import sanitize_html_content
 
 templates_dir = Path(__file__).resolve().parent / "templates"
@@ -65,6 +68,7 @@ def study_view(
     subject_id: str | None = None,
     topic_id: str | None = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Renderiza a tela de estudo de flashcards com suporte a filtros e Gap Indexing."""
     sub_uuid = _parse_uuid(subject_id)
@@ -75,7 +79,7 @@ def study_view(
     card_repo = SqlAlchemyFlashcardRepository(db)
     session_repo = SqlAlchemySessionRepository(db)
 
-    subjects = ListSubjectsUseCase(subject_repo).execute()
+    subjects = ListSubjectsUseCase(subject_repo).execute(user_id=current_user.id)
     topics = ListTopicsBySubjectUseCase(topic_repo).execute(sub_uuid) if sub_uuid else []
 
     # Information Scent: Contagem de cards disponíveis por matéria/tema via GROUP BY
@@ -89,9 +93,14 @@ def study_view(
 
     card: StudyCardDTO | None = None
     try:
-        get_current_uc = GetCurrentStudyCardUseCase(card_repo, session_repo, topic_repo)
-        card = get_current_uc.execute(GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid))
-    except EmptyPoolError:
+        get_current_uc = GetCurrentStudyCardUseCase(
+            card_repo, session_repo, topic_repo, subject_repo=subject_repo
+        )
+        card = get_current_uc.execute(
+            GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid),
+            user_id=current_user.id,
+        )
+    except (EmptyPoolError, DomainException):
         card = None
 
     context = {
@@ -107,6 +116,7 @@ def study_view(
         "subject_card_counts": subject_card_counts,
         "topic_card_counts": topic_card_counts,
         "update_filters": True,
+        "current_user": current_user,
     }
 
     # Se for requisição ágil HTMX, renderiza apenas o fragmento parcial com swaps out-of-band
@@ -134,6 +144,7 @@ def flip_card(
     round_number: Annotated[int, Form()],
     position: Annotated[int, Form()],
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Endpoint HTMX para alternar entre pergunta e resposta sem recarregar a tela."""
     card_repo = SqlAlchemyFlashcardRepository(db)
@@ -144,7 +155,7 @@ def flip_card(
         return templates.TemplateResponse(
             request=request,
             name="partials/card.html",
-            context={"card": None, "side": "front"},
+            context={"card": None, "side": "front", "current_user": current_user},
         )
 
     topic_names: list[str] = []
@@ -170,7 +181,7 @@ def flip_card(
     return templates.TemplateResponse(
         request=request,
         name="partials/card.html",
-        context={"card": study_dto, "side": new_side},
+        context={"card": study_dto, "side": new_side, "current_user": current_user},
     )
 
 
@@ -180,6 +191,7 @@ def next_card(
     subject_id: Annotated[str | None, Form()] = None,
     topic_id: Annotated[str | None, Form()] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Endpoint HTMX para avançar para o próximo card da rodada."""
     sub_uuid = _parse_uuid(subject_id)
@@ -188,12 +200,22 @@ def next_card(
     card_repo = SqlAlchemyFlashcardRepository(db)
     session_repo = SqlAlchemySessionRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
+    subject_repo = SqlAlchemySubjectRepository(db)
 
     card: StudyCardDTO | None = None
     try:
-        get_next_uc = GetNextFlashcardUseCase(card_repo, session_repo, default_rng, topic_repo)
-        card = get_next_uc.execute(GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid))
-    except EmptyPoolError:
+        get_next_uc = GetNextFlashcardUseCase(
+            card_repo,
+            session_repo,
+            default_rng,
+            topic_repo=topic_repo,
+            subject_repo=subject_repo,
+        )
+        card = get_next_uc.execute(
+            GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid),
+            user_id=current_user.id,
+        )
+    except (EmptyPoolError, DomainException):
         card = None
 
     return templates.TemplateResponse(
@@ -204,6 +226,7 @@ def next_card(
             "side": "front",
             "subject_id": sub_uuid,
             "topic_id": top_uuid,
+            "current_user": current_user,
         },
     )
 
@@ -216,13 +239,14 @@ def new_flashcard_view(
     topic_ids: Annotated[list[str] | None, Query()] = None,
     success: bool = False,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Tela de cadastro ágil de flashcards com seleção de múltiplos temas (ADR-004)."""
     top_uuid = _parse_uuid(topic_id)
     subject_repo = SqlAlchemySubjectRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
 
-    subjects = subject_repo.list_all()
+    subjects = subject_repo.list_by_owner(current_user.id)
     topics_by_subject = [
         {"subject": s, "topics": topic_repo.list_by_subject(s.id)} for s in subjects
     ]
@@ -241,6 +265,7 @@ def new_flashcard_view(
             "back": "",
             "success": success,
             "error": None,
+            "current_user": current_user,
         },
     )
 
@@ -253,6 +278,7 @@ def create_flashcard_web(
     front: Annotated[str, Form()] = "",
     back: Annotated[str, Form()] = "",
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Response:
     """Processa o cadastro ágil de flashcard e redireciona continuamente (Botão Único Salvar)."""
     card_repo = SqlAlchemyFlashcardRepository(db)
@@ -266,16 +292,23 @@ def create_flashcard_web(
     target_topic_ids = (topic_ids or []) or ([topic_id] if topic_id is not None else [])
 
     try:
-        use_case = CreateFlashcardUseCase(card_repo, topic_repo, session_repo, default_rng)
+        use_case = CreateFlashcardUseCase(
+            card_repo,
+            topic_repo,
+            session_repo,
+            default_rng,
+            subject_repo=subject_repo,
+        )
         use_case.execute(
             CreateFlashcardDTO(
                 topic_ids=target_topic_ids,
                 front=clean_front,
                 back=clean_back,
-            )
+            ),
+            user_id=current_user.id,
         )
     except DomainException as exc:
-        subjects = subject_repo.list_all()
+        subjects = subject_repo.list_by_owner(current_user.id)
         topics_by_subject = [
             {"subject": s, "topics": topic_repo.list_by_subject(s.id)} for s in subjects
         ]
@@ -289,6 +322,7 @@ def create_flashcard_web(
                 "back": back,
                 "success": False,
                 "error": str(exc),
+                "current_user": current_user,
             },
             status_code=400,
         )
@@ -301,11 +335,15 @@ def create_flashcard_web(
 
 
 @web_router.get("/subjects", response_class=HTMLResponse)
-def subjects_view(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+def subjects_view(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> HTMLResponse:
     """Gerenciamento de Matérias e Temas."""
     subject_repo = SqlAlchemySubjectRepository(db)
 
-    subjects_with_topics = subject_repo.list_all_with_topics()
+    subjects_with_topics = subject_repo.list_all_with_topics(user_id=current_user.id)
     subjects = [sub for sub, _ in subjects_with_topics]
     topics_by_subject = {sub.id: topics for sub, topics in subjects_with_topics}
 
@@ -316,6 +354,7 @@ def subjects_view(request: Request, db: Session = Depends(get_db)) -> HTMLRespon
             "subjects": subjects,
             "topics_by_subject": topics_by_subject,
             "error": None,
+            "current_user": current_user,
         },
     )
 
@@ -324,14 +363,19 @@ def subjects_view(request: Request, db: Session = Depends(get_db)) -> HTMLRespon
 def create_subject_web(
     request: Request,
     name: Annotated[str, Form()],
+    is_public: Annotated[bool, Form()] = False,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Response:
     """Criação de nova matéria via formulário."""
     subject_repo = SqlAlchemySubjectRepository(db)
     try:
-        CreateSubjectUseCase(subject_repo).execute(CreateSubjectDTO(name=name))
+        CreateSubjectUseCase(subject_repo).execute(
+            CreateSubjectDTO(name=name, is_public=is_public),
+            owner_id=current_user.id,
+        )
     except DomainException as exc:
-        subjects_with_topics = subject_repo.list_all_with_topics()
+        subjects_with_topics = subject_repo.list_all_with_topics(user_id=current_user.id)
         subjects = [sub for sub, _ in subjects_with_topics]
         topics_by_subject = {sub.id: topics for sub, topics in subjects_with_topics}
         return templates.TemplateResponse(
@@ -341,6 +385,41 @@ def create_subject_web(
                 "subjects": subjects,
                 "topics_by_subject": topics_by_subject,
                 "error": str(exc),
+                "current_user": current_user,
+            },
+            status_code=400,
+        )
+    return RedirectResponse(url="/subjects", status_code=303)
+
+
+@web_router.post("/subjects/{subject_id}/toggle-public", response_model=None)
+def toggle_subject_public_web(
+    request: Request,
+    subject_id: UUID,
+    is_public: Annotated[bool, Form()] = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Alterna visibilidade pública da matéria pelo proprietário."""
+    subject_repo = SqlAlchemySubjectRepository(db)
+    try:
+        ToggleSubjectPublicUseCase(subject_repo).execute(
+            user_id=current_user.id,
+            subject_id=subject_id,
+            is_public=is_public,
+        )
+    except DomainException as exc:
+        subjects_with_topics = subject_repo.list_all_with_topics(user_id=current_user.id)
+        subjects = [sub for sub, _ in subjects_with_topics]
+        topics_by_subject = {sub.id: topics for sub, topics in subjects_with_topics}
+        return templates.TemplateResponse(
+            request=request,
+            name="subjects.html",
+            context={
+                "subjects": subjects,
+                "topics_by_subject": topics_by_subject,
+                "error": str(exc),
+                "current_user": current_user,
             },
             status_code=400,
         )
@@ -353,16 +432,18 @@ def create_topic_web(
     subject_id: Annotated[UUID, Form()],
     name: Annotated[str, Form()],
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Response:
     """Criação de novo tema via formulário."""
     subject_repo = SqlAlchemySubjectRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
     try:
         CreateTopicUseCase(subject_repo, topic_repo).execute(
-            CreateTopicDTO(subject_id=subject_id, name=name)
+            CreateTopicDTO(subject_id=subject_id, name=name),
+            user_id=current_user.id,
         )
     except DomainException as exc:
-        subjects_with_topics = subject_repo.list_all_with_topics()
+        subjects_with_topics = subject_repo.list_all_with_topics(user_id=current_user.id)
         subjects = [sub for sub, _ in subjects_with_topics]
         topics_by_subject = {sub.id: topics for sub, topics in subjects_with_topics}
         return templates.TemplateResponse(
@@ -372,6 +453,7 @@ def create_topic_web(
                 "subjects": subjects,
                 "topics_by_subject": topics_by_subject,
                 "error": str(exc),
+                "current_user": current_user,
             },
             status_code=400,
         )

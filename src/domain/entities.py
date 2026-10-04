@@ -1,24 +1,76 @@
 """Entidades de domínio puras do sistema Study Reviewer (Clean Architecture - Camada 1)."""
 
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
-from src.domain.exceptions import DomainValidationError
+from src.domain.exceptions import (
+    DomainValidationError,
+    InvalidEmailError,
+    InvalidGoogleSubError,
+)
+
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+
+
+@dataclass
+class User:
+    """Entidade que representa um Usuário/Estudante autenticado."""
+
+    google_sub: str
+    email: str
+    name: str
+    avatar_url: str | None = None
+    id: UUID = field(default_factory=uuid4)
+    created_at: date = field(default_factory=date.today)
+
+    def __post_init__(self) -> None:
+        self.google_sub = self.google_sub.strip() if self.google_sub is not None else ""
+        self.email = self.email.strip().lower() if self.email is not None else ""
+        self.name = self.name.strip() if self.name is not None else ""
+        if self.avatar_url is not None:
+            cleaned_avatar = self.avatar_url.strip()
+            self.avatar_url = cleaned_avatar if cleaned_avatar else None
+
+        if not self.google_sub:
+            raise InvalidGoogleSubError("O identificador Google (sub) não pode ser vazio.")
+
+        if not self.name or len(self.name) > 150:
+            raise DomainValidationError("Nome de usuário deve ter entre 1 e 150 caracteres.")
+
+        if not self._is_valid_email(self.email):
+            raise InvalidEmailError(f"Formato de e-mail inválido: '{self.email}'.")
+
+    @staticmethod
+    def _is_valid_email(email: str) -> bool:
+        return bool(EMAIL_REGEX.match(email))
 
 
 @dataclass
 class Subject:
-    """Entidade que representa uma Matéria macro de estudo."""
+    """Entidade que representa uma Matéria macro de estudo com suporte
+    a multi-tenancy e compartilhamento read-only.
+    """
 
     name: str
     id: UUID = field(default_factory=uuid4)
+    owner_id: UUID = field(default_factory=uuid4)
+    is_public: bool = False
     created_at: date = field(default_factory=date.today)
 
     def __post_init__(self) -> None:
         self.name = self.name.strip()
         if len(self.name) < 2 or len(self.name) > 100:
             raise DomainValidationError("Nome da matéria deve ter entre 2 e 100 caracteres.")
+
+    def can_be_edited_by(self, user_id: UUID) -> bool:
+        """Determina se o usuário possui permissão de edição/exclusão (apenas o proprietário)."""
+        return self.owner_id == user_id
+
+    def can_be_studied_by(self, user_id: UUID) -> bool:
+        """Determina se o usuário possui permissão de estudo (proprietário ou matéria pública)."""
+        return self.owner_id == user_id or self.is_public
 
 
 @dataclass
@@ -109,6 +161,7 @@ class FlashcardPoolSession:
     """Entidade que encapsula o estado persistido de uma sessão de estudo da pool."""
 
     id: UUID = field(default_factory=uuid4)
+    user_id: UUID = field(default_factory=uuid4)
     subject_id_filter: UUID | None = None
     topic_id_filter: UUID | None = None
     current_position: int = 0

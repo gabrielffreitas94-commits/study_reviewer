@@ -20,16 +20,45 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.infrastructure.database import Base
 
 
+class UserModel(Base):
+    """Tabela de Usuários."""
+
+    __tablename__ = "users"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    google_sub: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
+
+    subjects: Mapped[list["SubjectModel"]] = relationship(
+        "SubjectModel", back_populates="owner", cascade="all, delete-orphan", lazy="selectin"
+    )
+    sessions: Mapped[list["PoolSessionModel"]] = relationship(
+        "PoolSessionModel", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
 class SubjectModel(Base):
     """Tabela de Matérias."""
 
     __tablename__ = "subjects"
-    __table_args__ = (Index("ix_subjects_id_include_name", "id", postgresql_include=["name"]),)
+    __table_args__ = (
+        Index("ix_subjects_id_include_name", "id", postgresql_include=["name"]),
+        Index("ix_subjects_owner_public", "owner_id", "is_public"),
+        UniqueConstraint("owner_id", "name", name="uq_subject_owner_name"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    owner_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True, default=uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
+    owner: Mapped["UserModel | None"] = relationship("UserModel", back_populates="subjects")
     topics: Mapped[list["TopicModel"]] = relationship(
         "TopicModel", back_populates="subject", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -83,8 +112,8 @@ class FlashcardModel(Base):
     __tablename__ = "flashcards"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    front: Mapped[str] = mapped_column(Text, nullable=False)
-    back: Mapped[str] = mapped_column(Text, nullable=False)
+    front: Mapped[Text] = mapped_column(Text, nullable=False)
+    back: Mapped[Text] = mapped_column(Text, nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False, index=True, default=100)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
@@ -100,8 +129,14 @@ class PoolSessionModel(Base):
     """Tabela de Sessões de Estudo persistidas com filtros e progresso."""
 
     __tablename__ = "flashcard_pool_sessions"
+    __table_args__ = (
+        Index("ix_sessions_user_filters", "user_id", "subject_id_filter", "topic_id_filter"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True, default=uuid4
+    )
     subject_id_filter: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
     )
@@ -114,3 +149,5 @@ class PoolSessionModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
+
+    user: Mapped["UserModel | None"] = relationship("UserModel", back_populates="sessions")

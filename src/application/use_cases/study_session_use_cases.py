@@ -1,13 +1,16 @@
 """Casos de uso para Estudo e Gestão da Pool de Flashcards (Clean Architecture - Camada 2)."""
 
+from uuid import UUID, uuid4
+
 from src.application.dto.study_dto import GetNextCardDTO, StudyBatchDTO, StudyCardDTO
 from src.application.ports.repositories import (
     IFlashcardRepository,
     ISessionRepository,
+    ISubjectRepository,
     ITopicRepository,
 )
 from src.domain.entities import FlashcardPoolSession
-from src.domain.exceptions import EmptyPoolError
+from src.domain.exceptions import EmptyPoolError, ResourceOwnershipError
 from src.domain.protocols import IRandomGenerator
 from src.domain.services import FlashcardPoolService
 
@@ -21,22 +24,32 @@ class GetNextFlashcardUseCase:
         session_repo: ISessionRepository,
         rng: IRandomGenerator,
         topic_repo: ITopicRepository | None = None,
+        subject_repo: ISubjectRepository | None = None,
     ) -> None:
         self._card_repo = card_repo
         self._session_repo = session_repo
         self._rng = rng
         self._topic_repo = topic_repo
+        self._subject_repo = subject_repo
 
-    def execute(self, input_dto: GetNextCardDTO) -> StudyCardDTO:
+    def execute(self, input_dto: GetNextCardDTO, user_id: UUID | None = None) -> StudyCardDTO:
+        if user_id is not None and self._subject_repo is not None and input_dto.subject_id:
+            subject = self._subject_repo.get_by_id(input_dto.subject_id)
+            if subject is not None and not subject.can_be_studied_by(user_id):
+                raise ResourceOwnershipError("Você não tem acesso a esta matéria privada.")
+
         total_cards = self._card_repo.count_pool(input_dto.subject_id, input_dto.topic_id)
         if total_cards == 0:
             raise EmptyPoolError(
                 "Nenhum flashcard disponível para estudo com os filtros selecionados."
             )
 
-        session = self._session_repo.get_active_session(input_dto.subject_id, input_dto.topic_id)
+        session = self._session_repo.get_active_session(
+            input_dto.subject_id, input_dto.topic_id, user_id=user_id
+        )
         if session is None:
             session = FlashcardPoolSession(
+                user_id=user_id if user_id is not None else uuid4(),
                 subject_id_filter=input_dto.subject_id,
                 topic_id_filter=input_dto.topic_id,
                 current_position=0,
@@ -103,22 +116,32 @@ class GetCurrentStudyCardUseCase:
         card_repo: IFlashcardRepository,
         session_repo: ISessionRepository,
         topic_repo: ITopicRepository | None = None,
+        subject_repo: ISubjectRepository | None = None,
     ) -> None:
         self._card_repo = card_repo
         self._session_repo = session_repo
         self._topic_repo = topic_repo
+        self._subject_repo = subject_repo
 
-    def execute(self, input_dto: GetNextCardDTO) -> StudyCardDTO:
+    def execute(self, input_dto: GetNextCardDTO, user_id: UUID | None = None) -> StudyCardDTO:
+        if user_id is not None and self._subject_repo is not None and input_dto.subject_id:
+            subject = self._subject_repo.get_by_id(input_dto.subject_id)
+            if subject is not None and not subject.can_be_studied_by(user_id):
+                raise ResourceOwnershipError("Você não tem acesso a esta matéria privada.")
+
         cards = self._card_repo.list_pool(input_dto.subject_id, input_dto.topic_id)
         if not cards:
             raise EmptyPoolError(
                 "Nenhum flashcard disponível para estudo com os filtros selecionados."
             )
 
-        session = self._session_repo.get_active_session(input_dto.subject_id, input_dto.topic_id)
+        session = self._session_repo.get_active_session(
+            input_dto.subject_id, input_dto.topic_id, user_id=user_id
+        )
         if session is None:
             first_card = cards[0]
             session = FlashcardPoolSession(
+                user_id=user_id if user_id is not None else uuid4(),
                 subject_id_filter=input_dto.subject_id,
                 topic_id_filter=input_dto.topic_id,
                 current_position=first_card.position,
@@ -174,21 +197,33 @@ class GetStudyBatchUseCase:
         card_repo: IFlashcardRepository,
         session_repo: ISessionRepository,
         topic_repo: ITopicRepository | None = None,
+        subject_repo: ISubjectRepository | None = None,
     ) -> None:
         self._card_repo = card_repo
         self._session_repo = session_repo
         self._topic_repo = topic_repo
+        self._subject_repo = subject_repo
 
-    def execute(self, input_dto: GetNextCardDTO, limit: int = 100) -> StudyBatchDTO:
+    def execute(
+        self, input_dto: GetNextCardDTO, limit: int = 100, user_id: UUID | None = None
+    ) -> StudyBatchDTO:
+        if user_id is not None and self._subject_repo is not None and input_dto.subject_id:
+            subject = self._subject_repo.get_by_id(input_dto.subject_id)
+            if subject is not None and not subject.can_be_studied_by(user_id):
+                raise ResourceOwnershipError("Você não tem acesso a esta matéria privada.")
+
         total_cards = self._card_repo.count_pool(input_dto.subject_id, input_dto.topic_id)
         if total_cards == 0:
             raise EmptyPoolError(
                 "Nenhum flashcard disponível para estudo com os filtros selecionados."
             )
 
-        session = self._session_repo.get_active_session(input_dto.subject_id, input_dto.topic_id)
+        session = self._session_repo.get_active_session(
+            input_dto.subject_id, input_dto.topic_id, user_id=user_id
+        )
         if session is None:
             session = FlashcardPoolSession(
+                user_id=user_id if user_id is not None else uuid4(),
                 subject_id_filter=input_dto.subject_id,
                 topic_id_filter=input_dto.topic_id,
                 current_position=0,
