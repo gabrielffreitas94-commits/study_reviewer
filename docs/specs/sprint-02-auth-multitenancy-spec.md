@@ -1,14 +1,19 @@
 # Especificação Técnica (SPEC) — Sprint 02
-## Módulo: Autenticação & Multi-tenancy com Google (OAuth2 / OIDC)
+## Módulo: Autenticação & Multi-tenancy com Google (OAuth2 / OIDC) e Compartilhamento Read-Only
 ### Projeto: Study Reviewer
 
 ---
 
 ## 1. Visão Geral e Fronteiras Arquiteturais
 
-A **Sprint 02** implementa a camada de **Identidade, Autenticação e Multi-tenancy** do **Study Reviewer** com base no [PRD.md](../../PRD.md) v6.0, [ADR-001](ADR-001-clean-architecture-layering.md), [ADR-006](ADR-006-google-oauth2-oidc-multitenancy.md) e [ADR-007](ADR-007-session-management-aes-256-gcm.md).
+A **Sprint 02** implementa a camada de **Identidade, Autenticação, Multi-tenancy e Compartilhamento Read-Only** do **Study Reviewer** com base no [PRD.md](../../PRD.md) v6.0, [ADR-001](ADR-001-clean-architecture-layering.md), [ADR-006](ADR-006-google-oauth2-oidc-multitenancy.md) e [ADR-007](ADR-007-session-management-aes-256-gcm.md).
 
-O objetivo central é prover login federado via Google OAuth2 / OpenID Connect (OIDC), gestão de sessões criptografadas de alta performance em cookies e headers de API via **AES-256-GCM**, e isolamento relacional multi-inquilino (*multi-tenancy*) dos dados de estudo por estudante (`owner_id`), erradicando vulnerabilidades de referência direta insegura (IDOR).
+O objetivo central é:
+1. Prover login federado via Google OAuth2 / OpenID Connect (OIDC).
+2. Gestão de sessões criptografadas de alta performance em cookies e headers de API via **AES-256-GCM**.
+3. Isolamento relacional multi-inquilino (*multi-tenancy*) dos dados de estudo por estudante (`owner_id`), erradicando vulnerabilidades IDOR (*Insecure Direct Object Reference*).
+4. Suporte a **Compartilhamento Read-Only**: o criador original (`owner`) é o único com permissão de edição e exclusão de seus cards e matérias, enquanto outros estudantes podem acessar e estudar matérias públicas/compartilhadas com sua própria sessão de estudo isolada.
+5. Deferimento planejado de funcionalidades de **Clonagem (Fork)**, **Colaboração Multi-editor** e **Transferência de Propriedade** para as Sprints pré-IA (Sprints 6 e 7).
 
 ```mermaid
 flowchart TD
@@ -16,30 +21,30 @@ flowchart TD
         Docker_DB["PostgreSQL 16 (Local / Neon)"]
         FastAPI_Web["FastAPI & Uvicorn (Middleware get_current_user)"]
         Google_OIDC["Google Identity Services (OAuth2 / OIDC)"]
-        Alembic_Mig["Alembic Migrations (users, FK owner_id, FK user_id)"]
+        Alembic_Mig["Alembic Migrations (users, FK owner_id, is_public, FK user_id)"]
     end
 
     subgraph Camada_3["3. Interface Adapters (src/adapters)"]
         Controllers_Web["WebAuthController (/auth/login, /auth/google, /auth/callback, /auth/logout)"]
         Controllers_API["ApiAuthController (/api/v1/auth/google, /api/v1/auth/me)"]
-        Repo_Impl["SqlAlchemyUserRepo, SqlAlchemySubjectRepo (com filtro owner_id)"]
+        Repo_Impl["SqlAlchemyUserRepo, SqlAlchemySubjectRepo (filtros owner_id e is_public)"]
         Crypto_Service["AesGcmSessionTokenService (AES-256-GCM)"]
         Google_Client["GoogleOAuthClient (httpx / google-auth)"]
         Mappers["UserMapper, SubjectMapper, FlashcardMapper"]
-        ORM_Models["UserModel, SubjectModel (owner_id FK), SessionModel (user_id FK)"]
+        ORM_Models["UserModel, SubjectModel (owner_id FK, is_public), SessionModel (user_id FK)"]
     end
 
     subgraph Camada_2["2. Use Cases / Application (src/application)"]
         UC_Auth["AuthenticateWithGoogleUseCase, GetCurrentUserUseCase, LogoutUseCase"]
-        UC_Cards["CreateFlashcardUseCase, GetNextFlashcardUseCase (com user_id)"]
-        UC_Taxonomy["CreateSubjectUseCase, ListSubjectsUseCase (com owner_id)"]
+        UC_Cards["CreateFlashcardUseCase (owner check), GetNextFlashcardUseCase (sessão individual)"]
+        UC_Taxonomy["CreateSubjectUseCase, ListSubjectsUseCase (owner + public), ToggleSubjectPublicUseCase"]
         Ports_Out["Protocols: IUserRepository, IGoogleAuthClient, ISessionTokenService, ISubjectRepository"]
         DTOs["GoogleAuthInputDTO, AuthResultDTO, UserDTO, SessionPayloadDTO"]
     end
 
     subgraph Camada_1["1. Entities & Domain Services (src/domain)"]
         E_User["User Entity (id, email, name, avatar_url, google_sub)"]
-        E_Subject["Subject Entity (id, name, owner_id)"]
+        E_Subject["Subject Entity (id, name, owner_id, is_public)"]
         E_Session["FlashcardPoolSession Entity (id, user_id, current_position, round_number)"]
         D_Exceptions["InvalidEmailError, InvalidGoogleSubError, UnauthorizedError, ResourceOwnershipError"]
     end
@@ -65,18 +70,22 @@ flowchart TD
   * `created_at: date`: Data pura de cadastro do usuário.
   * *Invariantes de Domínio:* Não permite e-mails em branco ou inválidos, nomes vazios ou `google_sub` vazio.
 
-* **`Subject` (Atualização Multi-tenant):**
-  * Adição do atributo obrigatório `owner_id: UUID`, vinculando a matéria ao estudante proprietário.
-  * A unicidade do nome da matéria passa a ser restrita ao escopo do `owner_id` (dois usuários distintos podem possuir matérias com o mesmo nome, ex: "Direito Constitucional", sem colisão).
+* **`Subject` (Atualização Multi-tenant & Read-Only Sharing):**
+  * `owner_id: UUID`: Vincula a matéria ao estudante proprietário (criador original).
+  * `is_public: bool`: Define se a matéria pode ser visualizada e estudada por outros usuários em modo somente-leitura (padrão: `False`).
+  * Método de domínio `can_be_edited_by(user_id: UUID) -> bool`: Retorna `True` se e somente se `self.owner_id == user_id`.
+  * Método de domínio `can_be_studied_by(user_id: UUID) -> bool`: Retorna `True` se `self.owner_id == user_id or self.is_public`.
+  * A unicidade do nome da matéria permanece restrita ao escopo do `owner_id`.
 
 * **`FlashcardPoolSession` (Atualização Multi-tenant):**
-  * Adição do atributo obrigatório `user_id: UUID`, vinculando a sessão de estudo e seu progresso ao usuário autenticado.
+  * `user_id: UUID`: Vincula a sessão de estudo e seu progresso ao usuário autenticado.
+  * *Regra de Isolamento:* Mesmo ao estudar uma matéria pública pertencente a outro autor, a sessão gerada e atualizada é estritamente vinculada ao `user_id` do estudante que está revisando.
 
 ### 2.2 Exceções de Domínio
 * `InvalidEmailError`: Lançada quando o formato do e-mail não atende ao padrão RFC 5322.
 * `InvalidGoogleSubError`: Lançada se o identificador Google fornecido for vazio ou nulo.
 * `UnauthorizedError`: Lançada na ausência de credenciais válidas ou sessão expirada.
-* `ResourceOwnershipError`: Lançada quando um usuário tenta manipular recursos pertencentes a outro usuário (violação de multi-tenancy / IDOR).
+* `ResourceOwnershipError`: Lançada quando um usuário sem permissão tenta editar/excluir recursos ou acessar matérias privadas de terceiros (violação de multi-tenancy / IDOR).
 
 ---
 
@@ -100,11 +109,23 @@ flowchart TD
   * `create_session_token(user_id: UUID, email: str) -> str`: Criptografa o payload via AES-256-GCM gerando token seguro.
   * `verify_session_token(token: str) -> SessionPayloadDTO | None`: Decripta e valida integridade, autenticidade e prazo de expiração do token.
 
-* **Atualização das Portas Existentes da Sprint 1:**
-  * `ISubjectRepository`: `list_by_owner(owner_id: UUID) -> list[Subject]`, `get_by_id_and_owner(subject_id: UUID, owner_id: UUID) -> Subject | None`, `exists_by_name(owner_id: UUID, name: str) -> bool`.
-  * `ITopicRepository`: `list_by_subject_and_owner(subject_id: UUID, owner_id: UUID) -> list[Topic]`, `get_by_id_and_owner(topic_id: UUID, owner_id: UUID) -> Topic | None`, `exists_by_name(subject_id: UUID, owner_id: UUID, name: str) -> bool`.
-  * `IFlashcardRepository`: `list_pool_by_owner(owner_id: UUID, subject_id: UUID | None, topic_id: UUID | None) -> list[Flashcard]`, `get_by_id_and_owner(flashcard_id: UUID, owner_id: UUID) -> Flashcard | None`, `count_pool_by_owner(owner_id: UUID, subject_id: UUID | None, topic_id: UUID | None) -> int`.
-  * `ISessionRepository`: `get_active_session_by_user(user_id: UUID, subject_id: UUID | None, topic_id: UUID | None) -> FlashcardPoolSession | None`.
+* **Atualização das Portas de Repositório:**
+  * `ISubjectRepository`:
+    - `list_by_owner(owner_id: UUID) -> list[Subject]` (apenas as matérias do próprio usuário).
+    - `list_accessible(user_id: UUID) -> list[Subject]` (matérias do usuário + matérias públicas com `is_public=True`).
+    - `get_by_id_for_user(subject_id: UUID, user_id: UUID) -> Subject | None` (retorna se for owner ou pública).
+    - `get_by_id_and_owner(subject_id: UUID, owner_id: UUID) -> Subject | None` (estrito para mutações/edições).
+    - `exists_by_name(owner_id: UUID, name: str) -> bool`.
+  * `ITopicRepository`:
+    - `list_by_subject(subject_id: UUID) -> list[Topic]`.
+    - `get_by_id_and_owner(topic_id: UUID, owner_id: UUID) -> Topic | None`.
+    - `exists_by_name(subject_id: UUID, name: str) -> bool`.
+  * `IFlashcardRepository`:
+    - `list_pool_by_subject(subject_id: UUID | None, topic_id: UUID | None) -> list[Flashcard]`.
+    - `get_by_id_and_owner(flashcard_id: UUID, owner_id: UUID) -> Flashcard | None`.
+    - `count_pool_accessible(user_id: UUID, subject_id: UUID | None, topic_id: UUID | None) -> int`.
+  * `ISessionRepository`:
+    - `get_active_session_by_user(user_id: UUID, subject_id: UUID | None, topic_id: UUID | None) -> FlashcardPoolSession | None`.
 
 ### 3.2 DTOs de Aplicação
 * `GoogleAuthInputDTO`: `code: str | None`, `id_token: str | None`, `redirect_uri: str`.
@@ -112,34 +133,25 @@ flowchart TD
 * `AuthResultDTO`: `user_id: UUID`, `email: str`, `name: str`, `avatar_url: str | None`, `session_token: str`, `is_new_user: bool`.
 * `SessionPayloadDTO`: `user_id: UUID`, `email: str`, `iat: int`, `exp: int`.
 * `UserDTO`: `id: UUID`, `email: str`, `name: str`, `avatar_url: str | None`, `created_at: date`.
+* `SubjectDTO`: `id: UUID`, `name: str`, `owner_id: UUID`, `is_public: bool`, `is_owner: bool`, `created_at: date`.
 
 ### 3.3 Casos de Uso
 
 1. **`AuthenticateWithGoogleUseCase`:**
-   * Recebe `GoogleAuthInputDTO`.
-   * Se informado `code`: consome `IGoogleAuthClient.exchange_code_for_user_info`.
-   * Se informado `id_token`: consome `IGoogleAuthClient.verify_id_token`.
-   * Localiza usuário no `IUserRepository` por `sub` ou `email`.
-   * **JIT Provisioning:**
-     - Se inexistente: cria nova entidade `User` e persiste via `IUserRepository.save`.
-     - Se existente: atualiza `name` e `avatar_url` se houver alteração cadastral no Google.
-   * Gera token de sessão através de `ISessionTokenService.create_session_token`.
-   * Retorna `AuthResultDTO`.
-
+   * Valida credenciais com Google, executa JIT Provisioning (criação ou sincronização de perfil), emite token de sessão AES-256-GCM.
 2. **`GetCurrentUserUseCase`:**
-   * Recebe o token de sessão serializado.
-   * Valida o token através de `ISessionTokenService.verify_session_token`. Se inválido ou expirado, lança `UnauthorizedError`.
-   * Busca e retorna os dados do usuário ativo no `IUserRepository`.
-
+   * Valida token de sessão via `ISessionTokenService` e resolve o usuário no `IUserRepository`.
 3. **`LogoutUseCase`:**
-   * Executa a invalidação lógica e comando de encerramento de sessão.
-
-4. **Adequação dos Use Cases da Sprint 1:**
-   * `CreateSubjectUseCase(owner_id: UUID, input: CreateSubjectDTO)`: vincula o `owner_id` recebido à nova matéria.
-   * `ListSubjectsUseCase(owner_id: UUID)`: filtra exclusivamente as matérias do proprietário.
-   * `CreateTopicUseCase(owner_id: UUID, input: CreateTopicDTO)`: valida previamente se a matéria vinculada pertence a `owner_id`. Caso contrário, rejeita com `ResourceOwnershipError`.
-   * `CreateFlashcardUseCase(owner_id: UUID, input: CreateFlashcardDTO)`: valida que os tópicos e matérias pertencem ao `owner_id`.
-   * `GetNextFlashcardUseCase(user_id: UUID, input: GetNextCardDTO)`: recupera ou inicializa a pool de estudo isolada para o `user_id`.
+   * Invalida sessão ativa no cliente.
+4. **Governança de Mutação nos Use Cases da Sprint 1:**
+   * `CreateSubjectUseCase(owner_id: UUID, input: CreateSubjectDTO)`: cria matéria associada a `owner_id` com `is_public = input.is_public`.
+   * `ListSubjectsUseCase(user_id: UUID)`: retorna matérias próprias (`is_owner=True`) e matérias públicas acessíveis (`is_owner=False`).
+   * `ToggleSubjectPublicUseCase(owner_id: UUID, subject_id: UUID, is_public: bool)`: apenas o dono pode alternar visibilidade.
+   * `CreateTopicUseCase(user_id: UUID, input: CreateTopicDTO)`: valida se `subject.owner_id == user_id`. Se não for dono (mesmo em matéria pública), lança `ResourceOwnershipError`.
+   * `CreateFlashcardUseCase(user_id: UUID, input: CreateFlashcardDTO)`: valida se o usuário é o dono da matéria associada. Não-proprietários são bloqueados com `ResourceOwnershipError`.
+   * `DeleteFlashcardUseCase(user_id: UUID, flashcard_id: UUID)`: valida se o usuário é o dono. Não-proprietários são bloqueados.
+   * `StartStudySessionUseCase(user_id: UUID, input: StartSessionDTO)`: permite iniciar sessão se o usuário for o dono ou se a matéria for pública. A sessão é registrada com `session.user_id = user_id`.
+   * `GetNextFlashcardUseCase(user_id: UUID, input: GetNextCardDTO)`: recupera e avança a pool de cards da matéria, registrando a evolução exclusivamente na sessão do estudante ativo.
 
 ---
 
@@ -147,40 +159,29 @@ flowchart TD
 
 ### 4.1 Repositórios e Mappers
 * **`SqlAlchemyUserRepository`:** Implementa `IUserRepository` com mapeamento explícito via `UserMapper`.
-* **Refatoração dos Repositórios Existentes:**
-  - `SqlAlchemySubjectRepository`: cláusulas `.where(SubjectModel.owner_id == owner_id)`.
-  - `SqlAlchemyTopicRepository`: cláusulas `.join(SubjectModel).where(SubjectModel.owner_id == owner_id)`.
-  - `SqlAlchemyFlashcardRepository`: cláusulas com join de matéria e filtro `SubjectModel.owner_id == owner_id`.
-  - `SqlAlchemySessionRepository`: cláusulas `.where(FlashcardPoolSessionModel.user_id == user_id)`.
+* **Refatoração dos Repositórios com Suporte a Multi-tenancy e Read-Only:**
+  - `SqlAlchemySubjectRepository`:
+    * Consultas de escrita: `.where(SubjectModel.id == id, SubjectModel.owner_id == user_id)`.
+    * Consultas de leitura: `.where(or_(SubjectModel.owner_id == user_id, SubjectModel.is_public.is_(True)))`.
+  - `SqlAlchemyTopicRepository` e `SqlAlchemyFlashcardRepository`:
+    * Mutações exigem verificação de titularidade da matéria de origem.
+    * Leitura permite visualização e estudo se a matéria de origem for do usuário ou pública.
   - Manutenção de `selectinload` para relacionamentos e prevenção de N+1 queries.
 
 ### 4.2 Criptografia de Sessão & Cliente Google
 * **`AesGcmSessionTokenService`:**
-  - Utiliza `cryptography.hazmat.primitives.ciphers.aead.AESGCM`.
-  - Encripta payload serializado em JSON com nonce aleatório de 12 bytes.
+  - Criptografia simétrica autenticada com AES-256-GCM.
   - Formato serializado: `base64url(nonce + ciphertext_and_tag)`.
 * **`GoogleOAuthClient`:**
-  - Utiliza `httpx` assíncrono para interagir com `https://oauth2.googleapis.com/token` e `https://openidconnect.googleapis.com/v1/userinfo`.
-  - Em ambiente de testes, o protocolo injetável permite substituição por fake em memória sem chamadas HTTP.
+  - Comunicação assíncrona com os endpoints do Google Identity, substituível por fake em memória nos testes.
 
-### 4.3 Controladores Web (Jinja2 + HTMX)
-* `GET /auth/login`: Renderiza página de login contendo botão oficial do Google Identity e preserva parâmetro de query `next` (ex: `/flashcards/study`).
-* `GET /auth/google`:
-  - Gera `state` aleatório criptograficamente assinado com a URL de retorno `next`.
-  - Grava cookie temporário `oauth_state` (`HttpOnly`, `SameSite=Lax`, `Max-Age=300`).
-  - Redireciona o navegador para o endpoint de consentimento do Google.
-* `GET /auth/callback`:
-  - Valida o parâmetro `state` recebido contra o cookie `oauth_state` (proteção CSRF).
-  - Executa `AuthenticateWithGoogleUseCase` com o `code`.
-  - Grava cookie de longa duração `session_token` (`HttpOnly`, `SameSite=Lax`, `Secure`, `Max-Age=2592000`).
-  - Redireciona o usuário para o destino `next` ou `/flashcards/study`.
-* `POST /auth/logout`:
-  - Deleta o cookie `session_token`.
-  - Redireciona para `/auth/login`.
-
-### 4.4 Controladores de API REST (FastAPI Routers)
-* `POST /api/v1/auth/google`: Recebe payload JSON `{"id_token": "..."}` e retorna `{ "access_token": "...", "token_type": "bearer", "user": { ... } }`.
-* `GET /api/v1/auth/me`: Retorna os dados do usuário autenticado a partir do cabeçalho `Authorization: Bearer <token>`.
+### 4.3 Controladores Web e API
+* `GET /auth/login`: Tela de boas-vindas com botão oficial Google.
+* `GET /auth/google`: Geração de `state` CSRF e redirecionamento.
+* `GET /auth/callback`: Validação de state, execução do use case, emissão do cookie `session_token` e redirecionamento.
+* `POST /auth/logout`: Limpeza do cookie `session_token`.
+* `POST /subjects/{id}/toggle-public`: Rota protegida para alternar status público da matéria (apenas owner).
+* `POST /api/v1/auth/google` e `GET /api/v1/auth/me`: Endpoints REST desacoplados.
 
 ---
 
@@ -194,68 +195,22 @@ flowchart TD
   - `name`: String(150), Not Null.
   - `avatar_url`: String(1024), Nullable.
   - `created_at`: Date, Not Null.
-* **Alterações em Tabelas Existentes:**
-  - `subjects`: Adição de `owner_id: UUID` (Foreign Key `users.id` com `ondelete="CASCADE"`, Not Null).
-  - `flashcard_pool_sessions`: Adição de `user_id: UUID` (Foreign Key `users.id` com `ondelete="CASCADE"`, Not Null).
-  - Índice composto cobrindo `ix_subjects_owner_name` em `(owner_id, name)` garantindo unicidade por usuário.
-  - Índice cobrindo `ix_sessions_user_filters` em `(user_id, subject_id_filter, topic_id_filter)`.
+* **Alterações nas Tabelas Existentes:**
+  - `subjects`:
+    * `owner_id`: UUID (FK `users.id` com `ondelete="CASCADE"`, Not Null).
+    * `is_public`: Boolean, Not Null, default=False.
+    * Índice cobrindo `ix_subjects_owner_public` em `(owner_id, is_public)`.
+  - `flashcard_pool_sessions`:
+    * `user_id`: UUID (FK `users.id` com `ondelete="CASCADE"`, Not Null).
+    * Índice cobrindo `ix_sessions_user_filters` em `(user_id, subject_id_filter, topic_id_filter)`.
 
 ### 5.2 Migração Versionada Alembic
-* Criação de nova revisão: `alembic revision --autogenerate -m "add_users_and_multitenancy"`.
-* Se houver dados prévios no banco (da Sprint 1), a migração cria automaticamente um usuário padrão do sistema (*System Migration User*) para associar às matérias órfãs, mantendo a integridade referencial sem perda de registros.
+* Cria tabela `users`.
+* Adiciona colunas `owner_id` e `is_public` em `subjects`.
+* Adiciona coluna `user_id` em `flashcard_pool_sessions`.
+* Cria usuário de migração do sistema para vincular a registros preexistentes em desenvolvimento.
 
 ### 5.3 FastAPI Security Dependency (`get_current_user`)
-* Dependency injetável que inspeciona:
-  1. Cabeçalho `Authorization: Bearer <token>`.
-  2. Cookie `session_token`.
-* Se o token for válido e o usuário existir: injeta a entidade `User` na rota.
-* Se ausente ou inválido:
-  - Em rotas web HTML/HTMX: redireciona para `/auth/login?next={current_url}` (ou emite header `HX-Redirect` caso a requisição venha via HTMX).
-  - Em rotas de API: lança `HTTPException(status_code=401, detail="Não autenticado")`.
-
----
-
-## 6. Mapeamento de Fluxo de Execução & Segurança
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Estudante
-    participant Browser as Navegador (HTMX)
-    participant WebRouter as WebAuthController
-    participant UseCase as AuthenticateWithGoogleUseCase
-    participant GoogleClient as GoogleOAuthClient
-    participant Google as Google Identity Services
-    participant UserRepo as SqlAlchemyUserRepo
-    participant Crypto as AesGcmSessionTokenService
-    participant DB as Neon PostgreSQL
-
-    Estudante->>Browser: Clica em "Continuar com o Google"
-    Browser->>WebRouter: GET /auth/google?next=/flashcards/study
-    WebRouter->>WebRouter: Gera state CSRF assinado e grava cookie temporário
-    WebRouter-->>Browser: Redireciona (302) para Google OAuth Consent
-    Browser->>Google: Tela de consentimento Google
-    Estudante->>Google: Autoriza acesso
-    Google-->>Browser: Redireciona (302) para /auth/callback?code=XYZ&state=ABC
-    Browser->>WebRouter: GET /auth/callback?code=XYZ&state=ABC
-    WebRouter->>WebRouter: Valida state recebido contra cookie (Anti-CSRF)
-    WebRouter->>UseCase: execute(GoogleAuthInputDTO(code="XYZ"))
-    UseCase->>GoogleClient: exchange_code_for_user_info("XYZ")
-    GoogleClient->>Google: POST /token + GET /userinfo
-    Google-->>GoogleClient: { sub, email, name, picture }
-    GoogleClient-->>UseCase: GoogleUserInfoDTO
-    UseCase->>UserRepo: get_by_google_sub(sub)
-    UserRepo->>DB: SELECT FROM users WHERE google_sub = sub
-    alt Usuário Inexistente (Primeiro Login)
-        UseCase->>UserRepo: save(Novo User com ID UUIDv4)
-        UserRepo->>DB: INSERT INTO users
-    else Usuário Já Cadastrado
-        UseCase->>UserRepo: save(User atualizado se mudou nome/avatar)
-        UserRepo->>DB: UPDATE users
-    end
-    UseCase->>Crypto: create_session_token(user.id, user.email)
-    Crypto-->>UseCase: Token Cifrado AES-256-GCM
-    UseCase-->>WebRouter: AuthResultDTO
-    WebRouter-->>Browser: Seta Cookie session_token (HttpOnly, SameSite=Lax, Secure) + 302 para /flashcards/study
-    Browser->>Estudante: Exibe painel de estudos isolado e seguro!
-```
+* Dependency que valida o cookie `session_token` ou cabeçalho Bearer, decripta via AES-256-GCM e injeta a entidade `User`.
+* Rotas Web: redireciona para `/auth/login` (ou header `HX-Redirect`).
+* Rotas API: retorna HTTP 401 Unauthorized.

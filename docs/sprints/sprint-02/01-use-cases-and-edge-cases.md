@@ -386,6 +386,66 @@ Cenário: Requisição parcial HTMX disparada com sessão expirada
   E o cliente HTMX força o redirecionamento completo da janela do navegador para o login
 ```
 
+#### UC-S02-31: Estudo em Matéria Pública de Terceiro em Modo Read-Only
+* **Categoria:** Caminho Feliz / Compartilhamento
+* **Camada Alvo:** Aplicação / `GetNextFlashcardUseCase`
+```gherkin
+Cenário: Estudante revisa matéria pública criada por outro usuário
+  Dado que o Usuário A criou a matéria pública "História do Brasil" com is_public=True
+  E o Usuário B (não-proprietário) inicia o estudo dessa matéria
+  Quando o Usuário B acionar o caso de uso GetNextFlashcard
+  Então os flashcards da matéria de A são exibidos para B
+  E uma FlashcardPoolSession vinculada a user_id=UsuarioB.id é criada/atualizada
+  E a posição e rodada do Usuário A permanecem completamente inalteradas
+```
+
+#### UC-S02-32: Tentativa de Criação de Tópico ou Card em Matéria Pública por Não-Proprietário
+* **Categoria:** Invariantes de Domínio / Segurança
+* **Camada Alvo:** Aplicação / `CreateTopicUseCase` & `CreateFlashcardUseCase`
+```gherkin
+Cenário: Não-proprietário tenta alterar conteúdo de matéria pública (Bloqueio Read-Only)
+  Dado que o Usuário A é dono da matéria pública "Cálculo I" (is_public=True)
+  Quando o Usuário B tentar criar um novo tópico ou novo flashcard associado a essa matéria
+  Então o caso de uso verifica a titularidade via subject.can_be_edited_by(UsuarioB.id)
+  E detecta que o Usuário B não é o proprietário
+  E lança ResourceOwnershipError (HTTP 403 Forbidden)
+  E nenhum registro é alterado no banco de dados
+```
+
+#### UC-S02-33: Tentativa de Exclusão de Matéria Pública por Não-Proprietário
+* **Categoria:** Invariantes de Domínio / Segurança
+* **Camada Alvo:** Aplicação / Repositório
+```gherkin
+Cenário: Tentativa não autorizada de excluir matéria de terceiro
+  Dado que a matéria "Bioquímica" pertence ao Usuário A e é pública
+  Quando o Usuário B disparar uma requisição para excluir a matéria
+  Então a verificação de permissão falha
+  E a operação é sumariamente rejeitada com ResourceOwnershipError
+  E a matéria de A permanece intacta
+```
+
+#### UC-S02-34: Proprietário Altera Status de Visibilidade da Matéria
+* **Categoria:** Ciclo de Vida & Transições
+* **Camada Alvo:** Aplicação / `ToggleSubjectPublicUseCase`
+```gherkin
+Cenário: Autor torna pública uma matéria anteriormente privada
+  Dado que o Usuário A possui a matéria privada "Física Quântica" (is_public=False)
+  Quando o Usuário A acionar o comando para torná-la pública
+  Então a flag is_public é atualizada para True
+  E a matéria passa a ser listada para outros estudantes em modo Read-Only
+```
+
+#### UC-S02-35: Matéria Privada de Terceiro Oculta da Listagem de Outros Usuários
+* **Categoria:** Busca & Filtros Multi-tenant
+* **Camada Alvo:** Aplicação / `ListSubjectsUseCase`
+```gherkin
+Cenário: Listagem de matérias acessíveis não vaza matérias privadas de outros
+  Dado que o Usuário A tem uma matéria privada "Diário Pessoal de Estudos" (is_public=False)
+  E o Usuário B lista suas matérias acessíveis
+  Quando a consulta for executada para o Usuário B
+  Então a matéria privada do Usuário A não consta na resposta
+```
+
 ---
 
 ## 3. Matriz de Rastreabilidade de Segurança (@pytest.mark.security)
@@ -397,7 +457,8 @@ Para atender à governança de segurança do projeto e ao meta-teste de AST (`te
 | **UC-S02-12 / 13** | Validação de State no Callback OAuth | Cross-Site Request Forgery (CSRF) no fluxo de login | Comparação constante de tempo do parâmetro `state` contra cookie assinado. |
 | **UC-S02-14 / 29** | Adulteração do Token AES-256-GCM | Falsificação de Sessão, Privilege Escalation e Bit-Flipping | Criptografia autenticada AEAD rejeita qualquer payload sem tag GCM válida. |
 | **UC-S02-16 / 17** | Acesso a Matéria de Terceiro | Insecure Direct Object Reference (IDOR) | Cláusulas de query forçam compulsoriamente `owner_id == user_id` retornando 404 estrito. |
-| **UC-S02-18** | Injeção de Tópico em Matéria Alheia | Quebra de Integridade Referencial Multi-tenant | Validação prévia de titularidade no caso de uso bloqueia persistência indevida. |
+| **UC-S02-18 / 32** | Modificação Indevida de Conteúdo por Não-Dono | Violação de Integridade e Quebra de Permissão Read-Only | Use cases bloqueiam categoricamente qualquer mutação em matéria que não pertença a `owner_id`. |
+| **UC-S02-33** | Tentativa de Exclusão por Terceiro | Exclusão Maliciosa Não Autorizada | Repositório e Use Case exigem validação de `owner_id` para deleção. |
 
 ---
 
@@ -405,4 +466,4 @@ Para atender à governança de segurança do projeto e ao meta-teste de AST (`te
 * **Status:** `[APROVADO PARA TDD]`
 * **Data da Auditoria:** 2026-10-03
 * **Auditor:** Especialista QA (Persona #2)
-* **Parecer Técnico:** A matriz com **30 casos de uso** foi auditada integralmente. Todas as 8 categorias obrigatórias foram cobertas com critérios determinísticos, entradas explícitas, invariantes de isolamento multi-tenant e asserções testáveis. As regras de governança de segurança contra CSRF, IDOR e integridade criptográfica AES-256-GCM foram minuciosamente mapeadas. O ciclo de desenvolvimento TDD está formalmente liberado para início.
+* **Parecer Técnico:** A matriz com **35 casos de uso** foi auditada integralmente. Todas as 8 categorias obrigatórias foram cobertas com critérios determinísticos, entradas explícitas, invariantes de isolamento multi-tenant, governança do modelo de compartilhamento Read-Only e asserções testáveis. As regras de governança de segurança contra CSRF, IDOR e integridade criptográfica AES-256-GCM foram minuciosamente mapeadas. O ciclo de desenvolvimento TDD está formalmente liberado para início.

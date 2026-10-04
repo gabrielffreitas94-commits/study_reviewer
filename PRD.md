@@ -268,35 +268,37 @@ flowchart TD
 
 ---
 
-### 🎯 Sprint 2: Autenticação & Multi-tenancy com Google (OAuth2 / OIDC) (Próxima Sprint)
-* **Objetivo:** Implementar autenticação centralizada via Google OAuth2 / OpenID Connect (OIDC), gestão de sessões seguras no backend (Web Jinja2/HTMX e API REST desacoplada para mobile) e isolamento multi-inquilino (*multi-tenancy*) dos dados de estudo por usuário, preparando o alicerce para futuros grupos e compartilhamento.
+### 🎯 Sprint 2: Autenticação, Multi-tenancy & Compartilhamento Read-Only com Google (OAuth2 / OIDC) (Próxima Sprint)
+* **Objetivo:** Implementar autenticação centralizada via Google OAuth2 / OpenID Connect (OIDC), gestão de sessões seguras no backend (Web Jinja2/HTMX e API REST desacoplada para mobile), isolamento multi-inquilino (*multi-tenancy*) dos dados de estudo por usuário e suporte a **Compartilhamento Read-Only** de matérias (onde apenas o proprietário pode editar/excluir e outros estudantes podem estudar com sessões isoladas).
 * **Escopo:**
   * **Clean Architecture & Domínio (Camada 1):**
     * Entidade `User` rica (`id: UUID`, `email: str`, `name: str`, `avatar_url: str | None`, `google_sub: str`, `created_at: date`) com validação de formato e invariantes.
-    * Atualização das entidades `Subject` (adição de `owner_id: UUID`) e `FlashcardPoolSession` (adição de `user_id: UUID`).
+    * Atualização da entidade `Subject` com `owner_id: UUID` e `is_public: bool = False`, além de métodos de autorização (`can_be_edited_by`, `can_be_studied_by`).
+    * Atualização da entidade `FlashcardPoolSession` (adição de `user_id: UUID`), garantindo que o progresso de estudo seja 100% individual, mesmo ao estudar matéria pública de outro usuário.
   * **Casos de Uso e Portas Agnósticas (Camada 2):**
     * `AuthenticateWithGoogleUseCase`: recebe credencial/código OIDC, valida integridade da assinatura via porta, busca ou provisiona o usuário (JIT Provisioning) e emite a sessão autenticada.
     * `GetCurrentUserUseCase`: resolve a entidade do usuário ativo a partir do token de sessão.
     * `LogoutUseCase`: revoga e invalida a sessão ativa.
-    * Adequação dos use cases de flashcards/matérias para exigir e validar a titularidade do usuário logado (`user_id`).
-    * Contratos abstratos (`typing.Protocol`): `IUserRepository`, `IGoogleAuthClient`, `ISessionTokenService`.
+    * `ToggleSubjectPublicUseCase`: permite ao dono alternar a visibilidade da matéria.
+    * Adequação dos use cases de flashcards/matérias para exigir e validar a titularidade do usuário logado (`user_id`): mutações exigem estritamente `owner_id == user_id` e consultas de estudo aceitam matérias próprias ou públicas (`is_public=True`).
+    * Contratos abstratos (`typing.Protocol`): `IUserRepository`, `IGoogleAuthClient`, `ISessionTokenService`, `ISubjectRepository`.
   * **Adaptadores de Interface & Persistência (Camada 3):**
     * Implementação de `SqlAlchemyUserRepository`.
-    * Atualização de `SqlAlchemySubjectRepository`, `SqlAlchemyFlashcardRepository` e `SqlAlchemySessionRepository` com filtros estritos por `user_id` (prevenção contra vulnerabilidade IDOR).
-    * Controladores Web (`/auth/login`, `/auth/google`, `/auth/callback`, `/auth/logout`) e API REST (`/api/v1/auth/*`).
+    * Atualização de `SqlAlchemySubjectRepository`, `SqlAlchemyFlashcardRepository` e `SqlAlchemySessionRepository` com filtros por titularidade e visibilidade pública (prevenção contra IDOR).
+    * Controladores Web (`/auth/login`, `/auth/google`, `/auth/callback`, `/auth/logout`, `/subjects/{id}/toggle-public`) e API REST (`/api/v1/auth/*`).
     * Modelos ORM atualizados (`UserModel`, FKs em `subjects` e `flashcard_pool_sessions`).
   * **Frameworks, Infraestrutura & Segurança (Camada 4):**
-    * Migração versionada via Alembic criando tabela `users` e associando foreign keys com `ondelete="CASCADE"`.
+    * Migração versionada via Alembic criando tabela `users`, colunas `owner_id` e `is_public` em `subjects` e associando foreign keys com `ondelete="CASCADE"`.
     * Cookies de sessão seguros com flags `HttpOnly`, `SameSite=Lax`, `Secure` e payload encriptado via **AES-256-GCM**.
-    * Middleware / Dependency Injection no FastAPI (`get_current_user`) para proteção de rotas privadas.
+    * Middleware / Dependency Injection no FastAPI (`get_current_user`) para proteção de rotas privadas e redirecionamento amigável com header `HX-Redirect`.
   * **Interface Web & UX/UI (Jinja2 + HTMX + TailwindCSS):**
     * Página de boas-vindas/login com botão padrão "Continuar com o Google" (Google Identity Services compliant).
     * Header com indicador do usuário autenticado (avatar, nome, menu dropdown com atalho de logout).
-    * Redirecionamento amigável e preservação da rota de destino pós-login.
+    * Listagem de matérias diferenciando "Minhas Matérias" (com permissão de edição) de "Matérias Públicas / Compartilhadas" (em modo Read-Only).
   * **LGPD & Governança de Segurança:**
     * Minimização Estrita de Dados (apenas `sub`, `email` e `name`, sem escopos excessivos na Google API).
     * Testes de segurança decorados com `@pytest.mark.security` cobrindo validação de token, proteção contra CSRF no fluxo OAuth via parâmetro `state` assinado, expiração de sessão e prevenção de IDOR multi-tenant.
-* **Entregável:** Sistema protegido por login Google em produção, sessões seguras, dados estritamente isolados por usuário e 100% de cobertura de testes.
+* **Entregável:** Sistema protegido por login Google em produção, sessões seguras, dados estritamente isolados por usuário, compartilhamento read-only ativo e 100% de cobertura de testes.
 
 ---
 
@@ -304,7 +306,8 @@ flowchart TD
 * **Sprint 3:** MVP Perguntas Abertas (Mecânica SRS Manual com Níveis 0 a 6).
 * **Sprint 4:** Sistema de Auditoria Completa de Performance (Logs Imutáveis).
 * **Sprint 5:** App Mobile Dedicado em Flutter.
-* **Sprint 6:** Dashboard Analítico de Performance.
+* **Sprint 6:** Dashboard Analítico de Performance & Análise de Compartilhamento Avançado (Clonagem/Fork de Matérias, Colaboração Multi-editor e Transferência de Propriedade).
 * **Sprint 7:** Pesquisa, Arquitetura e Planejamento da IA & RAG de Livros.
 * **Sprint 8:** IA com Resposta Escrita (Gemini Flash).
 * **Sprint 9:** IA com Resposta em Voz Efêmera (Gemini Multimodal).
+
