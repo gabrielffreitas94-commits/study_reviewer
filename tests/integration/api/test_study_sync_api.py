@@ -508,3 +508,31 @@ def test_sync_answers_use_case_direct_validations(db_session: Session) -> None:
             ),
             user_id=study_session.user_id,
         )
+
+    # 3. Validação de fila de sessão vazia
+    empty_session = FlashcardPoolSessionModel(
+        id=uuid4(),
+        user_id=dummy_user.id,
+        current_position=100,
+        round_number=1,
+        current_index=0,
+        card_queue=[],
+    )
+    db_session.add(empty_session)
+    db_session.commit()
+
+    with pytest.raises(DomainValidationError, match="não possui cards em sua fila ativa"):
+        use_case.execute(
+            SyncStudyBatchDTO(
+                session_id=empty_session.id,
+                events=[
+                    StudyEventDTO(
+                        id=uuid4(),
+                        card_id=uuid4(),
+                        reviewed_at=datetime.now(UTC),
+                        status="viewed",
+                    )
+                ],
+            ),
+            user_id=dummy_user.id,
+        )

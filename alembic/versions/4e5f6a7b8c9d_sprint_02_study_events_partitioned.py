@@ -34,7 +34,7 @@ def upgrade() -> None:
                 session_id UUID NOT NULL,
                 status VARCHAR(20) NOT NULL,
                 device_id VARCHAR(50),
-                CONSTRAINT pk_study_events PRIMARY KEY (reviewed_at, user_id, id),
+                CONSTRAINT pk_study_events PRIMARY KEY (reviewed_at, id),
                 CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
             ) PARTITION BY RANGE (reviewed_at);
             """
@@ -69,7 +69,7 @@ def upgrade() -> None:
             sa.Column("status", sa.String(length=20), nullable=False),
             sa.Column("device_id", sa.String(length=50), nullable=True),
             sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
-            sa.PrimaryKeyConstraint("reviewed_at", "user_id", "id", name="pk_study_events"),
+            sa.PrimaryKeyConstraint("reviewed_at", "id", name="pk_study_events"),
         )
         op.create_index(
             "ix_study_events_user_card_review",

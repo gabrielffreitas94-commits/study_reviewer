@@ -100,9 +100,11 @@ async function flushOutbox(authToken, csrfToken) {
 
     self.postMessage({ type: "SYNC_STATUS", status: "syncing", pendingCount: batch.length });
 
-    // Agrupa por session_id
-    const sessionId = batch[0].session_id;
-    const cleanEvents = batch.map((ev) => ({
+    // Agrupa estritamente pelo session_id do primeiro item para prevenir contaminação entre sessões
+    const targetSessionId = batch[0].session_id;
+    const sessionBatch = batch.filter((ev) => ev.session_id === targetSessionId);
+
+    const cleanEvents = sessionBatch.map((ev) => ({
       id: ev.id,
       card_id: ev.card_id,
       reviewed_at: ev.reviewed_at,
@@ -110,7 +112,7 @@ async function flushOutbox(authToken, csrfToken) {
       device_id: ev.device_id || "web-client",
     }));
 
-    const maxBatchIndex = Math.max(...batch.map((ev) => ev.current_index || 0));
+    const maxBatchIndex = Math.max(...sessionBatch.map((ev) => ev.current_index || 0));
 
     const headers = {
       "Content-Type": "application/json",
@@ -123,7 +125,7 @@ async function flushOutbox(authToken, csrfToken) {
       method: "POST",
       headers,
       body: JSON.stringify({
-        session_id: sessionId,
+        session_id: targetSessionId,
         events: cleanEvents,
         batch_index: maxBatchIndex,
       }),
@@ -132,7 +134,7 @@ async function flushOutbox(authToken, csrfToken) {
 
     if (response.ok) {
       const data = await response.json();
-      const removedIds = batch.map((b) => b.local_id);
+      const removedIds = sessionBatch.map((b) => b.local_id);
       await removeFromOutbox(removedIds);
       const remaining = await getPendingEvents(1);
       self.postMessage({
@@ -143,7 +145,7 @@ async function flushOutbox(authToken, csrfToken) {
         serverIndex: data.current_index,
       });
 
-      // Se restarem itens no outbox, despacha recursivamente
+      // Se restarem itens no outbox (inclusive de outras sessões), despacha recursivamente
       if (remaining.length > 0) {
         setTimeout(() => flushOutbox(authToken, csrfToken), 100);
       }

@@ -38,13 +38,15 @@ class SyncStudyAnswersUseCase:
             )
 
         # 2. Valida autorização de cada card_id na fila da sessão
-        if session.card_queue:
-            authorized_card_ids = set(session.card_queue)
-            for event in input_dto.events:
-                if event.card_id not in authorized_card_ids:
-                    raise ResourceOwnershipError(
-                        f"O card '{event.card_id}' não está autorizado para esta sessão de estudo."
-                    )
+        if not session.card_queue:
+            raise DomainValidationError("A sessão de estudo não possui cards em sua fila ativa.")
+
+        authorized_card_ids = set(session.card_queue)
+        for event in input_dto.events:
+            if event.card_id not in authorized_card_ids:
+                raise ResourceOwnershipError(
+                    f"O card '{event.card_id}' não está autorizado para esta sessão de estudo."
+                )
 
         # 3. Validação temporal e anti-tampering (Clock Skew e Replay)
         now = datetime.now(UTC)

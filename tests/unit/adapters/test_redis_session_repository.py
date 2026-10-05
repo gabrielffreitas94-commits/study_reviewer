@@ -72,6 +72,11 @@ def test_redis_session_repository_miss_and_delete() -> None:
         active_none = await repo.get_active_session(uuid4(), None, None)
         assert active_none is None
 
+        # Meta key órfã (chave de sessão expirou mas meta_key ainda existe)
+        orphan_session_id = uuid4()
+        await fake_redis.set(f"tenant:default:session_meta:{orphan_session_id}", str(uuid4()))
+        assert await repo.get_session(orphan_session_id) is None
+
         # Salva e deleta
         session = FlashcardPoolSession()
         await repo.save_session(session)

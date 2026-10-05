@@ -183,7 +183,7 @@ class StudyEventModel(Base):
         DateTime(timezone=True), primary_key=True, nullable=False
     )
     user_id: Mapped[UUID | None] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="SET NULL"), primary_key=True, nullable=True
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     card_id: Mapped[UUID] = mapped_column(Uuid, nullable=False, index=True)

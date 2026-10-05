@@ -189,7 +189,7 @@ CREATE TABLE study_events (
     session_id UUID NOT NULL,
     status VARCHAR(20) NOT NULL,      -- 'viewed', 'completed' (PRD v7.0 Flashcards)
     device_id VARCHAR(50),
-    CONSTRAINT pk_study_events PRIMARY KEY (reviewed_at, user_id, id),
+    CONSTRAINT pk_study_events PRIMARY KEY (reviewed_at, id),
     CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) PARTITION BY RANGE (reviewed_at);
 
@@ -227,7 +227,7 @@ CREATE TABLE study_events_y2026w41 PARTITION OF study_events
 * **Idempotência no Servidor:**
   ```python
   stmt = insert(StudyEventModel).values(events_payload)
-  stmt = stmt.on_conflict_do_nothing(index_elements=["reviewed_at", "user_id", "id"])
+  stmt = stmt.on_conflict_do_nothing(index_elements=["reviewed_at", "id"])
   await db_session.execute(stmt)
   ```
 

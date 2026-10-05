@@ -174,9 +174,9 @@ class FlashcardPoolSession:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    # Campos de compatibilidade
-    subject_id_filter: UUID | None = None
-    current_position: int = 0
+    # Campos e métodos de compatibilidade (Depreciados: programados para remoção na Sprint 03)
+    subject_id_filter: UUID | None = None  # Depreciado: use `subject_id`
+    current_position: int = 0  # Depreciado: use `current_index` com `card_queue`
     is_active: bool = True
 
     def __post_init__(self) -> None:
@@ -211,12 +211,12 @@ class FlashcardPoolSession:
         self.updated_at = datetime.now(UTC)
 
     def advance_to(self, position: int) -> None:
-        """Avança o ponteiro de exibição para uma nova posição (compatibilidade)."""
+        """[DEPRECIADO: Remoção Sprint 03] Avança o ponteiro de exibição para nova posição."""
         self.current_position = position
         self.updated_at = datetime.now(UTC)
 
     def next_round(self, initial_position: int = 100) -> None:
-        """Incrementa a rodada e redefine o ponteiro para o primeiro card (compatibilidade)."""
+        """[DEPRECIADO: Remoção na Sprint 03] Incrementa a rodada e redefine o ponteiro."""
         self.round_number += 1
         self.current_position = initial_position
         self.current_index = 0

@@ -361,7 +361,7 @@ class SqlAlchemyStudyEventRepository(IStudyEventRepository):
             insert_stmt = (
                 pg_insert(StudyEventModel)
                 .values(events)
-                .on_conflict_do_nothing(index_elements=["reviewed_at", "user_id", "id"])
+                .on_conflict_do_nothing(index_elements=["reviewed_at", "id"])
             )
         else:
             from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -369,7 +369,7 @@ class SqlAlchemyStudyEventRepository(IStudyEventRepository):
             insert_stmt = (
                 sqlite_insert(StudyEventModel)
                 .values(events)
-                .on_conflict_do_nothing(index_elements=["reviewed_at", "user_id", "id"])
+                .on_conflict_do_nothing(index_elements=["reviewed_at", "id"])
             )
 
         res: Any = self._session.execute(insert_stmt)

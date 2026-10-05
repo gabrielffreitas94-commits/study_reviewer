@@ -124,15 +124,32 @@ class RedisSessionRepository(ISessionStore):
                 user_id_raw if isinstance(user_id_raw, str) else user_id_raw.decode("utf-8")
             )
             s_key = self._session_key(UUID(user_id_str), session_id)
+            raw_session = await self._redis.get(s_key)
+            if raw_session:
+                session = self._deserialize_session(raw_session)
+                idx_key = self._active_index_key(
+                    session.user_id, session.subject_id, session.topic_id_filter
+                )
+                await self._redis.delete(idx_key)
             await self._redis.delete(s_key)
         await self._redis.delete(m_key)
 
     async def purge_user_sessions(self, user_id: UUID) -> int:
-        """Remove todas as chaves de sessão ativas do usuário (Conformidade LGPD Art. 18)."""
+        """Remove todas as chaves de sessão do usuário e metadados (LGPD Art. 18)."""
         pattern = f"tenant:{self._tenant_id}:user:{user_id}:*"
-        keys = []
+        keys: list[Any] = []
+        meta_keys: list[str] = []
+
         async for key in self._redis.scan_iter(match=pattern):
             keys.append(key)
-        if keys:
-            await self._redis.delete(*keys)
-        return len(keys)
+            key_str = key if isinstance(key, str) else key.decode("utf-8")
+            if ":session:" in key_str and key_str.endswith(":queue"):
+                parts = key_str.split(":")
+                if len(parts) >= 6:
+                    sess_id_str = parts[5]
+                    meta_keys.append(self._meta_key(UUID(sess_id_str)))
+
+        all_keys = list(keys) + meta_keys
+        if all_keys:
+            await self._redis.delete(*all_keys)
+        return len(all_keys)

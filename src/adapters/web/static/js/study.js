@@ -32,6 +32,7 @@
     lowWaterMark: 10,
     cacheTtlMs: 2 * 60 * 60 * 1000, // 2 horas
     batchLoadedAt: null,
+    isAdvancing: false,
   };
 
   // Elementos do DOM
@@ -362,9 +363,13 @@
     }
   }
 
-  // Avança para o próximo card (Optimistic UI em 0ms)
+  // Avança para o próximo card (Optimistic UI em 0ms com proteção contra duplo clique)
   async function advanceCard() {
-    if (!state.currentCard) return;
+    if (!state.currentCard || state.isAdvancing) return;
+    state.isAdvancing = true;
+    setTimeout(() => {
+      state.isAdvancing = false;
+    }, 130);
 
     // 1. Enfileira o evento do card que acaba de ser estudado
     dispatchStudyEvent(state.currentCard);
