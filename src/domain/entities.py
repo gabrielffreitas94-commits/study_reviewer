@@ -1,24 +1,76 @@
 """Entidades de domínio puras do sistema Study Reviewer (Clean Architecture - Camada 1)."""
 
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
-from src.domain.exceptions import DomainValidationError
+from src.domain.exceptions import (
+    DomainValidationError,
+    InvalidEmailError,
+    InvalidGoogleSubError,
+)
+
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+
+
+@dataclass
+class User:
+    """Entidade que representa um Usuário/Estudante autenticado."""
+
+    google_sub: str
+    email: str
+    name: str
+    avatar_url: str | None = None
+    id: UUID = field(default_factory=uuid4)
+    created_at: date = field(default_factory=date.today)
+
+    def __post_init__(self) -> None:
+        self.google_sub = self.google_sub.strip() if self.google_sub is not None else ""
+        self.email = self.email.strip().lower() if self.email is not None else ""
+        self.name = self.name.strip() if self.name is not None else ""
+        if self.avatar_url is not None:
+            cleaned_avatar = self.avatar_url.strip()
+            self.avatar_url = cleaned_avatar if cleaned_avatar else None
+
+        if not self.google_sub:
+            raise InvalidGoogleSubError("O identificador Google (sub) não pode ser vazio.")
+
+        if not self.name or len(self.name) > 150:
+            raise DomainValidationError("Nome de usuário deve ter entre 1 e 150 caracteres.")
+
+        if not self._is_valid_email(self.email):
+            raise InvalidEmailError(f"Formato de e-mail inválido: '{self.email}'.")
+
+    @staticmethod
+    def _is_valid_email(email: str) -> bool:
+        return bool(EMAIL_REGEX.match(email))
 
 
 @dataclass
 class Subject:
-    """Entidade que representa uma Matéria macro de estudo."""
+    """Entidade que representa uma Matéria macro de estudo com suporte
+    a multi-tenancy e compartilhamento read-only.
+    """
 
     name: str
     id: UUID = field(default_factory=uuid4)
+    owner_id: UUID = field(default_factory=uuid4)
+    is_public: bool = False
     created_at: date = field(default_factory=date.today)
 
     def __post_init__(self) -> None:
         self.name = self.name.strip()
         if len(self.name) < 2 or len(self.name) > 100:
             raise DomainValidationError("Nome da matéria deve ter entre 2 e 100 caracteres.")
+
+    def can_be_edited_by(self, user_id: UUID) -> bool:
+        """Determina se o usuário possui permissão de edição/exclusão (apenas o proprietário)."""
+        return self.owner_id == user_id
+
+    def can_be_studied_by(self, user_id: UUID) -> bool:
+        """Determina se o usuário possui permissão de estudo (proprietário ou matéria pública)."""
+        return self.owner_id == user_id or self.is_public
 
 
 @dataclass
@@ -104,29 +156,68 @@ class Flashcard:
         return self.topic_ids[0]
 
 
-@dataclass
+@dataclass(slots=True)
 class FlashcardPoolSession:
-    """Entidade que encapsula o estado persistido de uma sessão de estudo da pool."""
+    """Entidade de domínio rica representando a sessão efêmera de estudo.
+
+    A fila `card_queue` contém exclusivamente a fatia da rodada ativa
+    (50 a 100 UUIDs), otimizando o consumo de RAM em larga escala.
+    """
 
     id: UUID = field(default_factory=uuid4)
-    subject_id_filter: UUID | None = None
+    user_id: UUID = field(default_factory=uuid4)
+    subject_id: UUID | None = None
     topic_id_filter: UUID | None = None
-    current_position: int = 0
     round_number: int = 1
-    is_active: bool = True
+    current_index: int = 0  # Cursor na fila (0 a N-1)
+    card_queue: list[UUID] = field(default_factory=list)  # Janela ativa da rodada
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    # Campos e métodos de compatibilidade (Depreciados: programados para remoção na Sprint 03)
+    subject_id_filter: UUID | None = None  # Depreciado: use `subject_id`
+    current_position: int = 0  # Depreciado: use `current_index` com `card_queue`
+    is_active: bool = True
+
     def __post_init__(self) -> None:
+        if self.subject_id is None and self.subject_id_filter is not None:
+            self.subject_id = self.subject_id_filter
+        elif self.subject_id_filter is None and self.subject_id is not None:
+            self.subject_id_filter = self.subject_id
+
+        if self.current_index < 0:
+            raise DomainValidationError("O índice atual não pode ser negativo.")
         if self.round_number < 1:
-            raise DomainValidationError("Número da rodada deve ser maior ou igual a 1.")
+            raise DomainValidationError("O número da rodada deve ser >= 1.")
+
+    def get_current_card_id(self) -> UUID | None:
+        if self.current_index < len(self.card_queue):
+            return self.card_queue[self.current_index]
+        return None
+
+    def advance(self) -> None:
+        self.current_index += 1
+        self.updated_at = datetime.now(UTC)
+
+    def is_round_finished(self) -> bool:
+        return self.current_index >= len(self.card_queue)
+
+    def start_new_round(self, shuffled_ids: list[UUID]) -> None:
+        if not shuffled_ids:
+            raise DomainValidationError("A nova rodada requer uma lista não-vazia de IDs.")
+        self.round_number += 1
+        self.card_queue = list(shuffled_ids)
+        self.current_index = 0
+        self.updated_at = datetime.now(UTC)
 
     def advance_to(self, position: int) -> None:
-        """Avança o ponteiro de exibição para uma nova posição."""
+        """[DEPRECIADO: Remoção Sprint 03] Avança o ponteiro de exibição para nova posição."""
         self.current_position = position
         self.updated_at = datetime.now(UTC)
 
     def next_round(self, initial_position: int = 100) -> None:
-        """Incrementa a rodada e redefine o ponteiro para o primeiro card."""
+        """[DEPRECIADO: Remoção na Sprint 03] Incrementa a rodada e redefine o ponteiro."""
         self.round_number += 1
         self.current_position = initial_position
+        self.current_index = 0
         self.updated_at = datetime.now(UTC)

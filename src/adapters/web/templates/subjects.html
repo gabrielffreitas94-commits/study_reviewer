@@ -43,6 +43,18 @@
                         class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                 </div>
+                <div class="flex items-center space-x-2">
+                    <input 
+                        type="checkbox" 
+                        id="is_public" 
+                        name="is_public" 
+                        value="true"
+                        class="w-4 h-4 text-indigo-600 rounded border-slate-300 dark:border-slate-700 focus:ring-indigo-500"
+                    >
+                    <label for="is_public" class="text-xs text-slate-600 dark:text-slate-300">
+                        Compartilhar matéria publicamente (leitura e estudo para outros usuários)
+                    </label>
+                </div>
                 <button 
                     type="submit" 
                     class="w-full min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition shadow text-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -71,7 +83,9 @@
                     >
                         <option value="">Selecione a Matéria...</option>
                         {% for sub in subjects %}
+                            {% if not current_user or sub.owner_id == current_user.id %}
                             <option value="{{ sub.id }}">{{ sub.name }}</option>
+                            {% endif %}
                         {% endfor %}
                     </select>
                 </div>
@@ -145,8 +159,26 @@
                 {% for sub in subjects[:8] %}
                     <div class="subject-card bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between" data-subject-id="{{ sub.id }}">
                         <div>
-                            <div class="flex items-center justify-between mb-3 gap-2">
-                                <h3 class="text-lg font-bold text-slate-900 dark:text-white break-words break-words-anywhere [overflow-wrap:anywhere] min-w-0">{{ sub.name }}</h3>
+                            <div class="flex items-start justify-between mb-3 gap-2">
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <h3 class="text-lg font-bold text-slate-900 dark:text-white break-words break-words-anywhere [overflow-wrap:anywhere] min-w-0">{{ sub.name }}</h3>
+                                        {% if sub.is_public %}
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-semibold uppercase tracking-wider">
+                                            Pública
+                                        </span>
+                                        {% else %}
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">
+                                            Privada
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    {% if current_user and sub.owner_id != current_user.id %}
+                                    <span class="text-[11px] text-slate-400 dark:text-slate-500">
+                                        👤 Autor externo (somente-leitura)
+                                    </span>
+                                    {% endif %}
+                                </div>
                                 <a href="/study?subject_id={{ sub.id }}" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline shrink-0 whitespace-nowrap">
                                     Estudar Matéria ➔
                                 </a>
@@ -178,10 +210,20 @@
                         </div>
 
                         <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
-                            <span>Criado em {{ sub.created_at.strftime('%d/%m/%Y') if sub.created_at else '' }}</span>
+                            {% if not current_user or sub.owner_id == current_user.id %}
+                            <form action="/subjects/{{ sub.id }}/toggle-public" method="POST" class="inline">
+                                <input type="hidden" name="is_public" value="{{ 'false' if sub.is_public else 'true' }}">
+                                <button type="submit" class="text-xs text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium">
+                                    {{ '🔒 Tornar Privada' if sub.is_public else '🌐 Compartilhar' }}
+                                </button>
+                            </form>
                             <a href="/flashcards/new?subject_id={{ sub.id }}" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
                                 + Adicionar Card
                             </a>
+                            {% else %}
+                            <span class="text-[11px] text-slate-400">Somente-leitura</span>
+                            <span class="text-[11px] text-slate-400">Não editável</span>
+                            {% endif %}
                         </div>
                     </div>
                 {% endfor %}
@@ -219,6 +261,8 @@
     {
         "id": "{{ sub.id }}",
         "name": {{ sub.name|tojson }},
+        "is_public": {{ 'true' if sub.is_public else 'false' }},
+        "is_owner": {{ 'true' if (not current_user or sub.owner_id == current_user.id) else 'false' }},
         "created_at": "{{ sub.created_at.strftime('%d/%m/%Y') if sub.created_at else '' }}",
         "topics": [
             {% for t in topics_by_subject.get(sub.id, []) %}
@@ -281,18 +325,42 @@
         const topSection = document.createElement('div');
 
         const headerDiv = document.createElement('div');
-        headerDiv.className = 'flex items-center justify-between mb-3 gap-2';
+        headerDiv.className = 'flex items-start justify-between mb-3 gap-2';
+
+        const subInfoDiv = document.createElement('div');
+
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'flex items-center gap-2';
 
         const title = document.createElement('h3');
         title.className = 'text-lg font-bold text-slate-900 dark:text-white break-words break-words-anywhere [overflow-wrap:anywhere] min-w-0';
         title.textContent = sub.name;
+        titleDiv.appendChild(title);
+
+        const badge = document.createElement('span');
+        if (sub.is_public) {
+            badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-semibold uppercase tracking-wider';
+            badge.textContent = 'Pública';
+        } else {
+            badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider';
+            badge.textContent = 'Privada';
+        }
+        titleDiv.appendChild(badge);
+        subInfoDiv.appendChild(titleDiv);
+
+        if (!sub.is_owner) {
+            const authorSpan = document.createElement('span');
+            authorSpan.className = 'text-[11px] text-slate-400 dark:text-slate-500';
+            authorSpan.textContent = '👤 Autor externo (somente-leitura)';
+            subInfoDiv.appendChild(authorSpan);
+        }
 
         const studyLink = document.createElement('a');
         studyLink.href = `/study?subject_id=${sub.id}`;
         studyLink.className = 'text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline shrink-0 whitespace-nowrap';
         studyLink.textContent = 'Estudar Matéria ➔';
 
-        headerDiv.appendChild(title);
+        headerDiv.appendChild(subInfoDiv);
         headerDiv.appendChild(studyLink);
         topSection.appendChild(headerDiv);
 
@@ -335,16 +403,44 @@
         const footer = document.createElement('div');
         footer.className = 'mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400';
 
-        const dateSpan = document.createElement('span');
-        dateSpan.textContent = sub.created_at ? `Criado em ${sub.created_at}` : '';
+        if (sub.is_owner) {
+            const form = document.createElement('form');
+            form.action = `/subjects/${sub.id}/toggle-public`;
+            form.method = 'POST';
+            form.className = 'inline';
 
-        const addCardLink = document.createElement('a');
-        addCardLink.href = `/flashcards/new?subject_id=${sub.id}`;
-        addCardLink.className = 'text-indigo-600 dark:text-indigo-400 hover:underline font-medium';
-        addCardLink.textContent = '+ Adicionar Card';
+            const inputHidden = document.createElement('input');
+            inputHidden.type = 'hidden';
+            inputHidden.name = 'is_public';
+            inputHidden.value = sub.is_public ? 'false' : 'true';
+            form.appendChild(inputHidden);
 
-        footer.appendChild(dateSpan);
-        footer.appendChild(addCardLink);
+            const toggleBtn = document.createElement('button');
+            toggleBtn.type = 'submit';
+            toggleBtn.className = 'text-xs text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium';
+            toggleBtn.textContent = sub.is_public ? '🔒 Tornar Privada' : '🌐 Compartilhar';
+            form.appendChild(toggleBtn);
+
+            const addCardLink = document.createElement('a');
+            addCardLink.href = `/flashcards/new?subject_id=${sub.id}`;
+            addCardLink.className = 'text-indigo-600 dark:text-indigo-400 hover:underline font-medium';
+            addCardLink.textContent = '+ Adicionar Card';
+
+            footer.appendChild(form);
+            footer.appendChild(addCardLink);
+        } else {
+            const roSpan = document.createElement('span');
+            roSpan.className = 'text-[11px] text-slate-400';
+            roSpan.textContent = 'Somente-leitura';
+
+            const noEditSpan = document.createElement('span');
+            noEditSpan.className = 'text-[11px] text-slate-400';
+            noEditSpan.textContent = 'Não editável';
+
+            footer.appendChild(roSpan);
+            footer.appendChild(noEditSpan);
+        }
+
         card.appendChild(footer);
 
         return card;

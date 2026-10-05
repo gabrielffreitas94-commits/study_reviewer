@@ -62,29 +62,39 @@
 {% endif %}
 {% endif %}
 
-<!-- Card Parcial para estudo ativo HTMX -->
+<!-- Card Parcial para estudo ativo -->
 <div id="flashcard-container" class="w-full min-w-0 flex-1 flex flex-col justify-between" hx-target="#flashcard-container" hx-swap="outerHTML">
 
     <!-- Notificação Acessível via aria-live para leitores de tela -->
     <div id="card-announcer" class="sr-only" aria-live="polite" aria-atomic="true">
         {% if card %}
-            {% if side == 'back' %}
-                Resposta revelada: {{ card.back }}
-            {% else %}
-                {% if card.round_shuffled %}
-                    Nova rodada iniciada.
-                {% endif %}
-                Card número {{ card.current_index }} de {{ card.total_cards }}, Rodada {{ card.round_number }}. Pergunta: {{ card.front }}
-            {% endif %}
+            {% if card.round_shuffled %}Nova rodada iniciada. {% endif %}Card número {{ card.current_index }} de {{ card.total_cards }}, Rodada {{ card.round_number }}. Pergunta: {{ card.front }}
         {% else %}
             Nenhum card disponível.
         {% endif %}
     </div>
 
+    <!-- Banner de Modo Privado / Fallback de Armazenamento Gracioso (Seção 5.4) -->
+    <div id="private-mode-banner" class="hidden mb-4 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-300 text-sm flex items-center justify-between" role="status">
+        <span class="flex items-center space-x-2">
+            <span class="text-base" aria-hidden="true">🛡️</span>
+            <span>Modo de navegação privada detectado: seu progresso será salvo diretamente na nuvem a cada card respondido.</span>
+        </span>
+    </div>
+
+    <!-- Banner de Erro Não-Bloqueante com Retry Contextual (Seção 7.1) -->
+    <div id="sync-error-banner" class="hidden mb-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg text-rose-800 dark:text-rose-300 text-sm flex items-center justify-between" role="alert">
+        <span class="flex items-center space-x-2">
+            <span class="text-base" aria-hidden="true">⚠️</span>
+            <span>Não foi possível sincronizar agora. Suas respostas estão guardadas no aparelho e serão enviadas assim que a rede estabilizar.</span>
+        </span>
+        <button type="button" id="btn-sync-retry" class="ml-3 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-semibold">Tentar Novamente</button>
+    </div>
+
     {% if card %}
         <!-- Alerta de Nova Rodada (se shuffled) -->
-        {% if card.round_shuffled and side != 'back' %}
-        <div class="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between" role="status">
+        {% if card.round_shuffled %}
+        <div id="round-shuffled-alert" class="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between" role="status">
             <span class="flex items-center space-x-2">
                 <span class="text-base" aria-hidden="true">🔄</span>
                 <span><strong>Nova Rodada Iniciada!</strong></span>
@@ -92,57 +102,92 @@
         </div>
         {% endif %}
 
-        <!-- Superfície do Card (Interactive Flip Area) -->
-        <div 
-            id="card-surface"
-            tabindex="0"
-            role="button"
-            aria-label="{% if side == 'back' %}Resposta do card. Pressione espaço ou clique para ver a pergunta.{% else %}Pergunta do card. Pressione espaço ou clique para revelar a resposta.{% endif %}"
-            hx-post="/study/flip"
-            hx-vals='{"card_id": "{{ card.id }}", "side": "{{ side or 'front' }}", "current_index": "{{ card.current_index }}", "total_cards": "{{ card.total_cards }}", "round_number": "{{ card.round_number }}", "position": "{{ card.position }}"}'
-            class="w-full min-w-0 max-w-full flex-1 min-h-[300px] sm:min-h-[380px] bg-white dark:bg-slate-800 border-2 {% if side == 'back' %}border-indigo-400 dark:border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/20{% else %}border-slate-200 dark:border-slate-700{% endif %} rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer select-none focus:outline-none focus:ring-4 focus:ring-indigo-500/20 overflow-hidden"
-        >
-            <!-- Topo do Card: Badge de Frente/Verso, Temas e Posição Pinned -->
-            <div class="flex items-start justify-between gap-3 text-xs font-semibold tracking-wider uppercase mb-4 w-full min-w-0">
-                <div class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
-                    {% if side == 'back' %}
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0">
-                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5"></span> Resposta (Verso)
-                        </span>
-                    {% else %}
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0">
-                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span> Pergunta (Frente)
-                        </span>
-                    {% endif %}
-
-                    {% if card.topic_names %}
-                        {% for tname in card.topic_names %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 max-w-full break-words break-words-anywhere [overflow-wrap:anywhere]" title="{{ tname }}">
-                                <span class="mr-1 shrink-0" aria-hidden="true">🏷️</span>
-                                <span class="break-words break-words-anywhere [overflow-wrap:anywhere]">{{ tname }}</span>
+        <!-- Container 3D com CSS Containment e Perspective (Seção 7.3) -->
+        <div class="card-container w-full min-w-0 max-w-full flex-1 min-h-[300px] sm:min-h-[380px]">
+            <div 
+                id="card-surface"
+                class="card-inner relative w-full h-full min-h-[300px] sm:min-h-[380px] cursor-pointer select-none focus:outline-none focus:ring-4 focus:ring-indigo-500/20 rounded-2xl"
+                tabindex="0"
+                role="button"
+                aria-label="Pergunta do card. Pressione espaço ou clique para revelar a resposta."
+                data-card-id="{{ card.id }}"
+                data-session-id="{{ card.session_id or '' }}"
+                data-current-index="{{ card.current_index }}"
+                data-total-cards="{{ card.total_cards }}"
+                data-round-number="{{ card.round_number }}"
+                data-position="{{ card.position }}"
+            >
+                <!-- FACE FRONTAL (Pergunta) -->
+                <div class="card-face card-front w-full h-full bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                    <!-- Topo do Card: Badge Frente, Temas e Posição -->
+                    <div class="flex items-start justify-between gap-3 text-xs font-semibold tracking-wider uppercase mb-4 w-full min-w-0">
+                        <div class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span> Pergunta (Frente)
                             </span>
-                        {% endfor %}
-                    {% endif %}
+                            <span id="front-topics-container" class="flex flex-wrap items-center gap-1.5">
+                                {% if card.topic_names %}
+                                    {% for tname in card.topic_names %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 max-w-full break-words-anywhere" title="{{ tname }}">
+                                            <span class="mr-1 shrink-0" aria-hidden="true">🏷️</span>
+                                            <span>{{ tname }}</span>
+                                        </span>
+                                    {% endfor %}
+                                {% endif %}
+                            </span>
+                        </div>
+                        <span id="front-card-position" class="text-slate-400 dark:text-slate-500 font-mono text-[11px] shrink-0 whitespace-nowrap pt-1" title="Posição de Gap Indexing">
+                            #{{ card.position }}
+                        </span>
+                    </div>
+
+                    <!-- Pergunta Centralizada -->
+                    <div class="w-full min-w-0 my-auto py-6 flex flex-col justify-center items-center text-center">
+                        <div id="card-front-text" class="w-full min-w-0 text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white whitespace-pre-wrap break-words-anywhere leading-relaxed text-center max-w-2xl mx-auto">{{ card.front }}</div>
+                    </div>
+
+                    <!-- Rodapé Frente -->
+                    <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500 w-full min-w-0">
+                        <span class="truncate sm:overflow-visible">Toque no card ou pressione <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Espaço</kbd> para virar</span>
+                        <span class="hidden sm:inline shrink-0 ml-2">Avançar: <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Enter</kbd></span>
+                    </div>
                 </div>
 
-                <span class="text-slate-400 dark:text-slate-500 font-mono text-[11px] shrink-0 whitespace-nowrap pt-1" title="Posição de Gap Indexing">
-                    #{{ card.position }}
-                </span>
-            </div>
+                <!-- FACE TRASEIRA (Resposta) -->
+                <div class="card-face card-back w-full h-full bg-indigo-50/20 dark:bg-indigo-950/20 border-2 border-indigo-400 dark:border-indigo-500 rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                    <!-- Topo Verso -->
+                    <div class="flex items-start justify-between gap-3 text-xs font-semibold tracking-wider uppercase mb-4 w-full min-w-0">
+                        <div class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0">
+                                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5"></span> Resposta (Verso)
+                            </span>
+                            <span id="back-topics-container" class="flex flex-wrap items-center gap-1.5">
+                                {% if card.topic_names %}
+                                    {% for tname in card.topic_names %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 max-w-full break-words-anywhere" title="{{ tname }}">
+                                            <span class="mr-1 shrink-0" aria-hidden="true">🏷️</span>
+                                            <span>{{ tname }}</span>
+                                        </span>
+                                    {% endfor %}
+                                {% endif %}
+                            </span>
+                        </div>
+                        <span id="back-card-position" class="text-slate-400 dark:text-slate-500 font-mono text-[11px] shrink-0 whitespace-nowrap pt-1">
+                            #{{ card.position }}
+                        </span>
+                    </div>
 
-            <!-- Corpo Textual do Card com Word Break Seguro -->
-            <div class="w-full min-w-0 my-auto py-6 flex flex-col justify-center items-center text-center">
-                {% if side == 'back' %}
-                    <div class="w-full min-w-0 text-lg sm:text-2xl text-slate-800 dark:text-slate-100 font-medium whitespace-pre-wrap break-words break-words-anywhere [overflow-wrap:anywhere] leading-relaxed text-center max-w-2xl mx-auto">{{ card.back }}</div>
-                {% else %}
-                    <div class="w-full min-w-0 text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white whitespace-pre-wrap break-words break-words-anywhere [overflow-wrap:anywhere] leading-relaxed text-center max-w-2xl mx-auto">{{ card.front }}</div>
-                {% endif %}
-            </div>
+                    <!-- Resposta Centralizada -->
+                    <div class="w-full min-w-0 my-auto py-6 flex flex-col justify-center items-center text-center">
+                        <div id="card-back-text" class="w-full min-w-0 text-lg sm:text-2xl text-slate-800 dark:text-slate-100 font-medium whitespace-pre-wrap break-words-anywhere leading-relaxed text-center max-w-2xl mx-auto">{{ card.back }}</div>
+                    </div>
 
-            <!-- Rodapé interno do Card: Dica de Atalho -->
-            <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500 w-full min-w-0">
-                <span class="truncate sm:overflow-visible">Toque no card ou pressione <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Espaço</kbd> para virar</span>
-                <span class="hidden sm:inline shrink-0 ml-2">Avançar: <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Enter</kbd></span>
+                    <!-- Rodapé Verso -->
+                    <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500 w-full min-w-0">
+                        <span class="truncate sm:overflow-visible">Pressione <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Espaço</kbd> para desvirar</span>
+                        <span class="hidden sm:inline shrink-0 ml-2">Avançar: <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-mono">Enter</kbd></span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -151,12 +196,10 @@
             <button
                 type="button"
                 id="btn-flip"
-                hx-post="/study/flip"
-                hx-vals='{"card_id": "{{ card.id }}", "side": "{{ side or 'front' }}", "current_index": "{{ card.current_index }}", "total_cards": "{{ card.total_cards }}", "round_number": "{{ card.round_number }}", "position": "{{ card.position }}"}'
                 class="min-h-[48px] px-6 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-medium text-slate-700 dark:text-slate-200 transition shadow-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
                 <span aria-hidden="true">🔄</span>
-                <span>{% if side == 'back' %}Ver Pergunta (Espaço){% else %}Virar Card (Espaço){% endif %}</span>
+                <span id="btn-flip-label">Virar Card (Espaço)</span>
             </button>
 
             <button
@@ -171,9 +214,40 @@
             </button>
         </div>
 
+        <!-- Tela de Vitória / Conclusão de Rodada (Victory State - Seção 7.1) -->
+        <div id="victory-state" class="hidden flex-1 min-h-[380px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-sm">
+            <span class="text-6xl mb-4" aria-hidden="true">🎉</span>
+            <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Parabéns! Rodada Concluída!</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6">
+                Você revisou todos os cards deste bloco com sucesso. Suas respostas foram computadas e sincronizadas.
+            </p>
+            <div class="grid grid-cols-3 gap-4 w-full max-w-md mb-6">
+                <div class="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <span class="block text-2xl font-bold text-indigo-600 dark:text-indigo-400" id="stat-cards-count">{{ card.total_cards }}</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Cards Revisados</span>
+                </div>
+                <div class="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <span class="block text-2xl font-bold text-emerald-600 dark:text-emerald-400" id="stat-round-number">{{ card.round_number }}</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Rodada</span>
+                </div>
+                <div class="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <span class="block text-2xl font-bold text-amber-600 dark:text-amber-400" id="stat-focus-time">100%</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Conclusão</span>
+                </div>
+            </div>
+            <button
+                type="button"
+                id="btn-restart-round"
+                class="min-h-[48px] px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow inline-flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+                <span aria-hidden="true">🔄</span>
+                <span>Iniciar Próxima Rodada</span>
+            </button>
+        </div>
+
     {% else %}
         <!-- Estado Vazio (Zero Flashcards Disponíveis) -->
-        <div class="flex-1 min-h-[340px] bg-white dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+        <div class="flex-1 min-h-[380px] bg-white dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
             <span class="text-5xl mb-4" aria-hidden="true">📭</span>
             <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Nenhum Flashcard Disponível</h2>
             <p class="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6">

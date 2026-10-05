@@ -1,9 +1,29 @@
 """Contratos de repositórios (Portas de Saída - Clean Architecture - Camada 2)."""
 
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
-from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
+from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic, User
+
+
+class IUserRepository(Protocol):
+    """Porta de persistência para Usuários."""
+
+    def save(self, user: User) -> None:
+        """Persiste ou atualiza um usuário."""
+        ...
+
+    def get_by_id(self, user_id: UUID) -> User | None:
+        """Busca um usuário pelo seu UUID primário."""
+        ...
+
+    def get_by_google_sub(self, google_sub: str) -> User | None:
+        """Busca um usuário pelo seu identificador Google sub."""
+        ...
+
+    def get_by_email(self, email: str) -> User | None:
+        """Busca um usuário pelo seu endereço de e-mail."""
+        ...
 
 
 class ISubjectRepository(Protocol):
@@ -21,12 +41,22 @@ class ISubjectRepository(Protocol):
         """Lista todas as matérias cadastradas."""
         ...
 
-    def exists_by_name(self, name: str) -> bool:
-        """Verifica se já existe matéria com o nome informado."""
+    def list_by_owner(self, owner_id: UUID) -> list[Subject]:
+        """Lista todas as matérias pertencentes a um determinado usuário."""
         ...
 
-    def list_all_with_topics(self) -> list[tuple[Subject, list[Topic]]]:
-        """Lista todas as matérias acompanhadas de seus respectivos temas em lote (sem N+1)."""
+    def list_accessible(self, user_id: UUID) -> list[Subject]:
+        """Lista matérias acessíveis pelo usuário (próprias ou públicas)."""
+        ...
+
+    def exists_by_name(self, name: str, owner_id: UUID | None = None) -> bool:
+        """Verifica se já existe matéria com o nome informado no escopo do proprietário."""
+        ...
+
+    def list_all_with_topics(
+        self, user_id: UUID | None = None
+    ) -> list[tuple[Subject, list[Topic]]]:
+        """Lista matérias acompanhadas de seus respectivos temas em lote (sem N+1)."""
         ...
 
 
@@ -96,11 +126,34 @@ class ISessionRepository(Protocol):
     """Porta de persistência para o estado das sessões de estudo."""
 
     def get_active_session(
-        self, subject_id: UUID | None, topic_id: UUID | None
+        self,
+        subject_id: UUID | None,
+        topic_id: UUID | None,
+        user_id: UUID | None = None,
     ) -> FlashcardPoolSession | None:
-        """Recupera a sessão ativa para a combinação de filtros."""
+        """Recupera a sessão ativa para a combinação de filtros e usuário."""
+        ...
+
+    def get_by_id(self, session_id: UUID) -> FlashcardPoolSession | None:
+        """Recupera uma sessão de estudo pelo seu UUID."""
         ...
 
     def save_session(self, session: FlashcardPoolSession) -> None:
         """Persiste ou atualiza o estado da sessão de estudo."""
+        ...
+
+
+class IStudyEventRepository(Protocol):
+    """Porta para histórico append-only de eventos de estudo (study_events)."""
+
+    def bulk_insert(self, events: list[dict[str, Any]]) -> int:
+        """Insere lote de eventos com idempotência (ON CONFLICT DO NOTHING)."""
+        ...
+
+    def list_by_user(self, user_id: UUID, limit: int = 100) -> list[dict[str, Any]]:
+        """Lista eventos históricos de um usuário ordenados cronologicamente."""
+        ...
+
+    def anonymize_user_events(self, user_id: UUID) -> int:
+        """Anonimiza eventos desvinculando user_id e device_id (LGPD Art. 16, IV / 18, VI)."""
         ...

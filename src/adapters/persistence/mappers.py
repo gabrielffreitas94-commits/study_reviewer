@@ -1,12 +1,39 @@
-"""Mappers bidirecionais entre entidades puras de domínio e modelos ORM (Camada 3 - Adaptadores)."""
+from uuid import UUID
 
 from src.adapters.persistence.models import (
     FlashcardModel,
     PoolSessionModel,
     SubjectModel,
     TopicModel,
+    UserModel,
 )
-from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
+from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic, User
+
+
+class UserMapper:
+    """Conversor para Usuário."""
+
+    @staticmethod
+    def to_domain(model: UserModel) -> User:
+        return User(
+            id=model.id,
+            google_sub=model.google_sub,
+            email=model.email,
+            name=model.name,
+            avatar_url=model.avatar_url,
+            created_at=model.created_at,
+        )
+
+    @staticmethod
+    def to_model(entity: User) -> UserModel:
+        return UserModel(
+            id=entity.id,
+            google_sub=entity.google_sub,
+            email=entity.email,
+            name=entity.name,
+            avatar_url=entity.avatar_url,
+            created_at=entity.created_at,
+        )
 
 
 class SubjectMapper:
@@ -17,6 +44,8 @@ class SubjectMapper:
         return Subject(
             id=model.id,
             name=model.name,
+            owner_id=model.owner_id,
+            is_public=model.is_public,
             created_at=model.created_at,
         )
 
@@ -25,6 +54,8 @@ class SubjectMapper:
         return SubjectModel(
             id=entity.id,
             name=entity.name,
+            owner_id=entity.owner_id,
+            is_public=entity.is_public,
             created_at=entity.created_at,
         )
 
@@ -60,8 +91,8 @@ class FlashcardMapper:
         return Flashcard(
             id=model.id,
             topic_ids=topic_ids,
-            front=model.front,
-            back=model.back,
+            front=str(model.front),
+            back=str(model.back),
             position=model.position,
             created_at=model.created_at,
         )
@@ -82,24 +113,31 @@ class SessionMapper:
 
     @staticmethod
     def to_domain(model: PoolSessionModel) -> FlashcardPoolSession:
+        queue = [UUID(str(uid)) for uid in model.card_queue] if model.card_queue else []
         return FlashcardPoolSession(
             id=model.id,
+            user_id=model.user_id,
             subject_id_filter=model.subject_id_filter,
             topic_id_filter=model.topic_id_filter,
             current_position=model.current_position,
             round_number=model.round_number,
             is_active=model.is_active,
             updated_at=model.updated_at,
+            current_index=model.current_index,
+            card_queue=queue,
         )
 
     @staticmethod
     def to_model(entity: FlashcardPoolSession) -> PoolSessionModel:
         return PoolSessionModel(
             id=entity.id,
+            user_id=entity.user_id,
             subject_id_filter=entity.subject_id_filter,
             topic_id_filter=entity.topic_id_filter,
             current_position=entity.current_position,
             round_number=entity.round_number,
             is_active=entity.is_active,
             updated_at=entity.updated_at,
+            current_index=entity.current_index,
+            card_queue=[str(cid) for cid in entity.card_queue],
         )

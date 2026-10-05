@@ -43,12 +43,34 @@ class FakeSubjectRepository(ISubjectRepository):
     def list_all(self) -> list[Subject]:
         return sorted(self._subjects.values(), key=lambda s: s.name.lower())
 
-    def exists_by_name(self, name: str) -> bool:
-        norm = name.strip().lower()
-        return any(s.name.lower() == norm for s in self._subjects.values())
+    def list_by_owner(self, owner_id: UUID) -> list[Subject]:
+        return [
+            s
+            for s in sorted(self._subjects.values(), key=lambda s: s.name.lower())
+            if s.owner_id == owner_id
+        ]
 
-    def list_all_with_topics(self) -> list[tuple[Subject, list[Topic]]]:
-        return [(s, []) for s in self.list_all()]
+    def list_accessible(self, user_id: UUID) -> list[Subject]:
+        return [
+            s
+            for s in sorted(self._subjects.values(), key=lambda s: s.name.lower())
+            if s.owner_id == user_id or s.is_public
+        ]
+
+    def exists_by_name(self, name: str, owner_id: UUID | None = None) -> bool:
+        norm = name.strip().lower()
+        for s in self._subjects.values():
+            if s.name.lower() == norm:
+                if owner_id is None or s.owner_id == owner_id:
+                    return True
+        return False
+
+    def list_all_with_topics(
+        self, user_id: UUID | None = None
+    ) -> list[tuple[Subject, list[Topic]]]:
+        if user_id is None:
+            return [(s, []) for s in self.list_all()]
+        return [(s, []) for s in self.list_accessible(user_id)]
 
 
 class FakeTopicRepository(ITopicRepository):
@@ -147,12 +169,30 @@ class FakeSessionRepository(ISessionRepository):
     """Implementação em memória de ISessionRepository."""
 
     def __init__(self) -> None:
-        self._sessions: dict[tuple[UUID | None, UUID | None], FlashcardPoolSession] = {}
+        self._sessions: dict[
+            tuple[UUID | None, UUID | None, UUID | None], FlashcardPoolSession
+        ] = {}
 
     def get_active_session(
-        self, subject_id: UUID | None, topic_id: UUID | None
+        self,
+        subject_id: UUID | None,
+        topic_id: UUID | None,
+        user_id: UUID | None = None,
     ) -> FlashcardPoolSession | None:
-        return self._sessions.get((subject_id, topic_id))
+        # Tenta match exato com user_id primeiro
+        if (subject_id, topic_id, user_id) in self._sessions:
+            return self._sessions[(subject_id, topic_id, user_id)]
+        # Fallback sem user_id para compatibilidade de testes existentes
+        return self._sessions.get((subject_id, topic_id, None))
+
+    def get_by_id(self, session_id: UUID) -> FlashcardPoolSession | None:
+        for s in self._sessions.values():
+            if s.id == session_id:
+                return s
+        return None
 
     def save_session(self, session: FlashcardPoolSession) -> None:
-        self._sessions[(session.subject_id_filter, session.topic_id_filter)] = session
+        self._sessions[(session.subject_id_filter, session.topic_id_filter, session.user_id)] = (
+            session
+        )
+        self._sessions[(session.subject_id_filter, session.topic_id_filter, None)] = session

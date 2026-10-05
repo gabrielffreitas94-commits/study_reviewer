@@ -6,10 +6,15 @@ from src.application.dto.flashcard_dto import CreateFlashcardDTO, FlashcardDTO
 from src.application.ports.repositories import (
     IFlashcardRepository,
     ISessionRepository,
+    ISubjectRepository,
     ITopicRepository,
 )
 from src.domain.entities import Flashcard
-from src.domain.exceptions import DomainValidationError, EntityNotFoundError
+from src.domain.exceptions import (
+    DomainValidationError,
+    EntityNotFoundError,
+    ResourceOwnershipError,
+)
 from src.domain.protocols import IRandomGenerator
 from src.domain.services import FlashcardPoolService
 
@@ -23,13 +28,15 @@ class CreateFlashcardUseCase:
         topic_repo: ITopicRepository,
         session_repo: ISessionRepository,
         rng: IRandomGenerator,
+        subject_repo: ISubjectRepository | None = None,
     ) -> None:
         self._card_repo = card_repo
         self._topic_repo = topic_repo
         self._session_repo = session_repo
         self._rng = rng
+        self._subject_repo = subject_repo
 
-    def execute(self, input_dto: CreateFlashcardDTO) -> FlashcardDTO:
+    def execute(self, input_dto: CreateFlashcardDTO, user_id: UUID | None = None) -> FlashcardDTO:
         target_topic_ids = input_dto.topic_ids or (
             [input_dto.topic_id] if input_dto.topic_id else []
         )
@@ -40,6 +47,12 @@ class CreateFlashcardUseCase:
             topic = self._topic_repo.get_by_id(t_id)
             if topic is None:
                 raise EntityNotFoundError("Tema não encontrado.")
+            if user_id is not None and self._subject_repo is not None:
+                subject = self._subject_repo.get_by_id(topic.subject_id)
+                if subject is not None and not subject.can_be_edited_by(user_id):
+                    raise ResourceOwnershipError(
+                        "Você não tem permissão para adicionar cards a esta matéria."
+                    )
 
         primary_topic_id = target_topic_ids[0]
         pool = self._card_repo.list_pool(None, primary_topic_id)
@@ -98,30 +111,50 @@ class DeleteFlashcardUseCase:
         card_repo: IFlashcardRepository,
         session_repo: ISessionRepository,
         rng: IRandomGenerator,
+        topic_repo: ITopicRepository | None = None,
+        subject_repo: ISubjectRepository | None = None,
     ) -> None:
         self._card_repo = card_repo
         self._session_repo = session_repo
         self._rng = rng
+        self._topic_repo = topic_repo
+        self._subject_repo = subject_repo
 
-    def execute(self, flashcard_id: UUID) -> None:
+    def execute(self, flashcard_id: UUID, user_id: UUID | None = None) -> None:
         card = self._card_repo.get_by_id(flashcard_id)
         if card is None:
             raise EntityNotFoundError("Flashcard não encontrado.")
 
+        if user_id is not None and self._topic_repo is not None and self._subject_repo is not None:
+            for t_id in card.topic_ids:
+                topic = self._topic_repo.get_by_id(t_id)
+                if topic is not None:
+                    subject = self._subject_repo.get_by_id(topic.subject_id)
+                    if subject is not None and not subject.can_be_edited_by(user_id):
+                        raise ResourceOwnershipError(
+                            "Você não tem permissão para excluir cards desta matéria."
+                        )
+
         self._card_repo.delete(flashcard_id)
 
-        session = self._session_repo.get_active_session(None, card.topic_id)
-        if session is not None and session.current_position == card.position:
-            remaining = self._card_repo.list_pool(None, card.topic_id)
-            next_card, round_finished = FlashcardPoolService.get_next_card(remaining, card.position)
-            if round_finished:
+        session = self._session_repo.get_active_session(None, card.topic_id, user_id=user_id)
+        if session is not None:
+            if card.id in session.card_queue:
+                session.card_queue.remove(card.id)
+            if session.is_round_finished():
+                remaining = self._card_repo.list_pool(None, card.topic_id)
                 if remaining:
-                    shuffled = FlashcardPoolService.execute_round_shuffle(remaining, self._rng)
-                    self._card_repo.save_all(shuffled)
-                    session.next_round(initial_position=shuffled[0].position)
+                    shuffled_ids = FlashcardPoolService.execute_round_shuffle(remaining, self._rng)
+                    session.start_new_round(shuffled_ids)
+                    session.current_position = remaining[0].position
                 else:
                     session.current_position = 0
-            elif next_card is not None:
-                session.advance_to(next_card.position)
+            elif session.current_position == card.position:
+                remaining = self._card_repo.list_pool(None, card.topic_id)
+                next_card, round_finished = FlashcardPoolService.get_next_card(
+                    remaining, card.position
+                )
+                if next_card is not None:
+                    session.advance_to(next_card.position)
 
             self._session_repo.save_session(session)

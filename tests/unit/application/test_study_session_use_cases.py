@@ -11,7 +11,7 @@ from src.application.use_cases.study_session_use_cases import (
     GetStudyBatchUseCase,
 )
 from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
-from src.domain.exceptions import EmptyPoolError
+from src.domain.exceptions import EmptyPoolError, ResourceOwnershipError
 from tests.unit.application.fakes import (
     FakeFlashcardRepository,
     FakeRandomGenerator,
@@ -118,9 +118,9 @@ def test_get_next_card_end_of_round_triggers_shuffle_and_increments_round() -> N
     assert dto.round_number == 2
     assert dto.round_shuffled is True
     assert dto.current_index == 1
-    # Como FakeRandomGenerator inverte a lista, C2 virou o primeiro card (position=100)
+    # Como FakeRandomGenerator inverte a lista, C2 virou o primeiro card da fila efêmera da sessão
     assert dto.id == c2.id
-    assert dto.position == 100
+    assert dto.position == 200  # Posição imutável do catálogo mantida (Zero Write Amplification)
 
 
 @pytest.mark.unit
@@ -317,3 +317,191 @@ def test_get_next_and_current_card_with_topic_repo() -> None:
     curr_uc = GetCurrentStudyCardUseCase(card_repo, session_repo, topic_repo)
     dto_curr = curr_uc.execute(GetNextCardDTO(topic_id=t.id))
     assert dto_curr.topic_names == ["Direito Penal"]
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_get_next_card_private_subject_raises_ownership_error() -> None:
+    """Impede que estudante acesse card de matéria privada pertencente a outrem.
+
+    Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) e quebra de privacidade.
+    Garantia de segurança: Lança ResourceOwnershipError ao tentar estudar matéria privada de outro.
+    """
+    subject_repo = FakeSubjectRepository()
+    card_repo = FakeFlashcardRepository(FakeTopicRepository())
+    session_repo = FakeSessionRepository()
+    rng = FakeRandomGenerator()
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+    subject = Subject(name="Privada", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+
+    use_case = GetNextFlashcardUseCase(
+        card_repo=card_repo,
+        session_repo=session_repo,
+        rng=rng,
+        subject_repo=subject_repo,
+    )
+
+    with pytest.raises(ResourceOwnershipError, match="Você não tem acesso a esta matéria privada"):
+        use_case.execute(GetNextCardDTO(subject_id=subject.id), user_id=intruder_id)
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_get_study_batch_private_subject_raises_ownership_error() -> None:
+    """Impede que estudante solicite lote de revisão de matéria privada pertencente a outrem.
+
+    Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) e vazamento de dados.
+    Garantia de segurança: Lança ResourceOwnershipError ao solicitar batch
+    de matéria privada alheia.
+    """
+    subject_repo = FakeSubjectRepository()
+    card_repo = FakeFlashcardRepository(FakeTopicRepository())
+    session_repo = FakeSessionRepository()
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+    subject = Subject(name="Privada Batch", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+
+    use_case = GetStudyBatchUseCase(
+        card_repo=card_repo,
+        session_repo=session_repo,
+        subject_repo=subject_repo,
+    )
+
+    with pytest.raises(ResourceOwnershipError, match="Você não tem acesso a esta matéria privada"):
+        use_case.execute(GetNextCardDTO(subject_id=subject.id), user_id=intruder_id)
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_get_current_study_card_private_subject_raises_ownership_error() -> None:
+    """Impede leitura de card corrente de matéria privada pertencente a outrem.
+
+    Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) e quebra
+    de confidencialidade.
+    Garantia de segurança: Lança ResourceOwnershipError ao inspecionar card corrente
+    de matéria privada alheia.
+    """
+    subject_repo = FakeSubjectRepository()
+    card_repo = FakeFlashcardRepository(FakeTopicRepository())
+    session_repo = FakeSessionRepository()
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+    subject = Subject(name="Privada Current", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+
+    use_case = GetCurrentStudyCardUseCase(
+        card_repo=card_repo,
+        session_repo=session_repo,
+        subject_repo=subject_repo,
+    )
+
+    with pytest.raises(ResourceOwnershipError, match="Você não tem acesso a esta matéria privada"):
+        use_case.execute(GetNextCardDTO(subject_id=subject.id), user_id=intruder_id)
+
+
+@pytest.mark.unit
+def test_get_next_card_uninitialized_session_zero_position() -> None:
+    """Sessão existente com current_position=0 e card_queue vazia inicializa current_index=0."""
+    card_repo = FakeFlashcardRepository()
+    session_repo = FakeSessionRepository()
+    rng = FakeRandomGenerator()
+
+    t_id = uuid4()
+    c1 = Flashcard(topic_id=t_id, front="C1", back="1", position=100)
+    card_repo.save(c1)
+
+    session = FlashcardPoolSession(topic_id_filter=t_id, current_position=0, card_queue=[])
+    session_repo.save_session(session)
+
+    use_case = GetNextFlashcardUseCase(card_repo, session_repo, rng)
+    dto = use_case.execute(GetNextCardDTO(topic_id=t_id))
+    assert dto.id == c1.id
+    assert dto.current_index == 1
+
+
+@pytest.mark.unit
+def test_get_next_card_stale_card_id_regenerates_shuffle() -> None:
+    """Card ID na fila que não existe mais no repositório aciona reembaralhamento da rodada."""
+    card_repo = FakeFlashcardRepository()
+    session_repo = FakeSessionRepository()
+    rng = FakeRandomGenerator()
+
+    t_id = uuid4()
+    c1 = Flashcard(topic_id=t_id, front="C1", back="1", position=100)
+    card_repo.save(c1)
+
+    # Sessão aponta para um UUID que não existe mais no catálogo
+    session = FlashcardPoolSession(
+        topic_id_filter=t_id, current_position=100, card_queue=[uuid4()], current_index=0
+    )
+    session_repo.save_session(session)
+
+    use_case = GetNextFlashcardUseCase(card_repo, session_repo, rng)
+    dto = use_case.execute(GetNextCardDTO(topic_id=t_id))
+    assert dto.id == c1.id
+    assert dto.round_shuffled is True
+
+
+@pytest.mark.unit
+def test_get_current_card_fallback_greater_equal_position() -> None:
+    """Quando o card atual não existe na fila e não há match exato, busca próxima posição >=."""
+    card_repo = FakeFlashcardRepository()
+    session_repo = FakeSessionRepository()
+
+    t_id = uuid4()
+    c1 = Flashcard(topic_id=t_id, front="C1", back="1", position=100)
+    c2 = Flashcard(topic_id=t_id, front="C2", back="2", position=200)
+    card_repo.save(c1)
+    card_repo.save(c2)
+
+    # current_position = 150 (não há match exato, busca c2 que tem position >= 150)
+    session = FlashcardPoolSession(
+        topic_id_filter=t_id, current_position=150, card_queue=[uuid4()], current_index=0
+    )
+    session_repo.save_session(session)
+
+    use_case = GetCurrentStudyCardUseCase(card_repo, session_repo)
+    dto = use_case.execute(GetNextCardDTO(topic_id=t_id))
+    assert dto.id == c2.id
+    assert dto.position == 200
+
+
+@pytest.mark.unit
+def test_get_study_batch_uninitialized_session_and_fallbacks() -> None:
+    """Testa inicialização de card_queue vazia e fallbacks de batch_ids e cards vazios."""
+    card_repo = FakeFlashcardRepository()
+    session_repo = FakeSessionRepository()
+
+    t_id = uuid4()
+    c1 = Flashcard(topic_id=t_id, front="C1", back="1", position=100)
+    c2 = Flashcard(topic_id=t_id, front="C2", back="2", position=200)
+    card_repo.save(c1)
+    card_repo.save(c2)
+
+    # 1. Sessão sem card_queue
+    session = FlashcardPoolSession(topic_id_filter=t_id, current_position=0, card_queue=[])
+    session_repo.save_session(session)
+
+    use_case = GetStudyBatchUseCase(card_repo, session_repo)
+    batch = use_case.execute(GetNextCardDTO(topic_id=t_id), limit=10)
+    assert len(batch.cards) == 2
+
+    # 2. Sessão onde start_index ultrapassa a fila (batch_ids vazio)
+    session.current_position = 200
+    session.card_queue = [c1.id, c2.id]
+    session_repo.save_session(session)
+    batch2 = use_case.execute(GetNextCardDTO(topic_id=t_id), limit=10)
+    assert len(batch2.cards) == 2
+
+    # 3. Sessão onde batch_ids contém UUIDs que não estão no cards_map (cards vazio)
+    session.card_queue = [uuid4(), uuid4()]
+    session.current_position = 0
+    session_repo.save_session(session)
+    batch3 = use_case.execute(GetNextCardDTO(topic_id=t_id), limit=10)
+    assert len(batch3.cards) == 2

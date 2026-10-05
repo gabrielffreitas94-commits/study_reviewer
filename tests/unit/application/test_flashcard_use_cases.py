@@ -10,12 +10,17 @@ from src.application.use_cases.flashcard_use_cases import (
     CreateFlashcardUseCase,
     DeleteFlashcardUseCase,
 )
-from src.domain.entities import Flashcard, FlashcardPoolSession, Topic
-from src.domain.exceptions import DomainValidationError, EntityNotFoundError
+from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
+from src.domain.exceptions import (
+    DomainValidationError,
+    EntityNotFoundError,
+    ResourceOwnershipError,
+)
 from tests.unit.application.fakes import (
     FakeFlashcardRepository,
     FakeRandomGenerator,
     FakeSessionRepository,
+    FakeSubjectRepository,
     FakeTopicRepository,
 )
 
@@ -151,7 +156,9 @@ def test_delete_flashcard_advances_active_session() -> None:
     card_repo.save(c1)
     card_repo.save(c2)
 
-    session = FlashcardPoolSession(topic_id_filter=t_id, current_position=100)
+    session = FlashcardPoolSession(
+        topic_id_filter=t_id, current_position=100, card_queue=[c1.id, c2.id]
+    )
     session_repo.save_session(session)
 
     use_case = DeleteFlashcardUseCase(card_repo, session_repo, rng)
@@ -334,3 +341,43 @@ def test_study_card_dto_backward_compatibility() -> None:
     )
     assert dto_new.topic_ids == [t1]
     assert dto_new.topic_id == t1
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_delete_flashcard_by_non_owner_raises_ownership_error() -> None:
+    """Impede que usuários excluam flashcards pertencentes a matérias de terceiros.
+
+    Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) e destruição de dados.
+    Garantia de segurança: Lança ResourceOwnershipError ao tentar excluir card sem ownership.
+    """
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+    session_repo = FakeSessionRepository()
+    rng = FakeRandomGenerator()
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+
+    subject = Subject(name="Direito Processual", owner_id=owner_id, is_public=True)
+    subject_repo.save(subject)
+
+    topic = Topic(subject_id=subject.id, name="Recursos")
+    topic_repo.save(topic)
+
+    card = Flashcard(topic_id=topic.id, front="Frente", back="Verso", position=100)
+    card_repo.save(card)
+
+    use_case = DeleteFlashcardUseCase(
+        card_repo=card_repo,
+        session_repo=session_repo,
+        rng=rng,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+
+    with pytest.raises(
+        ResourceOwnershipError, match="Você não tem permissão para excluir cards desta matéria"
+    ):
+        use_case.execute(card.id, user_id=intruder_id)

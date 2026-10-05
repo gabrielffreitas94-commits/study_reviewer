@@ -9,13 +9,27 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from src.adapters.persistence.repositories import SqlAlchemyUserRepository
+from src.domain.entities import User
 from src.infrastructure.database import Base, get_db
+from src.infrastructure.security.dependencies import get_current_user
 from src.infrastructure.web.app import app
 
 
 @pytest.fixture
-def client() -> Generator[TestClient]:
-    """Cria cliente de testes com banco SQLite em memória isolado."""
+def test_user() -> User:
+    """Entidade de usuário padrão para testes de integração."""
+    return User(
+        id=uuid4(),
+        google_sub="test-sub-api-123",
+        email="api.test@studyreviewer.local",
+        name="Usuário API Teste",
+    )
+
+
+@pytest.fixture
+def client(test_user: User) -> Generator[TestClient]:
+    """Cria cliente de testes com banco SQLite em memória isolado e usuário autenticado."""
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -24,6 +38,10 @@ def client() -> Generator[TestClient]:
     Base.metadata.create_all(engine)
     TestingSession = sessionmaker(bind=engine)
 
+    # Persiste o usuário no banco de testes
+    with TestingSession() as session:
+        SqlAlchemyUserRepository(session).save(test_user)
+
     def override_get_db() -> Generator[Session]:
         session = TestingSession()
         try:
@@ -31,7 +49,11 @@ def client() -> Generator[TestClient]:
         finally:
             session.close()
 
+    def override_get_current_user() -> User:
+        return test_user
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
     with TestClient(app) as test_client:
         yield test_client
 

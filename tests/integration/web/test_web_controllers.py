@@ -1,6 +1,7 @@
 """Testes de integração para os controladores Web e templates (Camada 3 - Adaptadores)."""
 
 from collections.abc import Generator
+from datetime import UTC
 from uuid import uuid4
 
 import pytest
@@ -9,13 +10,27 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from src.adapters.persistence.repositories import SqlAlchemyUserRepository
+from src.domain.entities import User
 from src.infrastructure.database import Base, get_db
+from src.infrastructure.security.dependencies import get_current_user
 from src.infrastructure.web.app import app
 
 
 @pytest.fixture
-def client() -> Generator[TestClient]:
-    """Cria cliente de testes com banco SQLite em memória isolado."""
+def test_user() -> User:
+    """Entidade de usuário padrão para testes web de integração."""
+    return User(
+        id=uuid4(),
+        google_sub="test-sub-web-123",
+        email="web.test@studyreviewer.local",
+        name="Usuário Web Teste",
+    )
+
+
+@pytest.fixture
+def client(test_user: User) -> Generator[TestClient]:
+    """Cria cliente de testes com banco SQLite em memória isolado e usuário autenticado."""
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -24,6 +39,10 @@ def client() -> Generator[TestClient]:
     Base.metadata.create_all(engine)
     TestingSession = sessionmaker(bind=engine)
 
+    # Persiste o usuário no banco de testes
+    with TestingSession() as session:
+        SqlAlchemyUserRepository(session).save(test_user)
+
     def override_get_db() -> Generator[Session]:
         session = TestingSession()
         try:
@@ -31,7 +50,11 @@ def client() -> Generator[TestClient]:
         finally:
             session.close()
 
+    def override_get_current_user() -> User:
+        return test_user
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
     with TestClient(app) as test_client:
         yield test_client
 
@@ -125,39 +148,15 @@ def test_full_web_flashcard_flow(client: TestClient) -> None:
     assert "Card" in resp_study.text
     assert "Rodada 1" in resp_study.text
 
-    # 7. Testa Flip do card via HTMX
-    # Recupera o card atual via API para obter id e position
-    resp_next_api = client.get(f"/api/v1/study/next?topic_id={top_id}")
-    current_card = resp_next_api.json()
+    # 7. Verifica aposentadoria da rota HTTP /study/flip (HTTP 410 Gone)
+    resp_flip = client.post("/study/flip")
+    assert resp_flip.status_code == 410
+    assert "Rota aposentada" in resp_flip.text
 
-    resp_flip = client.post(
-        "/study/flip",
-        data={
-            "card_id": current_card["id"],
-            "side": "front",
-            "current_index": 1,
-            "total_cards": 2,
-            "round_number": 1,
-            "position": current_card["position"],
-        },
-    )
-    assert resp_flip.status_code == 200
-    assert "Resposta (Verso)" in resp_flip.text
-
-    # 8. Testa Flip de volta para Frente
-    resp_flip_back = client.post(
-        "/study/flip",
-        data={
-            "card_id": current_card["id"],
-            "side": "back",
-            "current_index": 1,
-            "total_cards": 2,
-            "round_number": 1,
-            "position": current_card["position"],
-        },
-    )
-    assert resp_flip_back.status_code == 200
-    assert "Pergunta (Frente)" in resp_flip_back.text
+    # 8. Verifica se a tela renderiza ambos os lados no DOM para giro 3D em 0ms e o widget de status
+    assert "card-front" in resp_study.text
+    assert "card-back" in resp_study.text
+    assert "sync-status-widget" in resp_study.text
 
     # 9. Testa Next Card via HTMX
     resp_next = client.post(
@@ -190,8 +189,8 @@ def test_web_validation_errors(client: TestClient) -> None:
 
 
 @pytest.mark.integration
-def test_flip_card_not_found(client: TestClient) -> None:
-    """Flip em card inexistente retorna partial com card=None."""
+def test_flip_card_retired(client: TestClient) -> None:
+    """Verifica que a rota /study/flip foi permanentemente aposentada retornando HTTP 410."""
     resp = client.post(
         "/study/flip",
         data={
@@ -203,8 +202,8 @@ def test_flip_card_not_found(client: TestClient) -> None:
             "position": 100,
         },
     )
-    assert resp.status_code == 200
-    assert "Nenhum card disponível" in resp.text
+    assert resp.status_code == 410
+    assert "Rota aposentada" in resp.text
 
 
 @pytest.mark.integration
@@ -294,3 +293,41 @@ def test_create_flashcard_web_multi_topic_and_single_button(client: TestClient) 
     )
     assert resp_err.status_code == 400
     assert "Flashcard deve estar associado a pelo menos 1 tema" in resp_err.text
+
+
+@pytest.mark.integration
+def test_study_sync_answers_web_alias(client: TestClient) -> None:
+    """Verifica que o endpoint alias /study/sync-answers funciona corretamente."""
+    # Cria matéria, tema e flashcard
+    sub = client.post("/api/v1/subjects", json={"name": "Direito Civil"}).json()
+    top = client.post("/api/v1/topics", json={"subject_id": sub["id"], "name": "Contratos"}).json()
+    client.post(
+        "/api/v1/flashcards",
+        json={"topic_id": top["id"], "front": "O que é contrato?", "back": "Acordo de vontades."},
+    )
+
+    # Inicia sessão de estudo
+    card = client.get(f"/api/v1/study/next?topic_id={top['id']}").json()
+    session_id = card["session_id"]
+
+    from datetime import datetime
+
+    payload = {
+        "session_id": session_id,
+        "events": [
+            {
+                "id": str(uuid4()),
+                "card_id": card["id"],
+                "reviewed_at": datetime.now(UTC).isoformat(),
+                "status": "viewed",
+                "device_id": "web-alias-dev",
+            }
+        ],
+        "batch_index": 1,
+    }
+
+    resp = client.post("/study/sync-answers", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["synced_count"] == 1

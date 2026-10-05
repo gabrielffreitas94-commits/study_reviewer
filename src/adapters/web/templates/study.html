@@ -2,6 +2,14 @@
 
 {% block title %}Estudo de Flashcards — Study Reviewer{% endblock %}
 
+{% block header_widget %}
+<!-- Widget de Status de Sincronização Discreto (Seção 7.2) -->
+<div id="sync-status-widget" class="flex items-center space-x-2 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-700" title="Status de Sincronização">
+    <span id="sync-status-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+    <span id="sync-status-text" class="hidden sm:inline">Progresso salvo na nuvem</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="flex-1 flex flex-col justify-between max-w-3xl mx-auto w-full min-w-0">
 
@@ -105,73 +113,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    // Gerenciamento ergonômico de atalhos de teclado (Espaço, Enter/Seta Direita, M e T)
-    document.addEventListener('keydown', function(e) {
-        // Ignora atalhos de navegação se estiver em campo de entrada/textarea/select
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
-            return;
-        }
-
-        // Barra de Espaço: Virar o card
-        if (e.code === 'Space') {
-            e.preventDefault();
-            const flipBtn = document.getElementById('btn-flip');
-            if (flipBtn) {
-                flipBtn.click();
-            }
-        }
-
-        // Enter ou Seta para a Direita: Avançar para o próximo card
-        if (e.code === 'Enter' || e.code === 'ArrowRight') {
-            e.preventDefault();
-            const nextBtn = document.getElementById('btn-next');
-            if (nextBtn) {
-                nextBtn.click();
-            }
-        }
-
-        // Atalho 'm' ou 'M': Foca no seletor de matéria
-        if (e.key === 'm' || e.key === 'M') {
-            const subjectSelect = document.getElementById('filter-subject');
-            if (subjectSelect) {
-                e.preventDefault();
-                subjectSelect.focus();
-            }
-        }
-
-        // Atalho 't' ou 'T': Foca no seletor de tema (se visível)
-        if (e.key === 't' || e.key === 'T') {
-            const topicSelect = document.getElementById('filter-topic');
-            if (topicSelect) {
-                e.preventDefault();
-                topicSelect.focus();
-            }
-        }
-    });
-
-    // Gestos de toque touch mobile (Swipe para a esquerda avança o card)
-    let touchStartX = 0;
-    let touchEndX = 0;
-
-    document.addEventListener('touchstart', function(e) {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    document.addEventListener('touchend', function(e) {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-    }, { passive: true });
-
-    function handleSwipe() {
-        const threshold = 60; // Limite mínimo de 60px para considerar swipe intencional
-        if (touchStartX - touchEndX > threshold) {
-            // Deslizou para a esquerda -> Próximo Card
-            const nextBtn = document.getElementById('btn-next');
-            if (nextBtn) {
-                nextBtn.click();
-            }
-        }
-    }
-</script>
+<!-- Motor de Estudo em Alta Escala (Flip 0ms CSS 3D, Web Worker & Prefetch) -->
+<script src="/static/js/study.js"></script>
 {% endblock %}

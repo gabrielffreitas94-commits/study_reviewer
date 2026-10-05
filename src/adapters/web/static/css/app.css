@@ -67,7 +67,12 @@ html.dark body {
   animation: chip-fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* 3D Flashcard Flip Mechanics */
+/* 3D Flashcard Flip Mechanics (Seção 7.3 e 7.4) */
+.card-container {
+  perspective: 1000px;
+  contain: layout size;
+}
+
 .perspective-1000 {
   perspective: 1000px;
 }
@@ -76,15 +81,15 @@ html.dark body {
   position: relative;
   width: 100%;
   min-height: 380px;
+  transition: transform 0.25s ease-in-out;
   transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.card-inner.card-flipped {
+.card-inner.is-flipped, .card-inner.card-flipped {
   transform: rotateY(180deg);
 }
 
-.card-front, .card-back {
+.card-face, .card-front, .card-back {
   position: absolute;
   top: 0;
   left: 0;
@@ -92,12 +97,37 @@ html.dark body {
   height: 100%;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  border-radius: 1rem;
   box-sizing: border-box;
 }
 
 .card-back {
   transform: rotateY(180deg);
+}
+
+/* Redução de movimento para acessibilidade WCAG AA (Seção 7.4) */
+@media (prefers-reduced-motion: reduce) {
+  .card-inner {
+    transition: opacity 0.15s ease-in-out !important;
+    transform: none !important;
+  }
+  .card-inner.is-flipped .card-front,
+  .card-inner.card-flipped .card-front {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .card-inner.is-flipped .card-back,
+  .card-inner.card-flipped .card-back {
+    opacity: 1;
+    transform: none !important;
+    visibility: visible;
+  }
+}
+
+/* Micro-transição suave acelerada por GPU para Optimistic UI (120ms - 150ms) */
+.card-transition-gpu {
+  will-change: transform, opacity;
+  transition: transform 0.14s cubic-bezier(0.2, 0, 0, 1), opacity 0.14s ease-out;
 }
 
 /* Buttons and Interactive Elements */

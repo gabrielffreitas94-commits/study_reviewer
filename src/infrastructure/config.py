@@ -20,5 +20,13 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"  # noqa: S104
     PORT: int = 8000
 
+    # Google OAuth 2.0 / OIDC
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/callback"
+
+    # Redis Cache & Efêmero
+    REDIS_URL: str = "redis://localhost:6379/0"
+
 
 settings = Settings()

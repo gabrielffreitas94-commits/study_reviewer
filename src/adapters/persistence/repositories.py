@@ -1,8 +1,9 @@
 """Implementações concretas dos repositórios utilizando SQLAlchemy 2.0 (Camada 3 - Adaptadores)."""
 
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from src.adapters.persistence.mappers import (
@@ -10,25 +11,59 @@ from src.adapters.persistence.mappers import (
     SessionMapper,
     SubjectMapper,
     TopicMapper,
+    UserMapper,
 )
 from src.adapters.persistence.models import (
     FlashcardModel,
     FlashcardTopicModel,
     PoolSessionModel,
+    StudyEventModel,
     SubjectModel,
     TopicModel,
+    UserModel,
 )
 from src.application.ports.repositories import (
     IFlashcardRepository,
     ISessionRepository,
+    IStudyEventRepository,
     ISubjectRepository,
     ITopicRepository,
+    IUserRepository,
 )
-from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
+from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic, User
+
+
+class SqlAlchemyUserRepository(IUserRepository):
+    """Repositório SQLAlchemy para Usuários."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def save(self, user: User) -> None:
+        model = UserMapper.to_model(user)
+        self._session.merge(model)
+        self._session.commit()
+
+    def get_by_id(self, user_id: UUID) -> User | None:
+        stmt = select(UserModel).where(UserModel.id == user_id)
+        model = self._session.scalars(stmt).first()
+        return UserMapper.to_domain(model) if model else None
+
+    def get_by_google_sub(self, google_sub: str) -> User | None:
+        stmt = select(UserModel).where(UserModel.google_sub == google_sub.strip())
+        model = self._session.scalars(stmt).first()
+        return UserMapper.to_domain(model) if model else None
+
+    def get_by_email(self, email: str) -> User | None:
+        stmt = select(UserModel).where(
+            func.lower(func.trim(UserModel.email)) == email.strip().lower()
+        )
+        model = self._session.scalars(stmt).first()
+        return UserMapper.to_domain(model) if model else None
 
 
 class SqlAlchemySubjectRepository(ISubjectRepository):
-    """Repositório SQLAlchemy para Matérias."""
+    """Repositório SQLAlchemy para Matérias com suporte a multi-tenancy e acesso público."""
 
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -48,20 +83,53 @@ class SqlAlchemySubjectRepository(ISubjectRepository):
         models = self._session.scalars(stmt).all()
         return [SubjectMapper.to_domain(m) for m in models]
 
-    def exists_by_name(self, name: str) -> bool:
+    def list_by_owner(self, owner_id: UUID) -> list[Subject]:
         stmt = (
-            select(SubjectModel.id)
-            .where(func.lower(func.trim(SubjectModel.name)) == name.strip().lower())
-            .limit(1)
+            select(SubjectModel)
+            .where(SubjectModel.owner_id == owner_id)
+            .order_by(func.lower(SubjectModel.name).asc())
         )
+        models = self._session.scalars(stmt).all()
+        return [SubjectMapper.to_domain(m) for m in models]
+
+    def list_accessible(self, user_id: UUID) -> list[Subject]:
+        stmt = (
+            select(SubjectModel)
+            .where(
+                or_(
+                    SubjectModel.owner_id == user_id,
+                    SubjectModel.is_public.is_(True),
+                )
+            )
+            .order_by(func.lower(SubjectModel.name).asc())
+        )
+        models = self._session.scalars(stmt).all()
+        return [SubjectMapper.to_domain(m) for m in models]
+
+    def exists_by_name(self, name: str, owner_id: UUID | None = None) -> bool:
+        stmt = select(SubjectModel.id).where(
+            func.lower(func.trim(SubjectModel.name)) == name.strip().lower()
+        )
+        if owner_id is not None:
+            stmt = stmt.where(SubjectModel.owner_id == owner_id)
+        stmt = stmt.limit(1)
         return self._session.scalar(stmt) is not None
 
-    def list_all_with_topics(self) -> list[tuple[Subject, list[Topic]]]:
+    def list_all_with_topics(
+        self, user_id: UUID | None = None
+    ) -> list[tuple[Subject, list[Topic]]]:
         stmt = (
             select(SubjectModel)
             .options(selectinload(SubjectModel.topics))
             .order_by(func.lower(SubjectModel.name).asc())
         )
+        if user_id is not None:
+            stmt = stmt.where(
+                or_(
+                    SubjectModel.owner_id == user_id,
+                    SubjectModel.is_public.is_(True),
+                )
+            )
         models = self._session.scalars(stmt).all()
         return [
             (
@@ -119,24 +187,18 @@ class SqlAlchemyFlashcardRepository(IFlashcardRepository):
         self._session = session
 
     def save(self, flashcard: Flashcard) -> None:
-        model = self._session.get(FlashcardModel, flashcard.id)
-        if model is None:
-            model = FlashcardMapper.to_model(flashcard)
-            if flashcard.topic_ids:
-                stmt = select(TopicModel).where(TopicModel.id.in_(flashcard.topic_ids))
-                model.topics = list(self._session.scalars(stmt).all())
-            self._session.add(model)
-        else:
-            model.front = flashcard.front
-            model.back = flashcard.back
-            model.position = flashcard.position
-            model.created_at = flashcard.created_at
+        model = FlashcardMapper.to_model(flashcard)
+        self._session.merge(model)
+        self._session.commit()
 
-            if flashcard.topic_ids:
-                current_topic_ids = {t.id for t in model.topics}
-                if current_topic_ids != set(flashcard.topic_ids):
-                    stmt = select(TopicModel).where(TopicModel.id.in_(flashcard.topic_ids))
-                    model.topics = list(self._session.scalars(stmt).all())
+        # Atualiza a tabela associativa N:N (flashcard_topics)
+        self._session.query(FlashcardTopicModel).filter(
+            FlashcardTopicModel.flashcard_id == flashcard.id
+        ).delete()
+
+        for t_id in flashcard.topic_ids:
+            assoc = FlashcardTopicModel(flashcard_id=flashcard.id, topic_id=t_id)
+            self._session.add(assoc)
 
         self._session.commit()
 
@@ -144,48 +206,37 @@ class SqlAlchemyFlashcardRepository(IFlashcardRepository):
         if not flashcards:
             return
 
-        card_ids = [card.id for card in flashcards]
-        stmt = select(FlashcardModel).where(FlashcardModel.id.in_(card_ids))
-        existing_models = {m.id: m for m in self._session.scalars(stmt).all()}
+        models = [FlashcardMapper.to_model(c) for c in flashcards]
+        card_ids = [c.id for c in flashcards]
 
-        new_cards: list[Flashcard] = []
-        for card in flashcards:
-            model = existing_models.get(card.id)
-            if model is not None:
-                model.position = card.position
-                model.front = card.front
-                model.back = card.back
-            else:
-                new_cards.append(card)
+        self._session.query(FlashcardTopicModel).filter(
+            FlashcardTopicModel.flashcard_id.in_(card_ids)
+        ).delete(synchronize_session=False)
 
-        if new_cards:
-            all_topic_ids = {t_id for c in new_cards for t_id in c.topic_ids}
-            topics_map: dict[UUID, TopicModel] = {}
-            if all_topic_ids:
-                topic_models = self._session.scalars(
-                    select(TopicModel).where(TopicModel.id.in_(all_topic_ids))
-                ).all()
-                topics_map = {t.id: t for t in topic_models}
+        new_assocs = [
+            FlashcardTopicModel(flashcard_id=c.id, topic_id=t_id)
+            for c in flashcards
+            for t_id in c.topic_ids
+        ]
 
-            new_models: list[FlashcardModel] = []
-            for card in new_cards:
-                m = FlashcardMapper.to_model(card)
-                if card.topic_ids:
-                    m.topics = [topics_map[t_id] for t_id in card.topic_ids if t_id in topics_map]
-                new_models.append(m)
-
-            self._session.add_all(new_models)
-
+        for m in models:
+            self._session.merge(m)
+        self._session.bulk_save_objects(new_assocs)
         self._session.commit()
 
     def get_by_id(self, flashcard_id: UUID) -> Flashcard | None:
-        stmt = select(FlashcardModel).where(FlashcardModel.id == flashcard_id)
+        stmt = (
+            select(FlashcardModel)
+            .options(selectinload(FlashcardModel.topics))
+            .where(FlashcardModel.id == flashcard_id)
+        )
         model = self._session.scalars(stmt).first()
         return FlashcardMapper.to_domain(model) if model else None
 
     def delete(self, flashcard_id: UUID) -> None:
-        model = self._session.get(FlashcardModel, flashcard_id)
-        if model is not None:
+        stmt = select(FlashcardModel).where(FlashcardModel.id == flashcard_id)
+        model = self._session.scalars(stmt).first()
+        if model:
             self._session.delete(model)
             self._session.commit()
 
@@ -196,7 +247,8 @@ class SqlAlchemyFlashcardRepository(IFlashcardRepository):
         limit: int | None = None,
         min_position: int | None = None,
     ) -> list[Flashcard]:
-        stmt = select(FlashcardModel).order_by(FlashcardModel.position.asc())
+        stmt = select(FlashcardModel).options(selectinload(FlashcardModel.topics))
+        stmt = stmt.order_by(FlashcardModel.position.asc())
 
         if min_position is not None:
             stmt = stmt.where(FlashcardModel.position > min_position)
@@ -263,13 +315,23 @@ class SqlAlchemySessionRepository(ISessionRepository):
         self._session = session
 
     def get_active_session(
-        self, subject_id: UUID | None, topic_id: UUID | None
+        self,
+        subject_id: UUID | None,
+        topic_id: UUID | None,
+        user_id: UUID | None = None,
     ) -> FlashcardPoolSession | None:
         stmt = select(PoolSessionModel).where(
             PoolSessionModel.subject_id_filter == subject_id,
             PoolSessionModel.topic_id_filter == topic_id,
             PoolSessionModel.is_active.is_(True),
         )
+        if user_id is not None:
+            stmt = stmt.where(PoolSessionModel.user_id == user_id)
+        model = self._session.scalars(stmt).first()
+        return SessionMapper.to_domain(model) if model else None
+
+    def get_by_id(self, session_id: UUID) -> FlashcardPoolSession | None:
+        stmt = select(PoolSessionModel).where(PoolSessionModel.id == session_id)
         model = self._session.scalars(stmt).first()
         return SessionMapper.to_domain(model) if model else None
 
@@ -277,3 +339,72 @@ class SqlAlchemySessionRepository(ISessionRepository):
         model = SessionMapper.to_model(session)
         self._session.merge(model)
         self._session.commit()
+
+
+class SqlAlchemyStudyEventRepository(IStudyEventRepository):
+    """Repositório SQLAlchemy para histórico append-only de eventos de estudo (study_events)."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def bulk_insert(self, events: list[dict[str, Any]]) -> int:
+        if not events:
+            return 0
+
+        bind = self._session.get_bind()
+        dialect_name = bind.dialect.name if bind else "sqlite"
+
+        insert_stmt: Any
+        if dialect_name == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            insert_stmt = (
+                pg_insert(StudyEventModel)
+                .values(events)
+                .on_conflict_do_nothing(index_elements=["reviewed_at", "id"])
+            )
+        else:
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+            insert_stmt = (
+                sqlite_insert(StudyEventModel)
+                .values(events)
+                .on_conflict_do_nothing(index_elements=["reviewed_at", "id"])
+            )
+
+        res: Any = self._session.execute(insert_stmt)
+        self._session.commit()
+        rowcount = getattr(res, "rowcount", -1)
+        return int(rowcount) if rowcount != -1 else len(events)
+
+    def list_by_user(self, user_id: UUID, limit: int = 100) -> list[dict[str, Any]]:
+        stmt = (
+            select(StudyEventModel)
+            .where(StudyEventModel.user_id == user_id)
+            .order_by(StudyEventModel.reviewed_at.desc())
+            .limit(limit)
+        )
+        models = self._session.scalars(stmt).all()
+        return [
+            {
+                "id": m.id,
+                "reviewed_at": m.reviewed_at,
+                "user_id": m.user_id,
+                "card_id": m.card_id,
+                "session_id": m.session_id,
+                "status": m.status,
+                "device_id": m.device_id,
+            }
+            for m in models
+        ]
+
+    def anonymize_user_events(self, user_id: UUID) -> int:
+        stmt = (
+            update(StudyEventModel)
+            .where(StudyEventModel.user_id == user_id)
+            .values(user_id=None, device_id=None)
+        )
+        res: Any = self._session.execute(stmt)
+        self._session.commit()
+        rowcount = getattr(res, "rowcount", -1)
+        return int(rowcount) if rowcount != -1 else 0
