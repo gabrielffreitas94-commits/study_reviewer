@@ -54,7 +54,7 @@ src\adapters\api\auth_controllers.py                          38      0   100%
 src\adapters\api\controllers.py                              175      0   100%
 src\adapters\persistence\mappers.py                           40      0   100%
 src\adapters\persistence\models.py                            76      0   100%
-src\adapters\persistence\redis_session_repository.py          69      0   100%
+src\adapters\persistence\redis_session_repository.py          82      0   100%
 src\adapters\persistence\repositories.py                     186      0   100%
 src\adapters\web\auth_controllers.py                          70      0   100%
 src\adapters\web\controllers.py                              154      0   100%
@@ -70,7 +70,7 @@ src\application\use_cases\auth_use_cases.py                   69      0   100%
 src\application\use_cases\flashcard_use_cases.py              83      0   100%
 src\application\use_cases\study_session_use_cases.py         154      0   100%
 src\application\use_cases\subject_use_cases.py                24      0   100%
-src\application\use_cases\sync_study_answers_use_case.py      37      0   100%
+src\application\use_cases\sync_study_answers_use_case.py      38      0   100%
 src\application\use_cases\topic_use_cases.py                  27      0   100%
 src\domain\entities.py                                       107      0   100%
 src\domain\exceptions.py                                      14      0   100%
@@ -88,9 +88,9 @@ src\infrastructure\security\sanitization.py                    6      0   100%
 src\infrastructure\security\session_service.py                45      0   100%
 src\infrastructure\web\app.py                                 42      0   100%
 ------------------------------------------------------------------------------
-TOTAL                                                       1808      0   100%
+TOTAL                                                       1822      0   100%
 Required test coverage of 100% reached. Total coverage: 100.00%
-230 passed, 8 warnings in 7.75s
+230 passed, 8 warnings in 7.09s
 ```
 
 ---
@@ -136,7 +136,7 @@ Required test coverage of 100% reached. Total coverage: 100.00%
 ## 🚀 Conclusão e Recomendação de Merge
 A **Sprint 02** cumpre com rigor absoluto a totalidade dos critérios de aceitação do Definition of Done (DoD):
 * **230 testes automatizados** aprovados.
-* **100.00% de cobertura estrita** de código em `src/` (1808 statements, 0 misses).
+* **100.00% de cobertura estrita** de código em `src/` (1822 statements, 0 misses).
 * **Zero alertas** de linters (`ruff check`, `ruff format`) e tipagem estrita (`mypy`).
 * **13 de 13 pareceres aprovados com louvor** pela bancada multidisciplinar de especialistas.
 * **Pronta para merge na branch `staging`**.
