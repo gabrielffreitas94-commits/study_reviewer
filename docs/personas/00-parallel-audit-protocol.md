@@ -100,7 +100,17 @@ Ao finalizar a implementação da Sprint, o agente orquestrador executa uma úni
 
 ---
 
-## 5. Saída Consolidada
-O agente orquestrador recebe as respostas reativamente, junta as 13 linhas padronizadas no formato:
-`| **X** | **Nome do Especialista** | [APROVADO] | Parecer técnico... |`
-e preenche a seção **🏛️ Bancada dos 13 Especialistas — Auditoria Obrigatória** no template de Pull Request.
+## 5. Saída Consolidada & Abertura Obrigatória da PR
+1. O agente orquestrador recebe as respostas reativamente, junta as 13 linhas padronizadas no formato:
+   `| **X** | **Nome do Especialista** | [APROVADO] | Parecer técnico... |`
+2. Preenche a seção **🏛️ Bancada dos 13 Especialistas — Auditoria Obrigatória** no template de Pull Request (`docs/sprints/sprint-XX/02-pull-request-sprint-XX.md`).
+3. Executa o commit local e envia a branch ao GitHub:
+   ```bash
+   git push -u origin feature/sprint-XX-<nome>
+   ```
+4. **Abre obrigatoriamente a Pull Request para a branch `staging`:**
+   ```bash
+   gh pr create --base staging --head feature/sprint-XX-<nome> --title "Sprint XX — <Título>" --body-file docs/sprints/sprint-XX/02-pull-request-sprint-XX.md
+   ```
+5. **Retorna a URL oficial do PR ao usuário.** Nenhuma sprint é concluída sem a Pull Request aberta no GitHub.
+

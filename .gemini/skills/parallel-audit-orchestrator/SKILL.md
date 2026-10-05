@@ -53,9 +53,19 @@ O agente orquestrador deve chamar `invoke_subagent` com um único payload conten
 
 ---
 
-## 3. Consolidação e Preenchimento da PR
+## 3. Consolidação, Encerramento e Abertura Obrigatória da PR
 
 Ao receber as respostas dos 4 subagentes, o agente orquestrador:
 1. Valida se todos os 13 especialistas emitiram seus pareceres formais (nenhum especialista pode ser omitido).
 2. Ordena os pareceres do #1 ao #13.
-3. Preenche a tabela oficial no template de Pull Request (`.github/PULL_REQUEST_TEMPLATE.md` e documento da Sprint em `docs/sprints/`).
+3. Preenche a tabela oficial no documento da Sprint em `docs/sprints/sprint-XX/02-pull-request-sprint-XX.md`.
+4. Commita as alterações da sprint e envia a branch ao remote:
+   ```bash
+   git push -u origin feature/sprint-XX-<nome>
+   ```
+5. **Cria obrigatoriamente a Pull Request no GitHub:**
+   ```bash
+   gh pr create --base staging --head feature/sprint-XX-<nome> --title "Sprint XX — <Título>" --body-file docs/sprints/sprint-XX/02-pull-request-sprint-XX.md
+   ```
+6. **Entrega a URL do PR ao usuário:** O encerramento da sprint só está completo após a confirmação da URL da PR aberta.
+

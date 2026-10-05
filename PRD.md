@@ -215,7 +215,7 @@ Para que qualquer Sprint seja considerada concluída e receba autorização de m
 6. [ ] **Aderência à Clean Architecture:** Núcleo de domínio Python puro (sem dependência de frameworks/ORM), use cases agnósticos e inversão de dependência via Protocols.
 7. [ ] **Auditoria Unânime da Bancada:** Pareceres formais assinados pelos **13 Especialistas** no template oficial de PR (`[APROVADO]` ou `[N/A JUSTIFICADO]`).
 8. [ ] **Paridade Docker Comprovada:** Aplicação e banco executando perfeitamente via `docker compose up`.
-9. [ ] **Pull Request Aberta para Staging:** PR devidamente aberta com documentação e histórico rastreável.
+9. [ ] **Pull Request Aberta no GitHub para Staging:** A sprint só é finalizada com a execução de `gh pr create` no GitHub apontando para `staging`, com documentação, 100% de cobertura, os 13 pareceres aprovados e a URL oficial entregue ao usuário.
 
 ### 7.1 Bancada dos 13 Especialistas de Auditoria e Qualidade
 
