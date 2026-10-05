@@ -1,7 +1,7 @@
 """Testes unitários para o FlashcardPoolService e algoritmo de Gap Indexing (ADR-002)."""
 
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -128,7 +128,7 @@ def test_rebalance_positions() -> None:
 
 @pytest.mark.unit
 def test_execute_round_shuffle() -> None:
-    """Verifica shuffle geral e reatribuição de posições."""
+    """Verifica shuffle geral e projeção de lista escalar de UUIDs."""
     t_id = uuid4()
     cards = [
         Flashcard(topic_id=t_id, front="Card 1", back="1", position=100),
@@ -141,12 +141,21 @@ def test_execute_round_shuffle() -> None:
 
     assert rng.shuffle_called is True
     assert len(shuffled) == 3
-    # Posições redistribuídas em múltiplos de 100
-    assert [c.position for c in shuffled] == [100, 200, 300]
+    assert all(isinstance(uid, UUID) for uid in shuffled)
     # DeterministicRandom inverte os itens
-    assert shuffled[0].front == "Card 3"
-    assert shuffled[1].front == "Card 2"
-    assert shuffled[2].front == "Card 1"
+    assert shuffled[0] == cards[2].id
+    assert shuffled[1] == cards[1].id
+    assert shuffled[2] == cards[0].id
+
+    # Teste com lista de UUIDs direta
+    uuid_list = [cards[0].id, cards[1].id]
+    shuffled_uuids = FlashcardPoolService.execute_round_shuffle(uuid_list, rng)
+    assert len(shuffled_uuids) == 2
+    assert shuffled_uuids[0] == cards[1].id
+    assert shuffled_uuids[1] == cards[0].id
+
+    # Teste com lista vazia
+    assert FlashcardPoolService.execute_round_shuffle([], rng) == []
 
 
 @pytest.mark.unit

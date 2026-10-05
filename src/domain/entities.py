@@ -156,30 +156,68 @@ class Flashcard:
         return self.topic_ids[0]
 
 
-@dataclass
+@dataclass(slots=True)
 class FlashcardPoolSession:
-    """Entidade que encapsula o estado persistido de uma sessão de estudo da pool."""
+    """Entidade de domínio rica representando a sessão efêmera de estudo.
+
+    A fila `card_queue` contém exclusivamente a fatia da rodada ativa
+    (50 a 100 UUIDs), otimizando o consumo de RAM em larga escala.
+    """
 
     id: UUID = field(default_factory=uuid4)
     user_id: UUID = field(default_factory=uuid4)
-    subject_id_filter: UUID | None = None
+    subject_id: UUID | None = None
     topic_id_filter: UUID | None = None
-    current_position: int = 0
     round_number: int = 1
-    is_active: bool = True
+    current_index: int = 0  # Cursor na fila (0 a N-1)
+    card_queue: list[UUID] = field(default_factory=list)  # Janela ativa da rodada
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    # Campos de compatibilidade
+    subject_id_filter: UUID | None = None
+    current_position: int = 0
+    is_active: bool = True
+
     def __post_init__(self) -> None:
+        if self.subject_id is None and self.subject_id_filter is not None:
+            self.subject_id = self.subject_id_filter
+        elif self.subject_id_filter is None and self.subject_id is not None:
+            self.subject_id_filter = self.subject_id
+
+        if self.current_index < 0:
+            raise DomainValidationError("O índice atual não pode ser negativo.")
         if self.round_number < 1:
-            raise DomainValidationError("Número da rodada deve ser maior ou igual a 1.")
+            raise DomainValidationError("O número da rodada deve ser >= 1.")
+
+    def get_current_card_id(self) -> UUID | None:
+        if self.current_index < len(self.card_queue):
+            return self.card_queue[self.current_index]
+        return None
+
+    def advance(self) -> None:
+        self.current_index += 1
+        self.updated_at = datetime.now(UTC)
+
+    def is_round_finished(self) -> bool:
+        return self.current_index >= len(self.card_queue)
+
+    def start_new_round(self, shuffled_ids: list[UUID]) -> None:
+        if not shuffled_ids:
+            raise DomainValidationError("A nova rodada requer uma lista não-vazia de IDs.")
+        self.round_number += 1
+        self.card_queue = list(shuffled_ids)
+        self.current_index = 0
+        self.updated_at = datetime.now(UTC)
 
     def advance_to(self, position: int) -> None:
-        """Avança o ponteiro de exibição para uma nova posição."""
+        """Avança o ponteiro de exibição para uma nova posição (compatibilidade)."""
         self.current_position = position
         self.updated_at = datetime.now(UTC)
 
     def next_round(self, initial_position: int = 100) -> None:
-        """Incrementa a rodada e redefine o ponteiro para o primeiro card."""
+        """Incrementa a rodada e redefine o ponteiro para o primeiro card (compatibilidade)."""
         self.round_number += 1
         self.current_position = initial_position
+        self.current_index = 0
         self.updated_at = datetime.now(UTC)

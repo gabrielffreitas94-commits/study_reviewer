@@ -1,19 +1,27 @@
 """Controladores de API REST (JSON para mobile e clientes externos - Camada 3)."""
 
+from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.adapters.persistence.repositories import (
     SqlAlchemyFlashcardRepository,
     SqlAlchemySessionRepository,
+    SqlAlchemyStudyEventRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
 )
 from src.application.dto.flashcard_dto import CreateFlashcardDTO, FlashcardDTO
-from src.application.dto.study_dto import GetNextCardDTO, StudyBatchDTO, StudyCardDTO
+from src.application.dto.study_dto import (
+    GetNextCardDTO,
+    StudyBatchDTO,
+    StudyCardDTO,
+    StudyEventDTO,
+    SyncStudyBatchDTO,
+)
 from src.application.dto.subject_dto import CreateSubjectDTO, SubjectDTO
 from src.application.dto.topic_dto import CreateTopicDTO, TopicDTO
 from src.application.use_cases.auth_use_cases import ToggleSubjectPublicUseCase
@@ -26,6 +34,7 @@ from src.application.use_cases.subject_use_cases import (
     CreateSubjectUseCase,
     ListSubjectsUseCase,
 )
+from src.application.use_cases.sync_study_answers_use_case import SyncStudyAnswersUseCase
 from src.application.use_cases.topic_use_cases import (
     CreateTopicUseCase,
     ListTopicsBySubjectUseCase,
@@ -41,6 +50,7 @@ from src.domain.exceptions import (
 from src.infrastructure.database import get_db
 from src.infrastructure.rng import default_rng
 from src.infrastructure.security.dependencies import get_current_user
+from src.infrastructure.security.rate_limiter import study_sync_rate_limiter
 from src.infrastructure.security.sanitization import sanitize_html_content
 
 api_router = APIRouter(prefix="/api/v1")
@@ -65,6 +75,27 @@ class CreateFlashcardRequest(BaseModel):
     back: str = Field(..., min_length=1, max_length=10000)
     topic_ids: list[UUID] = Field(default_factory=list)
     topic_id: UUID | None = None
+
+
+class StudyEventItemRequest(BaseModel):
+    card_id: UUID
+    reviewed_at: datetime
+    status: str = Field(..., pattern="^(viewed|completed)$")
+    id: UUID | None = None
+    device_id: str | None = Field(default=None, max_length=50)
+
+
+class SyncAnswersPayload(BaseModel):
+    session_id: UUID
+    events: list[StudyEventItemRequest] = Field(..., min_length=1, max_length=100)
+    batch_index: int | None = Field(default=None, ge=0)
+
+
+class SyncAnswersResponseModel(BaseModel):
+    status: str = "ok"
+    synced_count: int
+    session_id: UUID
+    current_index: int
 
 
 def _parse_uuid(val: str | None) -> UUID | None:
@@ -168,6 +199,67 @@ def mark_card_read_api(
         session_repo.save_session(session)
 
     return {"status": "ok"}
+
+
+@api_router.post("/study/sync-answers", response_model=SyncAnswersResponseModel)
+def sync_answers_api(
+    request: Request,
+    payload: SyncAnswersPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SyncAnswersResponseModel:
+    """Ingestão em lote de respostas com blindagem anti-IDOR, rate limit e idempotência."""
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > 256 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="Payload Too Large: corpo da requisição excede 256 KB.",
+        )
+
+    rate_key = f"sync:{current_user.id}"
+    if not study_sync_rate_limiter.is_allowed(rate_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Limite de taxa excedido (máximo de 20 requisições por minuto).",
+            headers={"Retry-After": "60"},
+        )
+
+    event_repo = SqlAlchemyStudyEventRepository(db)
+    session_repo = SqlAlchemySessionRepository(db)
+    use_case = SyncStudyAnswersUseCase(event_repo, session_repo)
+
+    dto_events = [
+        StudyEventDTO(
+            id=ev.id,
+            card_id=ev.card_id,
+            reviewed_at=ev.reviewed_at,
+            status=ev.status,
+            device_id=ev.device_id,
+        )
+        for ev in payload.events
+    ]
+    input_dto = SyncStudyBatchDTO(
+        session_id=payload.session_id,
+        events=dto_events,
+        batch_index=payload.batch_index,
+    )
+
+    try:
+        result = use_case.execute(input_dto, user_id=current_user.id)
+        return SyncAnswersResponseModel(
+            status=result.status,
+            synced_count=result.synced_count,
+            session_id=result.session_id,
+            current_index=result.current_index,
+        )
+    except EntityNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except DomainValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
 
 @api_router.post("/flashcards", response_model=FlashcardDTO, status_code=status.HTTP_201_CREATED)

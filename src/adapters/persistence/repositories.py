@@ -1,8 +1,9 @@
 """Implementações concretas dos repositórios utilizando SQLAlchemy 2.0 (Camada 3 - Adaptadores)."""
 
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from src.adapters.persistence.mappers import (
@@ -16,6 +17,7 @@ from src.adapters.persistence.models import (
     FlashcardModel,
     FlashcardTopicModel,
     PoolSessionModel,
+    StudyEventModel,
     SubjectModel,
     TopicModel,
     UserModel,
@@ -23,6 +25,7 @@ from src.adapters.persistence.models import (
 from src.application.ports.repositories import (
     IFlashcardRepository,
     ISessionRepository,
+    IStudyEventRepository,
     ISubjectRepository,
     ITopicRepository,
     IUserRepository,
@@ -327,7 +330,81 @@ class SqlAlchemySessionRepository(ISessionRepository):
         model = self._session.scalars(stmt).first()
         return SessionMapper.to_domain(model) if model else None
 
+    def get_by_id(self, session_id: UUID) -> FlashcardPoolSession | None:
+        stmt = select(PoolSessionModel).where(PoolSessionModel.id == session_id)
+        model = self._session.scalars(stmt).first()
+        return SessionMapper.to_domain(model) if model else None
+
     def save_session(self, session: FlashcardPoolSession) -> None:
         model = SessionMapper.to_model(session)
         self._session.merge(model)
         self._session.commit()
+
+
+class SqlAlchemyStudyEventRepository(IStudyEventRepository):
+    """Repositório SQLAlchemy para histórico append-only de eventos de estudo (study_events)."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def bulk_insert(self, events: list[dict[str, Any]]) -> int:
+        if not events:
+            return 0
+
+        bind = self._session.get_bind()
+        dialect_name = bind.dialect.name if bind else "sqlite"
+
+        insert_stmt: Any
+        if dialect_name == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            insert_stmt = (
+                pg_insert(StudyEventModel)
+                .values(events)
+                .on_conflict_do_nothing(index_elements=["reviewed_at", "user_id", "id"])
+            )
+        else:
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+            insert_stmt = (
+                sqlite_insert(StudyEventModel)
+                .values(events)
+                .on_conflict_do_nothing(index_elements=["reviewed_at", "user_id", "id"])
+            )
+
+        res: Any = self._session.execute(insert_stmt)
+        self._session.commit()
+        rowcount = getattr(res, "rowcount", -1)
+        return int(rowcount) if rowcount != -1 else len(events)
+
+    def list_by_user(self, user_id: UUID, limit: int = 100) -> list[dict[str, Any]]:
+        stmt = (
+            select(StudyEventModel)
+            .where(StudyEventModel.user_id == user_id)
+            .order_by(StudyEventModel.reviewed_at.desc())
+            .limit(limit)
+        )
+        models = self._session.scalars(stmt).all()
+        return [
+            {
+                "id": m.id,
+                "reviewed_at": m.reviewed_at,
+                "user_id": m.user_id,
+                "card_id": m.card_id,
+                "session_id": m.session_id,
+                "status": m.status,
+                "device_id": m.device_id,
+            }
+            for m in models
+        ]
+
+    def anonymize_user_events(self, user_id: UUID) -> int:
+        stmt = (
+            update(StudyEventModel)
+            .where(StudyEventModel.user_id == user_id)
+            .values(user_id=None, device_id=None)
+        )
+        res: Any = self._session.execute(stmt)
+        self._session.commit()
+        rowcount = getattr(res, "rowcount", -1)
+        return int(rowcount) if rowcount != -1 else 0

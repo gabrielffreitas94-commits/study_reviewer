@@ -17,6 +17,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: study_reviewer_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--maxmemory-policy", "volatile-ttl"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   web:
     build:
       context: .
@@ -27,6 +40,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/study_reviewer
+      REDIS_URL: redis://redis:6379/0
       SECRET_KEY: super-secret-key-study-reviewer-32b-length!
       ENVIRONMENT: development
       DEBUG: "True"
@@ -34,6 +48,8 @@ services:
       PORT: 8000
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./src:/app/src

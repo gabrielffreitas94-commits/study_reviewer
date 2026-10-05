@@ -138,17 +138,23 @@ class DeleteFlashcardUseCase:
         self._card_repo.delete(flashcard_id)
 
         session = self._session_repo.get_active_session(None, card.topic_id, user_id=user_id)
-        if session is not None and session.current_position == card.position:
-            remaining = self._card_repo.list_pool(None, card.topic_id)
-            next_card, round_finished = FlashcardPoolService.get_next_card(remaining, card.position)
-            if round_finished:
+        if session is not None:
+            if card.id in session.card_queue:
+                session.card_queue.remove(card.id)
+            if session.is_round_finished():
+                remaining = self._card_repo.list_pool(None, card.topic_id)
                 if remaining:
-                    shuffled = FlashcardPoolService.execute_round_shuffle(remaining, self._rng)
-                    self._card_repo.save_all(shuffled)
-                    session.next_round(initial_position=shuffled[0].position)
+                    shuffled_ids = FlashcardPoolService.execute_round_shuffle(remaining, self._rng)
+                    session.start_new_round(shuffled_ids)
+                    session.current_position = remaining[0].position
                 else:
                     session.current_position = 0
-            elif next_card is not None:
-                session.advance_to(next_card.position)
+            elif session.current_position == card.position:
+                remaining = self._card_repo.list_pool(None, card.topic_id)
+                next_card, round_finished = FlashcardPoolService.get_next_card(
+                    remaining, card.position
+                )
+                if next_card is not None:
+                    session.advance_to(next_card.position)
 
             self._session_repo.save_session(session)

@@ -1,9 +1,11 @@
 """Modelos ORM do SQLAlchemy 2.0 para persistência relacional (Camada 3 - Adaptadores)."""
 
 from datetime import UTC, date, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Date,
     DateTime,
@@ -145,9 +147,46 @@ class PoolSessionModel(Base):
     )
     current_position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     round_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    current_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    card_queue: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     user: Mapped["UserModel | None"] = relationship("UserModel", back_populates="sessions")
+
+    def __init__(self, **kwargs: Any) -> None:
+        if "card_queue" in kwargs and kwargs["card_queue"]:
+            kwargs["card_queue"] = [str(u) for u in kwargs["card_queue"]]
+        super().__init__(**kwargs)
+
+
+FlashcardPoolSessionModel = PoolSessionModel
+
+
+class StudyEventModel(Base):
+    """Tabela de histórico de eventos de estudo com particionamento temporal (append-only)."""
+
+    __tablename__ = "study_events"
+    __table_args__ = (
+        Index(
+            "ix_study_events_user_card_review",
+            "user_id",
+            "card_id",
+            "reviewed_at",
+            postgresql_include=["status"],
+        ),
+    )
+
+    reviewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), primary_key=True, nullable=False
+    )
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), primary_key=True, nullable=True
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    card_id: Mapped[UUID] = mapped_column(Uuid, nullable=False, index=True)
+    session_id: Mapped[UUID] = mapped_column(Uuid, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # 'viewed', 'completed'
+    device_id: Mapped[str | None] = mapped_column(String(50), nullable=True)

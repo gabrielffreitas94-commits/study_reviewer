@@ -1,6 +1,7 @@
 """Serviço de domínio para a Pool de Flashcards com Gap Indexing (Clean Architecture - Camada 1)."""
 
 import math
+from uuid import UUID
 
 from src.domain.entities import Flashcard
 from src.domain.protocols import IRandomGenerator
@@ -68,12 +69,19 @@ class FlashcardPoolService:
         return sorted_cards
 
     @staticmethod
-    def execute_round_shuffle(cards: list[Flashcard], rng: IRandomGenerator) -> list[Flashcard]:
-        """Embaralha todos os cards da lista e renumera suas posições em múltiplos de 100."""
-        shuffled = list(cards)
+    def execute_round_shuffle(
+        cards: list[Flashcard] | list[UUID], rng: IRandomGenerator
+    ) -> list[UUID]:
+        """Projeta e embaralha exclusivamente a lista escalar de UUIDs para a sessão do usuário."""
+        if not cards:
+            return []
+        first = cards[0]
+        if isinstance(first, Flashcard):
+            ids = [c.id for c in cards]  # type: ignore[union-attr]
+        else:
+            ids = [c for c in cards]
+        shuffled = list(ids)
         rng.shuffle(shuffled)
-        for idx, card in enumerate(shuffled):
-            card.position = (idx + 1) * 100
         return shuffled
 
     @staticmethod

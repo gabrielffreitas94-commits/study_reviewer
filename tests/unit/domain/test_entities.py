@@ -166,6 +166,8 @@ def test_flashcard_pool_session_creation_valid() -> None:
     assert session.topic_id_filter is None
     assert session.current_position == 0
     assert session.round_number == 1
+    assert session.current_index == 0
+    assert session.card_queue == []
     assert session.is_active is True
     assert isinstance(session.updated_at, datetime)
 
@@ -173,8 +175,15 @@ def test_flashcard_pool_session_creation_valid() -> None:
 @pytest.mark.unit
 def test_flashcard_pool_session_invalid_round_raises_error() -> None:
     """Garante que número de rodada < 1 seja rejeitado."""
-    with pytest.raises(DomainValidationError, match="Número da rodada deve ser maior ou igual a 1"):
+    with pytest.raises(DomainValidationError, match="O número da rodada deve ser >= 1"):
         FlashcardPoolSession(round_number=0)
+
+
+@pytest.mark.unit
+def test_flashcard_pool_session_invalid_index_raises_error() -> None:
+    """Garante que cursor negativo seja rejeitado com DomainValidationError."""
+    with pytest.raises(DomainValidationError, match="O índice atual não pode ser negativo"):
+        FlashcardPoolSession(current_index=-1)
 
 
 @pytest.mark.unit
@@ -187,3 +196,56 @@ def test_flashcard_pool_session_advance() -> None:
     session.next_round(initial_position=100)
     assert session.round_number == 2
     assert session.current_position == 100
+
+
+@pytest.mark.unit
+def test_flashcard_pool_session_queue_advance_and_round_management() -> None:
+    """Valida get_current_card_id, advance, is_round_finished e start_new_round."""
+    id1, id2 = uuid4(), uuid4()
+    session = FlashcardPoolSession(card_queue=[id1, id2])
+
+    assert session.get_current_card_id() == id1
+    assert session.is_round_finished() is False
+
+    session.advance()
+    assert session.current_index == 1
+    assert session.get_current_card_id() == id2
+    assert session.is_round_finished() is False
+
+    session.advance()
+    assert session.current_index == 2
+    assert session.get_current_card_id() is None
+    assert session.is_round_finished() is True
+
+    # Nova rodada com lista vazia deve disparar erro
+    with pytest.raises(DomainValidationError, match="A nova rodada requer uma lista não-vazia"):
+        session.start_new_round([])
+
+    # Nova rodada válida
+    id3 = uuid4()
+    session.start_new_round([id3])
+    assert session.round_number == 2
+    assert session.current_index == 0
+    assert session.card_queue == [id3]
+    assert session.get_current_card_id() == id3
+    assert session.is_round_finished() is False
+
+
+@pytest.mark.unit
+def test_study_session_exceptions_hierarchy() -> None:
+    """Valida a hierarquia de exceções de sessão de estudo."""
+    from src.domain.exceptions import (
+        DomainException,
+        SessionDesynchronizedError,
+        SessionExpiredError,
+        SessionQueueEmptyError,
+        StudySessionError,
+    )
+
+    err1 = SessionExpiredError("Sessão expirada")
+    err2 = SessionQueueEmptyError("Fila vazia")
+    err3 = SessionDesynchronizedError("Cursor dessincronizado")
+
+    for err in [err1, err2, err3]:
+        assert isinstance(err, StudySessionError)
+        assert isinstance(err, DomainException)

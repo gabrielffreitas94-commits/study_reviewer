@@ -1,6 +1,6 @@
 """Contratos de repositórios (Portas de Saída - Clean Architecture - Camada 2)."""
 
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic, User
@@ -134,6 +134,26 @@ class ISessionRepository(Protocol):
         """Recupera a sessão ativa para a combinação de filtros e usuário."""
         ...
 
+    def get_by_id(self, session_id: UUID) -> FlashcardPoolSession | None:
+        """Recupera uma sessão de estudo pelo seu UUID."""
+        ...
+
     def save_session(self, session: FlashcardPoolSession) -> None:
         """Persiste ou atualiza o estado da sessão de estudo."""
+        ...
+
+
+class IStudyEventRepository(Protocol):
+    """Porta para histórico append-only de eventos de estudo (study_events)."""
+
+    def bulk_insert(self, events: list[dict[str, Any]]) -> int:
+        """Insere lote de eventos com idempotência (ON CONFLICT DO NOTHING)."""
+        ...
+
+    def list_by_user(self, user_id: UUID, limit: int = 100) -> list[dict[str, Any]]:
+        """Lista eventos históricos de um usuário ordenados cronologicamente."""
+        ...
+
+    def anonymize_user_events(self, user_id: UUID) -> int:
+        """Anonimiza eventos desvinculando user_id e device_id (LGPD Art. 16, IV / 18, VI)."""
         ...

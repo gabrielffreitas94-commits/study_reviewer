@@ -1,4 +1,4 @@
-"""Mappers bidirecionais entre entidades puras de domínio e modelos ORM (Camada 3 - Adaptadores)."""
+from uuid import UUID
 
 from src.adapters.persistence.models import (
     FlashcardModel,
@@ -113,6 +113,7 @@ class SessionMapper:
 
     @staticmethod
     def to_domain(model: PoolSessionModel) -> FlashcardPoolSession:
+        queue = [UUID(str(uid)) for uid in model.card_queue] if model.card_queue else []
         return FlashcardPoolSession(
             id=model.id,
             user_id=model.user_id,
@@ -122,6 +123,8 @@ class SessionMapper:
             round_number=model.round_number,
             is_active=model.is_active,
             updated_at=model.updated_at,
+            current_index=model.current_index,
+            card_queue=queue,
         )
 
     @staticmethod
@@ -135,4 +138,6 @@ class SessionMapper:
             round_number=entity.round_number,
             is_active=entity.is_active,
             updated_at=entity.updated_at,
+            current_index=entity.current_index,
+            card_queue=[str(cid) for cid in entity.card_queue],
         )

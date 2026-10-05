@@ -25,5 +25,8 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/callback"
 
+    # Redis Cache & Efêmero
+    REDIS_URL: str = "redis://localhost:6379/0"
+
 
 settings = Settings()

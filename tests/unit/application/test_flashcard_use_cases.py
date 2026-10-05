@@ -156,7 +156,9 @@ def test_delete_flashcard_advances_active_session() -> None:
     card_repo.save(c1)
     card_repo.save(c2)
 
-    session = FlashcardPoolSession(topic_id_filter=t_id, current_position=100)
+    session = FlashcardPoolSession(
+        topic_id_filter=t_id, current_position=100, card_queue=[c1.id, c2.id]
+    )
     session_repo.save_session(session)
 
     use_case = DeleteFlashcardUseCase(card_repo, session_repo, rng)

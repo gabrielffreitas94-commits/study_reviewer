@@ -9,6 +9,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from src.adapters.api.controllers import (
+    SyncAnswersPayload,
+    SyncAnswersResponseModel,
+    sync_answers_api,
+)
 from src.adapters.persistence.repositories import (
     SqlAlchemyFlashcardRepository,
     SqlAlchemySessionRepository,
@@ -134,54 +139,16 @@ def study_view(
     )
 
 
-@web_router.post("/study/flip", response_class=HTMLResponse)
-def flip_card(
-    request: Request,
-    card_id: Annotated[UUID, Form()],
-    side: Annotated[str, Form()],
-    current_index: Annotated[int, Form()],
-    total_cards: Annotated[int, Form()],
-    round_number: Annotated[int, Form()],
-    position: Annotated[int, Form()],
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> HTMLResponse:
-    """Endpoint HTMX para alternar entre pergunta e resposta sem recarregar a tela."""
-    card_repo = SqlAlchemyFlashcardRepository(db)
-    topic_repo = SqlAlchemyTopicRepository(db)
-    card = card_repo.get_by_id(card_id)
+@web_router.post("/study/flip", response_class=Response)
+def flip_card() -> Response:
+    """Rota HTTP aposentada permanentemente (Seção 7.3 e 9.3 da especificação).
 
-    if card is None:
-        return templates.TemplateResponse(
-            request=request,
-            name="partials/card.html",
-            context={"card": None, "side": "front", "current_user": current_user},
-        )
-
-    topic_names: list[str] = []
-    for t_id in card.topic_ids:
-        t = topic_repo.get_by_id(t_id)
-        if t:
-            topic_names.append(t.name)
-
-    new_side = "back" if side == "front" else "front"
-    study_dto = StudyCardDTO(
-        id=card.id,
-        topic_ids=list(card.topic_ids),
-        topic_names=topic_names,
-        front=card.front,
-        back=card.back,
-        position=position,
-        current_index=current_index,
-        total_cards=total_cards,
-        round_number=round_number,
-        round_shuffled=False,
-    )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="partials/card.html",
-        context={"card": study_dto, "side": new_side, "current_user": current_user},
+    O giro do flashcard agora ocorre 100% no cliente em 0ms via CSS 3D (.is-flipped).
+    """
+    return Response(
+        status_code=410,
+        content="Rota aposentada: o giro do flashcard ocorre 100% no cliente em 0ms via CSS 3D.",
+        media_type="text/plain",
     )
 
 
@@ -229,6 +196,17 @@ def next_card(
             "current_user": current_user,
         },
     )
+
+
+@web_router.post("/study/sync-answers", response_model=SyncAnswersResponseModel)
+def sync_answers_web_alias(
+    request: Request,
+    payload: SyncAnswersPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SyncAnswersResponseModel:
+    """Alias direto para /study/sync-answers delegando para o controlador de API (Seção 9.2)."""
+    return sync_answers_api(request, payload, db=db, current_user=current_user)
 
 
 @web_router.get("/flashcards/new", response_class=HTMLResponse)

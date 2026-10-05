@@ -42,3 +42,19 @@ class ResourceOwnershipError(DomainException):
 
 class InvalidSessionTokenError(DomainException):
     """Token de sessão com formato inválido, assinatura violada ou decifração corrompida."""
+
+
+class StudySessionError(DomainException):
+    """Exceção base para o subsistema de sessões de estudo."""
+
+
+class SessionExpiredError(StudySessionError):
+    """Sessão efêmera expirou no cache após 24h de inatividade."""
+
+
+class SessionQueueEmptyError(StudySessionError):
+    """Fila de cards da matéria/tópico esgotada ou sem registros."""
+
+
+class SessionDesynchronizedError(StudySessionError):
+    """Inconsistência detectada entre cursor local e estado remoto."""
