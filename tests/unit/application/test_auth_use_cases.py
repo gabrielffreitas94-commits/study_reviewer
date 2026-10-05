@@ -104,6 +104,14 @@ class FakeSessionTokenService(ISessionTokenService):
     def verify_session_token(self, token: str) -> SessionPayloadDTO | None:
         return self.tokens.get(token)
 
+    def create_oauth_state(self, next_url: str = "") -> str:
+        return f"fake-state-{next_url}"
+
+    def verify_oauth_state(self, state: str) -> str | None:
+        if state.startswith("fake-state-"):
+            return state.removeprefix("fake-state-")
+        return None
+
 
 class InMemorySubjectRepository(ISubjectRepository):
     """Repositório fake em memória para Matérias com suporte a multi-tenancy."""
@@ -453,3 +461,50 @@ def test_create_and_list_subjects_multi_tenant() -> None:
     assert "Matéria A Pública" in names_b
     public_from_a = next(s for s in subs_b if s.name == "Matéria A Pública")
     assert public_from_a.is_owner is False
+
+
+@pytest.mark.unit
+def test_authenticate_google_existing_user_linked_by_email_updates_sub() -> None:
+    """Valida que quando um usuário é localizado por e-mail, seu google_sub é
+    devidamente atualizado.
+    """
+    google_client = FakeGoogleAuthClient()
+    user_repo = InMemoryUserRepository()
+    token_service = FakeSessionTokenService()
+
+    # Usuário pré-existente (ex: vindo de migração) com sub genérico
+    existing_user = User(
+        google_sub="system-migration-sub",
+        email="migrado@aluno.com",
+        name="Aluno Antigo",
+        avatar_url="https://antigo.png",
+    )
+    user_repo.save(existing_user)
+
+    # Google retorna o mesmo e-mail, mas novo sub oficial
+    google_client.code_to_user_info["code-123"] = GoogleUserInfoDTO(
+        sub="google-official-sub-999",
+        email="migrado@aluno.com",
+        name="Aluno Atualizado",
+        avatar_url="https://novo.png",
+    )
+
+    use_case = AuthenticateWithGoogleUseCase(
+        google_client=google_client,
+        user_repo=user_repo,
+        token_service=token_service,
+    )
+    result = use_case.execute(
+        GoogleAuthInputDTO(code="code-123", redirect_uri="http://localhost:8000/auth/callback")
+    )
+
+    assert result.user_id == existing_user.id
+    assert result.is_new_user is False
+    assert result.name == "Aluno Atualizado"
+
+    # Confirma que no repositório o google_sub foi atualizado
+    updated_user = user_repo.get_by_id(existing_user.id)
+    assert updated_user is not None
+    assert updated_user.google_sub == "google-official-sub-999"
+    assert updated_user.name == "Aluno Atualizado"
+    assert updated_user.avatar_url == "https://novo.png"

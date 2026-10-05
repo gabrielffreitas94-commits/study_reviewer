@@ -196,6 +196,7 @@ def test_google_oauth_client_verify_id_token_success_and_error() -> None:
     fake_success = MagicMock()
     fake_success.status_code = 200
     fake_success.json.return_value = {
+        "aud": "id",
         "sub": "sub-idtoken-123",
         "email": "idtoken@google.com",
         "name": "ID Token User",
@@ -213,6 +214,31 @@ def test_google_oauth_client_verify_id_token_success_and_error() -> None:
     with patch("httpx.Client.get", return_value=fake_err):
         with pytest.raises(ValueError, match="ID Token do Google inválido"):
             client.verify_id_token("bad-token")
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_google_oauth_client_verify_id_token_aud_mismatch() -> None:
+    """Valida rejeição de ID Token cujo audience (aud) não pertence a esta aplicação.
+
+    Vulnerabilidade prevenida: Confused Deputy Attack e autenticação forjada via ID Tokens
+    emitidos para outros clientes OAuth da Google (CWE-287).
+    Garantia de segurança: O token é rejeitado com ValueError se a claim 'aud' divergir do
+    client_id configurado no sistema.
+    """
+    client = GoogleOAuthClient(client_id="meu-client-id-oficial", client_secret="secret")
+    fake_token_data = {
+        "aud": "outro-client-id-malicioso",
+        "sub": "sub-123",
+        "email": "alvo@google.com",
+    }
+    fake_resp = MagicMock()
+    fake_resp.status_code = 200
+    fake_resp.json.return_value = fake_token_data
+
+    with patch("httpx.Client.get", return_value=fake_resp):
+        with pytest.raises(ValueError, match="Audience do ID Token incompatível"):
+            client.verify_id_token("token-de-outro-app")
 
 
 @pytest.mark.unit

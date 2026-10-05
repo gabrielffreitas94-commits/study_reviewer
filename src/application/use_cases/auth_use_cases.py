@@ -68,6 +68,9 @@ class AuthenticateWithGoogleUseCase:
         else:
             # Sincronização de perfil para usuário existente
             changed = False
+            if user.google_sub != user_info.sub:
+                user.google_sub = user_info.sub
+                changed = True
             if user_info.name and user.name != user_info.name:
                 user.name = user_info.name.strip()
                 changed = True

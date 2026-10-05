@@ -32,3 +32,11 @@ class ISessionTokenService(Protocol):
     def verify_session_token(self, token: str) -> SessionPayloadDTO | None:
         """Decifra e valida a integridade, autenticidade e expiração do token de sessão."""
         ...
+
+    def create_oauth_state(self, next_url: str = "") -> str:
+        """Gera um state CSRF criptografado contendo o timestamp e a rota de retorno."""
+        ...
+
+    def verify_oauth_state(self, state: str) -> str | None:
+        """Valida o state CSRF e recupera a rota de retorno next_url caso válido."""
+        ...

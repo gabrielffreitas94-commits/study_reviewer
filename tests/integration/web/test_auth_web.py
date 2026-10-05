@@ -304,3 +304,61 @@ def test_oauth_callback_exception_redirects_to_login_with_error(
     )
     assert res.status_code == 303
     assert "/auth/login?error=" in res.headers["location"]
+
+
+@pytest.mark.integration
+@pytest.mark.security
+def test_login_page_open_redirect_sanitized(
+    auth_client: TestClient,
+    test_db_session: sessionmaker[Session],
+) -> None:
+    """Valida neutralização de tentativas de Open Redirect na rota de login e autenticação web.
+
+    Vulnerabilidade prevenida: Open Redirect (CWE-601) e ataques de phishing através de
+    parâmetros de redirecionamento manipulados para domínios externos.
+    Garantia de segurança: O sistema sanitiza qualquer URL de destino que não seja estritamente
+    relativa no mesmo domínio, revertendo para a rota segura '/study'.
+    """
+    user = User(google_sub="sub-open-redir", email="redir@test.com", name="Redir")
+    with test_db_session() as db:
+        SqlAlchemyUserRepository(db).save(user)
+
+    session_service: ISessionTokenService = get_session_service()
+    token = session_service.create_session_token(user.id, user.email)
+    auth_client.cookies.set("session_token", token)
+
+    # 1. Tentativa com URL externa absoluta
+    res1 = auth_client.get("/auth/login?next=https://evil.com/phishing", follow_redirects=False)
+    assert res1.status_code == 303
+    assert res1.headers["location"] == "/study"
+
+    # 2. Tentativa com protocolo relativo (//evil.com)
+    res2 = auth_client.get("/auth/login?next=//evil.com", follow_redirects=False)
+    assert res2.status_code == 303
+    assert res2.headers["location"] == "/study"
+
+    # 3. Tentativa com barra invertida (/\\evil.com)
+    res3 = auth_client.get("/auth/login?next=/\\evil.com", follow_redirects=False)
+    assert res3.status_code == 303
+    assert res3.headers["location"] == "/study"
+
+    # 4. Rota relativa legítima é aceita
+    res4 = auth_client.get("/auth/login?next=/subjects", follow_redirects=False)
+    assert res4.status_code == 303
+    assert res4.headers["location"] == "/subjects"
+
+    # 5. Tentativa com parâmetro next vazio (deve cair no fallback seguro default)
+    res5 = auth_client.get("/auth/login?next=", follow_redirects=False)
+    assert res5.status_code == 303
+    assert res5.headers["location"] == "/study"
+
+
+@pytest.mark.integration
+def test_get_current_user_preserves_query_string(
+    auth_client: TestClient,
+) -> None:
+    """Valida que o redirecionamento para login preserva parâmetros de query string."""
+    res = auth_client.get("/study?subject_id=123&mode=review", follow_redirects=False)
+    assert res.status_code == 303
+    expected_next = urllib.parse.quote("/study?subject_id=123&mode=review", safe="")
+    assert res.headers["location"] == f"/auth/login?next={expected_next}"

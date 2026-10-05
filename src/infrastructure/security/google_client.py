@@ -71,6 +71,9 @@ class GoogleOAuthClient(IGoogleAuthClient):
                 raise ValueError(f"ID Token do Google inválido: {resp.text}")
 
             payload = resp.json()
+            if payload.get("aud") != self._client_id:
+                raise ValueError("Audience do ID Token incompatível com este aplicativo.")
+
             return GoogleUserInfoDTO(
                 sub=payload["sub"],
                 email=payload["email"],

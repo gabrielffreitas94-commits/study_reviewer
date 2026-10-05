@@ -115,20 +115,22 @@ from uuid import UUID
 from datetime import datetime
 from src.domain.exceptions import DomainValidationError
 
+
 @dataclass(slots=True)
 class FlashcardPoolSession:
     """Entidade de domínio rica representando a sessão efêmera de estudo.
-    
+
     A fila `card_queue` contém exclusivamente a fatia da rodada ativa
     (50 a 100 UUIDs), otimizando o consumo de RAM em larga escala.
     """
+
     id: UUID
     user_id: UUID
     subject_id: UUID
     topic_id_filter: UUID | None
     round_number: int
-    current_index: int          # Cursor na fila (0 a N-1)
-    card_queue: list[UUID]      # Janela ativa da rodada exclusiva deste usuário
+    current_index: int  # Cursor na fila (0 a N-1)
+    card_queue: list[UUID]  # Janela ativa da rodada exclusiva deste usuário
     created_at: datetime
     updated_at: datetime
 
@@ -163,11 +165,14 @@ Para assegurar contratos de erro tipados e determinismo na camada de aplicação
 class StudySessionError(Exception):
     """Exceção base para o subsistema de sessões de estudo."""
 
+
 class SessionExpiredError(StudySessionError):
     """Sessão efêmera expirou no cache após 24h de inatividade."""
 
+
 class SessionQueueEmptyError(StudySessionError):
     """Fila de cards da matéria/tópico esgotada ou sem registros."""
+
 
 class SessionDesynchronizedError(StudySessionError):
     """Inconsistência detectada entre cursor local e estado remoto."""

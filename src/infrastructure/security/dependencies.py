@@ -70,7 +70,8 @@ def get_current_user(
         return user
 
     path = request.url.path
-    next_param = urllib.parse.quote(str(request.url.path), safe="")
+    full_target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+    next_param = urllib.parse.quote(full_target, safe="")
 
     # Consumo via API REST
     if path.startswith("/api/"):

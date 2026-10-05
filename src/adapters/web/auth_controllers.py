@@ -30,6 +30,16 @@ templates = Jinja2Templates(directory=str(templates_dir))
 auth_router = APIRouter(prefix="/auth", tags=["Web Auth"])
 
 
+def _safe_redirect_url(target: str | None, default: str = "/study") -> str:
+    """Valida e sanitiza rotas de redirecionamento prevenindo Open Redirect (CWE-601)."""
+    if not target:
+        return default
+    clean = target.strip()
+    if clean.startswith("/") and not clean.startswith("//") and not clean.startswith("/\\"):
+        return clean
+    return default
+
+
 @auth_router.get("/login", response_class=HTMLResponse)
 def login_page(
     request: Request,
@@ -38,14 +48,15 @@ def login_page(
     current_user: User | None = Depends(get_current_user_optional),
 ) -> Response:
     """Renderiza a página de login com botão Google e tratamento de redirecionamento."""
+    safe_next = _safe_redirect_url(next, "/study")
     if current_user is not None:
-        return RedirectResponse(url=next or "/study", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url=safe_next, status_code=status.HTTP_303_SEE_OTHER)
 
     return templates.TemplateResponse(
         request=request,
         name="auth/login.html",
         context={
-            "next_url": next,
+            "next_url": safe_next,
             "error": error,
             "current_user": None,
         },
@@ -60,8 +71,8 @@ def google_login_redirect(
     session_service: ISessionTokenService = Depends(get_session_service),
 ) -> Response:
     """Gera state CSRF criptografado e redireciona o usuário para o Google Consent."""
-    # Cria o state contendo next_url criptografado
-    state = getattr(session_service, "create_oauth_state", lambda n: "state")(next)
+    safe_next = _safe_redirect_url(next, "/study")
+    state = session_service.create_oauth_state(safe_next)
 
     redirect_uri = settings.GOOGLE_REDIRECT_URI or str(request.url_for("google_oauth_callback"))
     auth_url = google_client.get_authorization_url(state=state, redirect_uri=redirect_uri)
@@ -110,9 +121,8 @@ def google_oauth_callback(
         )
 
     # Recupera rota de destino original a partir do state
-    next_url = (
-        getattr(session_service, "verify_oauth_state", lambda s: "/study")(clean_state) or "/study"
-    )
+    verified_next = session_service.verify_oauth_state(clean_state)
+    next_url = _safe_redirect_url(verified_next, "/study")
 
     redirect_uri = settings.GOOGLE_REDIRECT_URI or str(request.url_for("google_oauth_callback"))
 
