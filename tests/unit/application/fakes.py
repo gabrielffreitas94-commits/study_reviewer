@@ -185,6 +185,12 @@ class FakeSessionRepository(ISessionRepository):
         # Fallback sem user_id para compatibilidade de testes existentes
         return self._sessions.get((subject_id, topic_id, None))
 
+    def get_by_id(self, session_id: UUID) -> FlashcardPoolSession | None:
+        for s in self._sessions.values():
+            if s.id == session_id:
+                return s
+        return None
+
     def save_session(self, session: FlashcardPoolSession) -> None:
         self._sessions[(session.subject_id_filter, session.topic_id_filter, session.user_id)] = (
             session
