@@ -1,5 +1,7 @@
-# Product Requirements Document (PRD) — v6.0
+# Product Requirements Document (PRD) — v7.0
 ## Study Reviewer — Sistema Inteligente de Revisão Ativa e Repetição Espaçada
+
+> **Changelog v7.0:** Evolução arquitetural do subsistema de Flashcards para Alta Escala Concorrente (10M de usuários e 500k simultâneos). Desacoplamento formal entre o **Catálogo Imutável de Flashcards** e a **Sessão Efêmera do Estudante** (`FlashcardPoolSession`), eliminando contenção de locks de banco e race conditions. Introdução de Prefetching Preditivo (0ms percebido com Dedicated Web Worker), rotação de lotes com Low-Water Mark, cache com TTL no Redis, persistência relacional append-only com particionamento temporal no PostgreSQL e conformidade integral com Privacy by Design da LGPD e acessibilidade WCAG 2.1 AA.
 
 ---
 
@@ -7,74 +9,89 @@
 
 ### 1.1 Missão
 O **Study Reviewer** é uma aplicação focada em aprendizado contínuo e retenção de longo prazo, dividida em dois sistemas complementares de estudo ativo:
-1. **Flashcards (Pool Contínua por Rodadas):** Rotação sequencial da pool com inserção de novos cards nos **primeiros 10%** da fila e **shuffle geral** da lista toda ao concluir cada ciclo/rodada de revisão. Opera com navegação ágil, atalhos de teclado e gestos de toque no celular, sem notas e sem complexidade de agendamento por dias.
+1. **Flashcards (Pool Contínua por Rodadas em Alta Escala):** Rotação sequencial e contínua do baralho com inserção de novos cards nos **primeiros 10%** do catálogo da matéria e **shuffle efêmero por usuário** ao concluir cada ciclo/rodada de revisão. Opera com navegação instantânea de 0ms percebidos no cliente, atalhos ergonômicos de teclado e gestos de toque no celular, sem notas qualitativas e sem complexidade de agendamento por dias (rotação contínua e foco no fluxo de estudo).
 2. **Perguntas Abertas (Mecânica SRS Estrita):** Fila de repetição espaçada por calendário (`[1, 7, 15, 30, 60, 90, 180]` dias), promoção estrita a **100% de acerto**, penalidade de regressão no nível 6 (retorno ao nível 2 com reagendamento para `hoje + 15d`) e auditoria histórica completa.
 
 ---
 
 ### 1.2 Princípios de Engenharia e Arquitetura
-* **Clean Architecture Estrita e Casos de Uso Agnósticos:** Divisão em 4 camadas concêntricas (Entities, Use Cases, Interface Adapters, Frameworks & Drivers). A camada de Casos de Uso é 100% agnóstica, servindo tanto os controladores web (Jinja2 + HTMX) quanto a futura API REST para o aplicativo mobile sem duplicação de lógica.
-* **Paridade Dev/Prod com Docker:** Desenvolvimento e produção utilizam a mesma stack conteinerizada (Docker Compose com PostgreSQL e FastAPI).
-* **Evolução Segura de Schema com Migrações Versionadas:** Requisito não-funcional de controle automatizado de versões de banco de dados, garantindo migrações contínuas sem quebras ou perda de dados.
-* **Datas Puramente Calendárias:** Todo o agendamento de perguntas abertas opera no formato `YYYY-MM-DD` (sem horas, minutos ou desvios de fuso horário).
+* **Clean Architecture Estrita e Casos de Uso Agnósticos:** Divisão em 4 camadas concêntricas (Entities, Use Cases, Interface Adapters, Frameworks & Drivers). A camada de Casos de Uso é 100% agnóstica, servindo tanto os controladores web (Jinja2 + HTMX) quanto a API REST para mobile sem duplicação de lógica.
+* **Desacoplamento de Catálogo vs. Sessão Efêmera:** A entidade `Flashcard` pertence ao catálogo compartilhado da matéria e permanece estritamente **imutável** durante as sessões de estudo. A ordem de estudo e o embaralhamento pertencem exclusivamente à **Sessão do Usuário** (`FlashcardPoolSession`), garantindo isolamento absoluto entre múltiplos alunos concorrentes sem race conditions ou write amplification.
+* **Arquitetura 3 Camadas de Alta Escala (Zero Latency & Write-Behind):**
+  * **Cliente:** Prefetching preditivo de 50 cards com buffer em memória e **Dedicated Web Worker** gerenciando I/O no `IndexedDB` e despacho em lote via `fetch(keepalive: true)`, assegurando **INP $\le 50\text{ ms}$** e **0 ms** de transição percebida.
+  * **Borda e Cache Efêmero:** Gateway com WAF e rate limiting (20 req/min), e **Redis Cluster** com nós de 6 a 8 GB de RAM operando com política `volatile-ttl` e TTL de 24 horas para absorção das filas ativas de estudo.
+  * **Persistência Relacional:** PostgreSQL 16 com histórico append-only particionado por intervalo temporal (`PARTITION BY RANGE (reviewed_at)`), viabilizando descarte de dados antigos em $\mathcal{O}(1)$ sem sobrecarregar o autovacuum sob carga de até 1 bilhão de eventos/dia.
+* **Paridade Dev/Prod com Docker:** Desenvolvimento e produção utilizam a mesma stack conteinerizada (Docker Compose com PostgreSQL 16, Redis 7 e FastAPI rodando sob usuário não-root).
 * **Segurança e Criptografia em Repouso com AES-256-GCM:** Autenticação segura na borda por sessão/cookie, sanitização estrita de inputs contra XSS (via biblioteca de sanitização como `nh3`) e proteção de segredos/tokens armazenados utilizando Criptografia Autenticada **AES-256-GCM (AEAD)**.
-* **Auditoria Histórica e Privacidade por Design (LGPD):** Auditoria exclusiva para perguntas abertas ligada à Matéria (`subject_id`) e ao Tema (`topic_id`) com colunas desnormalizadas congeladas (`historical_subject_name`, `historical_topic_name`). Suporte a exportação de dados em JSON e diretriz de efemeridade estrita para áudios gravados na Sprint 9 (descarte imediato pós-transcrição).
+* **Privacidade por Design (LGPD - Lei nº 13.709/2018):** Minimização de dados pessoais, expurgo atômico de dados locais (`IndexedDB`/`localStorage`) no logout do usuário, desidentificação irreversível de históricos de estudo (`ON DELETE SET NULL` no `user_id` de `study_events`) para fins analíticos sob o Art. 16, IV, e TTL de 2 horas em lotes locais offline.
+* **Acessibilidade Universal (WCAG 2.1 nível AA):** Interfaces 100% operáveis por teclado com retenção programática de foco pós-transição (prevenção do Focus Loss Bug), anúncios em Live Regions atômicas (`aria-live="polite"`), atalhos configuráveis (WCAG 2.1.4) e respeito à diretiva `prefers-reduced-motion`.
 * **Design System e Dark Mode Nativo:** Interface responsiva Mobile-First com TailwindCSS, suporte nativo a Tema Claro e Escuro (via seletor de classe, sem cintilação visual de carregamento/FOUC e com respeito ao `prefers-color-scheme`).
 
 ---
 
-## 2. Mecânica dos Flashcards (Sprint 1 — Pool Contínua por Rodadas)
+## 2. Mecânica dos Flashcards (Pool Contínua por Rodadas em Alta Escala)
 
-Os Flashcards **não** utilizam algoritmo de dias nem auditoria. Eles operam em uma **Pool Dinâmica de Rodada Completa** com suporte a estudo de **Todas as Matérias (Global)** ou com **Filtro por Matéria/Tema Específico**.
+Os Flashcards **não** utilizam algoritmo de dias nem notas qualitativas ('easy', 'hard'). Eles operam em uma **Pool Dinâmica de Rodada Completa** com suporte a estudo de **Todas as Matérias (Global)** ou com **Filtro por Matéria/Tema Específico**, projetada para operar com máxima fluidez e zero latência.
 
 ```mermaid
 flowchart TD
-    subgraph Ciclo_da_Pool["Ciclo da Pool de Flashcards (Gap Indexing: múltiplos de 100)"]
-        Head["Primeiros 10% da Pool (Posições Iniciais)"]
-        Body["Restante da Pool"]
-        Tail["Fim da Pool (Último Card da Rodada)"]
+    subgraph Catálogo["Catálogo Compartilhado (PostgreSQL Imutável)"]
+        Head["Primeiros 10% do Acervo da Matéria"]
+        Body["Restante do Acervo"]
+        NewCard["Novo Card Cadastrado"] -->|Inserção por Ponto Médio| Head
     end
 
-    NewCard["Novo Card Cadastrado"] -->|Inserção por Ponto Médio| Head
-    User["Usuário Revisa"] -->|Card a Card sequencialmente| Tail
-    Tail -->|Ao concluir último card| Shuffle["Shuffle Completo + Redistribuição em Gaps de 100"]
-    Shuffle --> Head
+    subgraph Sessao["Sessão Efêmera do Usuário (Cliente + Redis)"]
+        Queue["Fila da Rodada Ativa (50 a 100 IDs)"]
+        Prefetch["Buffer de 50 Cards no Cliente"]
+        User["Estudante Revisa (0ms via Optimistic UI)"]
+        
+        Queue -->|Prefetch em Lote| Prefetch
+        Prefetch -->|Consome Card| User
+        User -->|Último Card da Rodada| Shuffle["Shuffle Determinístico da Sessão"]
+        Shuffle -->|Nova Rodada| Queue
+    end
 ```
 
 ### 2.1 Regras de Operação da Pool & Gap Indexing
 
-1. **Ordenação por Gap Indexing (Múltiplos de 100):**
-   * Cada flashcard na pool de estudo possui um campo numérico `position`.
-   * Na inicialização ou após cada shuffle geral, os cards recebem posições espaçadas de 100 em 100 (`100, 200, 300, 400...`).
+1. **Ordenação Base por Gap Indexing (Múltiplos de 100 no Catálogo):**
+   * Cada flashcard cadastrado na matéria possui um campo numérico estático `position`.
+   * Os cards recebem posições espaçadas de 100 em 100 (`100, 200, 300, 400...`), servindo de referência global para o acervo base.
 
 2. **Inserção de Novos Cards nos Primeiros 10%:**
-   * Quando um novo flashcard é cadastrado, ele é alocado em uma posição aleatória entre os primeiros 10% da fila:
+   * Quando um novo flashcard é cadastrado, ele é alocado em uma posição aleatória entre os primeiros 10% do acervo da matéria:
      $$\text{índice\_alvo} = \text{random}(0, \max(1, \lfloor 0.1 \times N \rfloor))$$
    * A nova posição é calculada como o ponto médio entre o card anterior e o próximo daquele índice:
      $$\text{nova\_posição} = pos_{ant} + \lfloor (pos_{prox} - pos_{ant}) / 2 \rfloor$$
-   * Isso permite inserção instantânea em banco relacional sem necessidade de renumerar os demais cards da pool.
+   * Isso permite inserção instantânea em banco relacional sem necessidade de renumerar os demais cards do catálogo. Em sessões ativas concorrentes, vigora o *Snapshot Isolation por Rodada*: novos cards ingressam na fila do estudante apenas no ciclo/rodada seguinte.
 
 3. **Tratamento Exaustivo de Edge Cases no Posicionamento:**
    * **Pool Vazia ($N = 0$):** O primeiro card inserido recebe `position = 100`.
    * **Pool Unitária ($N = 1$):** O novo card recebe `position = 50` (antes) ou `position = 200` (depois), conforme sorteio.
    * **Inserção no Início Absoluto (antes do primeiro card):** Se o card for inserido antes do índice 0, sua posição será $\lfloor pos_{primeiro} / 2 \rfloor$. Se $pos_{primeiro} \le 1$, o sistema dispara rebalanceamento preventivo.
-   * **Esgotamento de Gap ($pos_{prox} - pos_{ant} \le 1$):** Caso múltiplos cards sejam inseridos consecutivamente no mesmo intervalo até não haver inteiros livres, o sistema dispara um rebalanceamento local dos vizinhos ou redistribuição uniforme da pool em múltiplos de 100.
-   * **Exclusão de Card no Meio da Rodada:** Se um card for excluído enquanto uma rodada estiver em andamento, o card é removido e o tamanho $N$ decrementa. O ponteiro da rodada avança naturalmente para o próximo card da sequência sem quebrar a rodada. Se o card excluído era o último restante da rodada, o ciclo se encerra e o shuffle é acionado.
+   * **Esgotamento de Gap ($pos_{prox} - pos_{ant} \le 1$):** Caso múltiplos cards sejam inseridos consecutivamente no mesmo intervalo, o sistema dispara um rebalanceamento local ou redistribuição uniforme do acervo em múltiplos de 100.
+   * **Exclusão de Card no Meio da Rodada:** Cards excluídos recebem *tombstone* (`deleted_at = NOW()`). Se um card excluído já estiver pré-carregado no lote ativo do estudante, a resposta é computada para conclusão, mas o card é sumariamente aposentado para rodadas subsequentes.
 
-4. **Navegação e Persistência da Sessão:**
-   * O estado da rodada é persistido em banco de dados na entidade `FlashcardPoolSession` (`session_id`, `current_position`, `round_number`, `subject_id_filter`), permitindo ao usuário pausar os estudos, fechar o navegador e retomar exatamente de onde parou.
-   * Ao finalizar o último card da lista, a rodada se encerra: o sistema reembaralha todos os cards da pool ativa, redistribui as posições em múltiplos de 100, incrementa o `round_number` e posiciona o ponteiro no primeiro card da nova rodada.
+4. **Navegação, Shuffle Efêmero e Persistência de Sessão:**
+   * O estado da rodada é mantido na entidade de domínio `FlashcardPoolSession` (`id`, `user_id`, `subject_id`, `topic_id_filter`, `round_number`, `current_index`, `card_queue: list[UUID]`), otimizada com `@dataclass(slots=True)` para alta densidade em memória.
+   * A lista `card_queue` armazena exclusivamente os IDs da rodada ativa (50 a 100 cards), e **nunca** muta a entidade `Flashcard` no banco relacional.
+   * Ao finalizar o último card da lista (`is_round_finished() == True`), o término da rodada dispara o shuffle apenas na coleção de IDs da sessão (`session.start_new_round(shuffled_ids)`), incrementa `round_number` e zera `current_index`.
+   * O aluno pode pausar, fechar o navegador e retomar seus estudos de qualquer dispositivo sem risco de corrupção de estado por concorrência.
 
-5. **Ergonomia, Atalhos de Teclado e Gestos Touch:**
+5. **Experiência do Estudante, Ergonomia e Acessibilidade (0ms Percebido):**
+   * **Componente Flip 100% Client-Side:** O giro do flashcard ocorre instantaneamente no dispositivo via CSS 3D (`.is-flipped`, `perspective: 1000px`, `transform: rotateY(180deg)`), aposentando requisições HTTP para visualização do verso.
+   * **Prefetch Preditivo com Low-Water Mark (10 cards):** O cliente baixa lotes de 50 cards completos. Ao atingir o card 40 (restando 10 cards no buffer), o lote subsequente é requisitado em background, eliminando congelamentos perceptíveis.
+   * **Micro-transição Otimista:** A troca de card utiliza micro-animação acelerada por GPU (120ms a 150ms), eliminando o efeito abrupto/jarring e preservando o *flow state* do estudante.
+   * **Os 5 Estados de Interface:** Tratamento estrito dos estados *Ideal*, *Empty* (Victory State com métricas da rodada), *Loading* (Skeleton de altura fixa `min-h-[380px]` para CLS zero), *Error* (banner com retry) e *Partial* (indicador de modo offline / sincronização pendente).
    * **Atalhos no Desktop:**
      * `Barra de Espaço`: Virar o card (alternar entre Pergunta e Resposta).
      * `Enter` ou `Seta para a Direita`: Avançar para o próximo card.
-   * **Comandos Touch no Mobile (Web Responsivo e Flutter):**
+     * Desativação automática de atalhos em campos de digitação e opção de desligamento (WCAG 2.1.4).
+   * **Comandos Touch no Mobile:**
      * `Toque Único (Tap)` no card: Virar o card / Revelar resposta.
      * `Deslizar para a Esquerda (Swipe Left)`: Avançar para o próximo card.
-     * `Arrastar para Baixo (Pull to Refresh)`: Sincronizar sessão e recarregar a fila.
-     * *Nota de Produto:* Não existe funcionalidade de favoritos; o foco é fluidez contínua sem categorizações paralelas.
-   * **Indicador de Ritmo:** Exibição clara do progresso atual (ex: *"Card 14 de 50 • Rodada 2"*).
+   * **Retenção Programática de Foco:** O foco do teclado é mantido no card após cada avanço dinâmico via `.focus()`, prevenindo o *Focus Loss Bug*.
 
 ---
 
@@ -156,36 +173,40 @@ erDiagram
 
 ---
 
-## 5. Arquitetura de Software (Clean Architecture)
+## 5. Arquitetura de Software (Clean Architecture & Alta Escala)
 
 ```mermaid
 flowchart TD
     subgraph Camada_4["4. Frameworks & Drivers"]
-        Docker["Docker & Docker Compose (Dev/Prod Parity)"]
-        FastAPI_App["FastAPI Web Framework & Uvicorn"]
-        Postgres_DB["PostgreSQL (Neon / Local) via SQLAlchemy"]
-        Templates_HTMX["Templates Jinja2 + HTMX + TailwindCSS"]
+        Docker["Docker Compose (Postgres 16 + Redis 7 + FastAPI)"]
+        FastAPI_App["FastAPI Web Framework (Async + Uvicorn)"]
+        Redis_Store["Redis Cluster (Filas Efêmeras, TTL 24h, volatile-ttl)"]
+        Postgres_DB["PostgreSQL 16 (Particionado por Range Temporal)"]
+        Frontend_Worker["Dedicated Web Worker (study-sync.worker.js) + IndexedDB"]
+        Templates_HTMX["Templates Jinja2 + CSS 3D Flip + TailwindCSS"]
     end
 
     subgraph Camada_3["3. Interface Adapters"]
-        Controllers_Web["Web Controllers (HTML/HTMX Responses)"]
-        Controllers_API["API Controllers (JSON REST Responses para Flutter)"]
-        Repo_Impl["SqlAlchemyFlashcardRepository, SqlAlchemyQuestionRepository, SqlAlchemyAuditRepository"]
-        Mappers["Domain/ORM Mappers"]
+        Controllers_Web["Web Controllers (HTML/HTMX + orjson)"]
+        Controllers_Sync["Batch Sync Controller (/study/sync-answers, Anti-IDOR, Anti-DoS)"]
+        Controllers_API["API Controllers (REST JSON para Flutter)"]
+        Repo_Impl["SqlAlchemyFlashcardRepository, RedisSessionRepository, SqlAlchemyAuditRepository"]
+        Mappers["Domain/ORM/DTO Mappers"]
     end
 
     subgraph Camada_2["2. Use Cases (Application Layer - 100% Agnóstica)"]
         UC_Card["GetNextFlashcardUseCase, ReviewFlashcardUseCase, CreateFlashcardUseCase"]
+        UC_Sync["SyncStudyAnswersBatchUseCase"]
         UC_Question["ReviewQuestionUseCase, GetDueQuestionsUseCase"]
-        UC_Ports["Protocols: IFlashcardRepo, IQuestionRepo, IAuditRepo, ISessionRepo"]
+        UC_Ports["Protocols: IFlashcardRepo, ISessionStore, IQuestionRepo, IAuditRepo"]
     end
 
     subgraph Camada_1["1. Entities & Domain Services (Core Puro)"]
-        E_Flashcard["Flashcard Entity (Position & Contents)"]
-        E_Session["FlashcardPoolSession Entity"]
+        E_Flashcard["Flashcard Entity (Imutável em Sessão)"]
+        E_Session["FlashcardPoolSession Entity (@dataclass slots=True, Fila de UUIDs)"]
         E_Question["Question Entity (SRS Level & Date)"]
         E_Audit["ReviewAuditLog Entity"]
-        DS_Pool["FlashcardPoolService (Gap Indexing, Middle Point Insert, Round Shuffle)"]
+        DS_Pool["FlashcardPoolService (Gap Indexing, Inserção 10%, Shuffle Efêmero)"]
         DS_Spacing["SpacingPolicyService (1..180d, Nível 6 -> 2)"]
     end
 
@@ -198,9 +219,9 @@ flowchart TD
 
 ## 6. Ambiente e Deploy
 
-* **Desenvolvimento Local:** Executado via `docker compose up` (FastAPI com hot-reload + PostgreSQL 16 persistente).
-* **Produção:** Neon Serverless PostgreSQL (Free Tier) + Render.com Web Service via Dockerfile multi-stage enxuto rodando sob usuário não-root.
-* **Segurança na Nuvem:** Autenticação de sessão ativada na borda para proteção dos dados pessoais em ambiente público, e encriptação com **AES-256-GCM** para segredos armazenados.
+* **Desenvolvimento Local:** Executado via `docker compose up` (FastAPI com hot-reload + PostgreSQL 16 + Redis 7 com healthchecks configurados).
+* **Produção:** PostgreSQL 16 gerenciado + Nó de Redis Cluster provisionado (6 a 8 GB de RAM) + Render/Cloud Run Web Service via Dockerfile multi-stage enxuto rodando sob usuário não-root.
+* **Segurança na Nuvem:** Autenticação de sessão na borda, cookies encriptados via **AES-256-GCM**, rate limiting em endpoints em lote e validação temporal contra tampering.
 
 ---
 
@@ -214,100 +235,51 @@ Para que qualquer Sprint seja considerada concluída e receba autorização de m
 5. [ ] **Qualidade Estática de Código:** Linters e checagem de tipos (Ruff format/check e Mypy strict) passando com zero alertas e sem supressões artificiais.
 6. [ ] **Aderência à Clean Architecture:** Núcleo de domínio Python puro (sem dependência de frameworks/ORM), use cases agnósticos e inversão de dependência via Protocols.
 7. [ ] **Auditoria Unânime da Bancada:** Pareceres formais assinados pelos **13 Especialistas** no template oficial de PR (`[APROVADO]` ou `[N/A JUSTIFICADO]`).
-8. [ ] **Paridade Docker Comprovada:** Aplicação e banco executando perfeitamente via `docker compose up`.
+8. [ ] **Paridade Docker Comprovada:** Aplicação, Redis e banco executando perfeitamente via `docker compose up`.
 9. [ ] **Pull Request Aberta no GitHub para Staging:** A sprint só é finalizada com a execução de `gh pr create` no GitHub apontando para `staging`, com documentação, 100% de cobertura, os 13 pareceres aprovados e a URL oficial entregue ao usuário.
 
 ### 7.1 Bancada dos 13 Especialistas de Auditoria e Qualidade
-
-Para assegurar excelência em todas as dimensões de entrega e confiabilidade, cada Pull Request para `staging` deve ser auditada e aprovada formalmente pelos 13 especialistas:
+Cada Pull Request para `staging` é auditada e aprovada formalmente pela bancada completa de especialistas:
 1. **Especialista de Produto (PO):** Aderência aos requisitos e valor de entrega do PRD sem escopo fantasma.
 2. **Especialista QA:** Testabilidade, integridade de cenários BDD e barreira de 100% de cobertura.
 3. **Especialista Arquiteto:** Preservação das fronteiras da Clean Architecture, regra de dependência e inversão via Protocols.
 4. **Especialista de Segurança:** Auditoria contra OWASP Top 10, sanitização defensiva, zero credenciais no repositório e testes de segurança AST.
-5. **Especialista de Telemetria:** Structured logging com correlation IDs, rastreabilidade e integridade operacional.
-6. **Especialista de UX:** Ergonomia de estudo, atalhos de teclado ágeis, feedback imediato e navegação touch em mobile.
-7. **Especialista de UI:** Design System consistente com Tailwind CSS, dark mode nativo e ausência de FOUC.
+5. **Especialista de Telemetria:** Structured logging com correlation IDs, rastreabilidade distribuída (W3C TraceContext) e métricas operacionais de Redis/banco.
+6. **Especialista de UX:** Ergonomia de estudo, transição fluida acelerada por GPU (120-150ms), atalhos de teclado ágeis, feedback de sincronização e navegação touch em mobile.
+7. **Especialista de UI:** Design System consistente com Tailwind CSS, tratamento dos 5 estados de interface, Flip 100% CSS 3D e ausência de FOUC.
 8. **Especialista de DevOps:** Paridade Dev/Prod via Docker Compose, contêiner multi-stage sob usuário não-root e esteiras modulares de CI/CD.
-9. **Especialista de Acessibilidade:** Conformidade estrita com WCAG 2.1 nível AA, navegação completa por teclado e semântica WAI-ARIA.
-10. **Especialista em LGPD:** Princípio da minimização de dados, proteção de privacidade e transparência.
-11. **Especialista de Performance de Programação Python:** Eficiência algorítmica assintótica Big-O (tempo e espaço), uso de geradores, lookup O(1) e ausência de loops redundantes no backend.
-12. **Especialista de Performance de Frontend:** Core Web Vitals (LCP, INP, CLS), Tailwind CSS estático minificado, ausência de layout thrashing e fragmentos HTMX parciais enxutos.
-13. **Especialista de Performance de Banco de Dados:** Eliminação do antipadrão N+1 queries via eager loading (selectinload), cobertura de índices B-tree/covering, persistência em lote atômica e ciclos curtos de transação.
+9. **Especialista de Acessibilidade:** Conformidade estrita com WCAG 2.1 nível AA, navegação completa por teclado com retenção de foco e semântica WAI-ARIA.
+10. **Especialista em LGPD:** Minimização de dados, purga de dados locais no logout e anonimização de histórico analítico sob o Art. 16, IV.
+11. **Especialista de Performance de Programação Python:** Eficiência Big-O, uso de `slots=True`, projeção escalar de IDs, pipelines não-bloqueantes (`redis.asyncio`/`asyncpg`) e serialização ultra-rápida (`orjson`).
+12. **Especialista de Performance de Frontend:** Core Web Vitals (LCP, INP $\le 50$ms via Web Worker, CLS zero com CSS Containment), Tailwind CSS estático minificado e prefetch preditivo com Low-Water Mark.
+13. **Especialista de Performance de Banco de Dados:** Eliminação de N+1 via `selectinload()`, particionamento temporal `PARTITION BY RANGE (reviewed_at)`, índices cobridores B-tree e ingestão atômica em batch.
 
 ---
 
-## 8. Roadmap Estratégico por Sprints
+## 8. Roadmap Estratégico de Evolução do Produto
+
+O desenvolvimento do **Study Reviewer** é estruturado em fases incrementais orientadas à entrega contínua de valor, escalabilidade e inteligência de estudo:
 
 ```mermaid
 flowchart TD
-    S1["Sprint 1: MVP Flashcards em Produção (Docker + Pool por Rodada com Gaps de 100)"] --> S2["Sprint 2: Autenticação & Multi-tenancy com Google (OAuth2 / OIDC)"]
-    S2 --> S3["Sprint 3: MVP Perguntas Abertas (SRS Manual)"]
-    S3 --> S4["Sprint 4: Sistema de Auditoria Completa"]
-    S4 --> S5["Sprint 5: App Mobile Dedicado em Flutter"]
-    S5 --> S6["Sprint 6: Dashboard Analítico de Performance"]
-    S6 --> S7["Sprint 7: Pesquisa, Arquitetura e Planejamento da IA & RAG de Livros"]
-    S7 --> S8["Sprint 8: IA com Resposta Escrita (Gemini Flash)"]
-    S8 --> S9["Sprint 9: IA com Resposta em Voz Efêmera (Gemini Multimodal)"]
+    M1["Marco 1: Fundação & Flashcards (Pool Dinâmica)"] --> M2["Marco 2: Identidade, Multi-tenancy & Sessões em Alta Escala"]
+    M2 --> M3["Marco 3: Perguntas Abertas & Repetição Espaçada (SRS Estrito)"]
+    M3 --> M4["Marco 4: Auditoria Histórica & Governança de Aprendizado"]
+    M4 --> M5["Marco 5: Expansão Multiplataforma (App Mobile)"]
+    M5 --> M6["Marco 6: Analytics Avançado & Colaboração"]
+    M6 --> M7["Marco 7: Inteligência Artificial & Avaliação Semântica Multimodal"]
 ```
 
-### 🎯 Sprint 1: MVP Flashcards em Produção (Concluída / Em Validação)
-* **Objetivo:** Sistema de flashcards funcional em produção na nuvem, rodando localmente via Docker, com suporte a estudo global ou por matéria/tema selecionado.
-* **Escopo:**
-  * Setup Docker Compose com PostgreSQL e FastAPI.
-  * Clean Architecture: Domínio de Flashcards com `FlashcardPoolService` operando via **Gap Indexing (múltiplos de 100)**:
-    * Inserção aleatória no ponto médio dos primeiros 10% da pool com rebalanceamento automático contra colisões.
-    * Navegação sequencial persistida via `FlashcardPoolSession` em banco de dados.
-    * Fim de rodada com shuffle completo redistribuindo a pool em múltiplos de 100.
-  * CRUD de Matérias, Temas e Flashcards com modo de cadastro ágil.
-  * Interface web responsiva Mobile-First com Jinja2 + HTMX + TailwindCSS.
-  * Suporte a Dark Mode nativo com prevenção de FOUC.
-  * Atalhos de teclado no desktop (`Espaço`/`Enter`) e gestos ergonômicos de toque no mobile.
-  * Autenticação de sessão na borda e criptografia AES-256-GCM para dados protegidos.
-  * Deploy do banco no Neon e do app no Render.
-* **Entregável:** Link de produção ativo no Render com Docker, sem auditoria analítica e 100% funcional.
+### 8.1 Matriz de Marcos Estratégicos (Product Milestones)
 
----
+| Marco | Dimensão de Valor | Principais Capacidades Entregues | Documentação Técnica de Execução |
+| :--- | :--- | :--- | :--- |
+| **Marco 1: Fundação & Flashcards** | Estudo Ativo Básico | Pool dinâmica por rodadas com Gap Indexing (múltiplos de 100), inserção nos primeiros 10%, atalhos ergonômicos de teclado e gestos touch, Clean Architecture e paridade Docker. | [`docs/specs/sprint-01-flashcards-spec.md`](docs/specs/sprint-01-flashcards-spec.md) |
+| **Marco 2: Identidade & Alta Escala** | Multi-usuário & Performance | Login Google (OAuth2/OIDC), isolamento multi-tenant, compartilhamento read-only de matérias e arquitetura de sessões em alta escala (500k RPS amortizados, Redis, Web Worker e particionamento temporal). | [`docs/specs/sprint-02-auth-multitenancy-spec.md`](docs/specs/sprint-02-auth-multitenancy-spec.md) |
+| **Marco 3: Perguntas Abertas (SRS)** | Retenção de Longo Prazo | Fila de repetição espaçada por calendário `[1..180d]`, promoção estrita a 100% de acerto e penalidade de regressão no Nível 6. | *Detalhamento técnico na SPEC da Sprint 03* |
+| **Marco 4: Auditoria de Performance** | Métricas & Compliance | Trilha de auditoria imutável de revisões, congelamento de nomes históricos e exportação de dados (LGPD). | *Detalhamento técnico na SPEC da Sprint 04* |
+| **Marco 5: Expansão Mobile** | Portabilidade & Ubiquidade | Aplicativo nativo/cross-platform em Flutter consumindo a API REST agnóstica existente. | *Detalhamento técnico na SPEC da Sprint 05* |
+| **Marco 6: Analytics & Colaboração** | Insights & Estudo Social | Dashboards analíticos de retenção, clonagem (fork) de matérias públicas e colaboração multi-editor. | *Detalhamento técnico na SPEC da Sprint 06* |
+| **Marco 7: IA & Avaliação Multimodal** | Correção Automatizada | Avaliação semântica de respostas abertas via Gemini Flash (texto) e Gemini Multimodal (áudio efêmero com descarte biométrico). | *Detalhamento técnico nas SPECs das Sprints 07, 08 e 09* |
 
-### 🎯 Sprint 2: Autenticação, Multi-tenancy & Compartilhamento Read-Only com Google (OAuth2 / OIDC) (Próxima Sprint)
-* **Objetivo:** Implementar autenticação centralizada via Google OAuth2 / OpenID Connect (OIDC), gestão de sessões seguras no backend (Web Jinja2/HTMX e API REST desacoplada para mobile), isolamento multi-inquilino (*multi-tenancy*) dos dados de estudo por usuário e suporte a **Compartilhamento Read-Only** de matérias (onde apenas o proprietário pode editar/excluir e outros estudantes podem estudar com sessões isoladas).
-* **Escopo:**
-  * **Clean Architecture & Domínio (Camada 1):**
-    * Entidade `User` rica (`id: UUID`, `email: str`, `name: str`, `avatar_url: str | None`, `google_sub: str`, `created_at: date`) com validação de formato e invariantes.
-    * Atualização da entidade `Subject` com `owner_id: UUID` e `is_public: bool = False`, além de métodos de autorização (`can_be_edited_by`, `can_be_studied_by`).
-    * Atualização da entidade `FlashcardPoolSession` (adição de `user_id: UUID`), garantindo que o progresso de estudo seja 100% individual, mesmo ao estudar matéria pública de outro usuário.
-  * **Casos de Uso e Portas Agnósticas (Camada 2):**
-    * `AuthenticateWithGoogleUseCase`: recebe credencial/código OIDC, valida integridade da assinatura via porta, busca ou provisiona o usuário (JIT Provisioning) e emite a sessão autenticada.
-    * `GetCurrentUserUseCase`: resolve a entidade do usuário ativo a partir do token de sessão.
-    * `LogoutUseCase`: revoga e invalida a sessão ativa.
-    * `ToggleSubjectPublicUseCase`: permite ao dono alternar a visibilidade da matéria.
-    * Adequação dos use cases de flashcards/matérias para exigir e validar a titularidade do usuário logado (`user_id`): mutações exigem estritamente `owner_id == user_id` e consultas de estudo aceitam matérias próprias ou públicas (`is_public=True`).
-    * Contratos abstratos (`typing.Protocol`): `IUserRepository`, `IGoogleAuthClient`, `ISessionTokenService`, `ISubjectRepository`.
-  * **Adaptadores de Interface & Persistência (Camada 3):**
-    * Implementação de `SqlAlchemyUserRepository`.
-    * Atualização de `SqlAlchemySubjectRepository`, `SqlAlchemyFlashcardRepository` e `SqlAlchemySessionRepository` com filtros por titularidade e visibilidade pública (prevenção contra IDOR).
-    * Controladores Web (`/auth/login`, `/auth/google`, `/auth/callback`, `/auth/logout`, `/subjects/{id}/toggle-public`) e API REST (`/api/v1/auth/*`).
-    * Modelos ORM atualizados (`UserModel`, FKs em `subjects` e `flashcard_pool_sessions`).
-  * **Frameworks, Infraestrutura & Segurança (Camada 4):**
-    * Migração versionada via Alembic criando tabela `users`, colunas `owner_id` e `is_public` em `subjects` e associando foreign keys com `ondelete="CASCADE"`.
-    * Cookies de sessão seguros com flags `HttpOnly`, `SameSite=Lax`, `Secure` e payload encriptado via **AES-256-GCM**.
-    * Middleware / Dependency Injection no FastAPI (`get_current_user`) para proteção de rotas privadas e redirecionamento amigável com header `HX-Redirect`.
-  * **Interface Web & UX/UI (Jinja2 + HTMX + TailwindCSS):**
-    * Página de boas-vindas/login com botão padrão "Continuar com o Google" (Google Identity Services compliant).
-    * Header com indicador do usuário autenticado (avatar, nome, menu dropdown com atalho de logout).
-    * Listagem de matérias diferenciando "Minhas Matérias" (com permissão de edição) de "Matérias Públicas / Compartilhadas" (em modo Read-Only).
-  * **LGPD & Governança de Segurança:**
-    * Minimização Estrita de Dados (apenas `sub`, `email` e `name`, sem escopos excessivos na Google API).
-    * Testes de segurança decorados com `@pytest.mark.security` cobrindo validação de token, proteção contra CSRF no fluxo OAuth via parâmetro `state` assinado, expiração de sessão e prevenção de IDOR multi-tenant.
-* **Entregável:** Sistema protegido por login Google em produção, sessões seguras, dados estritamente isolados por usuário, compartilhamento read-only ativo e 100% de cobertura de testes.
-
----
-
-### 📋 Sprints Futuras Subsequentes
-* **Sprint 3:** MVP Perguntas Abertas (Mecânica SRS Manual com Níveis 0 a 6).
-* **Sprint 4:** Sistema de Auditoria Completa de Performance (Logs Imutáveis).
-* **Sprint 5:** App Mobile Dedicado em Flutter.
-* **Sprint 6:** Dashboard Analítico de Performance & Análise de Compartilhamento Avançado (Clonagem/Fork de Matérias, Colaboração Multi-editor e Transferência de Propriedade).
-* **Sprint 7:** Pesquisa, Arquitetura e Planejamento da IA & RAG de Livros.
-* **Sprint 8:** IA com Resposta Escrita (Gemini Flash).
-* **Sprint 9:** IA com Resposta em Voz Efêmera (Gemini Multimodal).
-
+> 📌 **Governança Documental:** O detalhamento técnico de implementação de cada sprint (arquivos alterados, schemas DTO, migrações Alembic e rotinas de teste) reside exclusivamente nos documentos de **Especificação Técnica da Sprint** (`docs/specs/sprint-XX-*-spec.md`) e nas **Pull Requests de Fechamento** (`docs/sprints/sprint-XX/`). O presente PRD mantém o foco perpétuo na **Visão, Regras de Negócio e Requisitos Globais do Produto**.
