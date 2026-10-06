@@ -166,16 +166,55 @@
     }
   }
 
+  // Normaliza o objeto de card garantindo consistência entre camelCase e snake_case
+  function normalizeCard(rawCard) {
+    if (!rawCard) return null;
+    const currentIndex =
+      rawCard.currentIndex !== undefined
+        ? rawCard.currentIndex
+        : rawCard.current_index;
+    const totalCards =
+      rawCard.totalCards !== undefined
+        ? rawCard.totalCards
+        : rawCard.total_cards;
+    const roundNumber =
+      rawCard.roundNumber !== undefined
+        ? rawCard.roundNumber
+        : rawCard.round_number;
+    const sessionId =
+      rawCard.sessionId !== undefined
+        ? rawCard.sessionId
+        : rawCard.session_id;
+
+    return {
+      ...rawCard,
+      id: rawCard.id,
+      front: rawCard.front || "",
+      back: rawCard.back || "",
+      position: rawCard.position || 100,
+      currentIndex: parseInt(currentIndex || "1", 10),
+      current_index: parseInt(currentIndex || "1", 10),
+      totalCards: parseInt(totalCards || state.totalCards || "1", 10),
+      total_cards: parseInt(totalCards || state.totalCards || "1", 10),
+      roundNumber: parseInt(roundNumber || state.roundNumber || "1", 10),
+      round_number: parseInt(roundNumber || state.roundNumber || "1", 10),
+      sessionId: sessionId || state.sessionId || null,
+      session_id: sessionId || state.sessionId || null,
+      topic_names: rawCard.topic_names || [],
+    };
+  }
+
   // Enfileira evento de estudo no Worker ou via fallback volátil
   function dispatchStudyEvent(card) {
     if (!card || !state.sessionId) return;
+    const normalized = normalizeCard(card);
 
     const eventPayload = {
       id: crypto.randomUUID ? crypto.randomUUID() : null,
-      card_id: card.id,
+      card_id: normalized.id,
       session_id: state.sessionId,
       reviewed_at: new Date().toISOString(),
-      current_index: card.current_index,
+      current_index: normalized.currentIndex,
       status: "viewed",
       device_id: state.deviceId,
     };
@@ -193,6 +232,9 @@
   // Virar o card em 0ms (Client-Side CSS 3D)
   function flipCard() {
     if (!els.surface) return;
+
+    // Remove qualquer transform inline para que as regras CSS 3D funcionem perfeitamente
+    els.surface.style.removeProperty("transform");
 
     const isCurrentlyFlipped = els.surface.classList.contains("is-flipped");
     if (isCurrentlyFlipped) {
@@ -222,23 +264,28 @@
   function renderCard(card, isNewRound = false) {
     if (!els.surface) return;
 
-    // Reseta flip
-    els.surface.classList.remove("is-flipped");
+    const normalized = normalizeCard(card);
+    state.currentCard = normalized;
 
-    // Animação acelerada por GPU (120-150ms)
-    els.surface.classList.add("card-transition-gpu");
-    els.surface.style.opacity = "0.7";
-    els.surface.style.transform = "scale(0.985)";
+    // Reseta estado de flip visual e classes/estilos residuais
+    els.surface.classList.remove("is-flipped");
+    els.surface.style.removeProperty("transform");
+    if (els.btnFlipLabel) {
+      els.btnFlipLabel.textContent = "Virar Card (Espaço)";
+    }
+
+    // Micro-transição suave com fade de opacidade (sem poluir o transform 3D)
+    els.surface.style.opacity = "0.6";
 
     setTimeout(() => {
       // Atualiza textos
-      if (els.frontText) els.frontText.textContent = card.front;
-      if (els.backText) els.backText.textContent = card.back;
-      if (els.frontPos) els.frontPos.textContent = `#${card.position}`;
-      if (els.backPos) els.backPos.textContent = `#${card.position}`;
+      if (els.frontText) els.frontText.textContent = normalized.front;
+      if (els.backText) els.backText.textContent = normalized.back;
+      if (els.frontPos) els.frontPos.textContent = `#${normalized.position}`;
+      if (els.backPos) els.backPos.textContent = `#${normalized.position}`;
 
       // Atualiza tópicos
-      const topicsHtml = (card.topic_names || [])
+      const topicsHtml = (normalized.topic_names || [])
         .map(
           (t) =>
             `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 max-w-full break-words-anywhere" title="${t}"><span class="mr-1 shrink-0" aria-hidden="true">🏷️</span><span>${t}</span></span>`
@@ -248,33 +295,40 @@
       if (els.frontTopics) els.frontTopics.innerHTML = topicsHtml;
       if (els.backTopics) els.backTopics.innerHTML = topicsHtml;
 
-      // Atualiza atributos de acessibilidade
-      els.surface.setAttribute("data-card-id", card.id);
+      // Atualiza atributos do dataset e acessibilidade
+      els.surface.setAttribute("data-card-id", normalized.id);
+      els.surface.setAttribute("data-current-index", normalized.currentIndex);
+      els.surface.setAttribute("data-total-cards", normalized.totalCards);
+      els.surface.setAttribute("data-round-number", normalized.roundNumber);
+      els.surface.setAttribute("data-position", normalized.position);
+      if (normalized.sessionId) {
+        els.surface.setAttribute("data-session-id", normalized.sessionId);
+      }
       els.surface.setAttribute(
         "aria-label",
         "Pergunta do card. Pressione espaço ou clique para revelar a resposta."
       );
-      if (els.btnFlipLabel) els.btnFlipLabel.textContent = "Virar Card (Espaço)";
 
       // Atualiza indicador de progresso
       if (els.progress) {
         els.progress.innerHTML = `
           <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-          <span>Card <strong class="text-slate-900 dark:text-white">${card.current_index}</strong> de <strong class="text-slate-900 dark:text-white">${card.total_cards || state.totalCards}</strong></span>
+          <span>Card <strong class="text-slate-900 dark:text-white">${normalized.currentIndex}</strong> de <strong class="text-slate-900 dark:text-white">${normalized.totalCards}</strong></span>
           <span>•</span>
-          <span>Rodada <strong class="text-slate-900 dark:text-white">${card.round_number || state.roundNumber}</strong></span>
+          <span>Rodada <strong class="text-slate-900 dark:text-white">${normalized.roundNumber}</strong></span>
         `;
       }
 
       // Região viva do leitor de tela
       if (els.announcer) {
         const prefix = isNewRound ? "Nova rodada iniciada. " : "";
-        els.announcer.textContent = `${prefix}Card número ${card.current_index} de ${card.total_cards || state.totalCards}, Rodada ${card.round_number || state.roundNumber}. Pergunta: ${card.front}`;
+        els.announcer.textContent = `${prefix}Card número ${normalized.currentIndex} de ${normalized.totalCards}, Rodada ${normalized.roundNumber}. Pergunta: ${normalized.front}`;
       }
 
-      // Conclui transição GPU
-      els.surface.style.opacity = "1";
-      els.surface.style.transform = "scale(1)";
+      // Conclui transição restaurando opacidade e garantindo zero transform inline
+      els.surface.style.removeProperty("opacity");
+      els.surface.style.removeProperty("transform");
+      els.surface.classList.remove("card-transition-gpu");
 
       // Retenção programática de foco (WCAG 2.1 AA)
       els.surface.focus();
@@ -283,15 +337,20 @@
 
   // Exibe a tela de vitória / conclusão de rodada (Victory State)
   function showVictoryState(completedRound) {
-    if (els.surface && els.surface.parentElement) {
-      els.surface.parentElement.classList.add("hidden");
+    if (els.surface) {
+      els.surface.classList.remove("is-flipped");
+      els.surface.style.removeProperty("transform");
+      els.surface.style.removeProperty("opacity");
+      if (els.surface.parentElement) {
+        els.surface.parentElement.classList.add("hidden");
+      }
     }
     const actionBtns = els.btnFlip ? els.btnFlip.parentElement : null;
     if (actionBtns) actionBtns.classList.add("hidden");
 
     const roundToShow =
       completedRound ||
-      (state.currentCard ? state.currentCard.roundNumber : state.roundNumber);
+      (state.currentCard ? (state.currentCard.roundNumber || state.currentCard.round_number) : state.roundNumber);
     if (els.statCards) els.statCards.textContent = state.totalCards;
     if (els.statRound) els.statRound.textContent = roundToShow;
     if (els.victoryState) els.victoryState.classList.remove("hidden");
@@ -307,8 +366,16 @@
   // Oculta victory state e exibe a superfície do card
   function hideVictoryState() {
     if (els.victoryState) els.victoryState.classList.add("hidden");
-    if (els.surface && els.surface.parentElement) {
-      els.surface.parentElement.classList.remove("hidden");
+    if (els.surface) {
+      els.surface.classList.remove("is-flipped");
+      els.surface.style.removeProperty("transform");
+      els.surface.style.removeProperty("opacity");
+      if (els.surface.parentElement) {
+        els.surface.parentElement.classList.remove("hidden");
+      }
+    }
+    if (els.btnFlipLabel) {
+      els.btnFlipLabel.textContent = "Virar Card (Espaço)";
     }
     const actionBtns = els.btnFlip ? els.btnFlip.parentElement : null;
     if (actionBtns) actionBtns.classList.remove("hidden");
@@ -375,14 +442,14 @@
       state.isAdvancing = false;
     }, 130);
 
-    const finishedCard = state.currentCard;
+    const finishedCard = normalizeCard(state.currentCard);
 
     // 1. Enfileira o evento do card que acaba de ser estudado
     dispatchStudyEvent(finishedCard);
 
     // 2. Se a fila em memória tiver o próximo card, avança imediatamente
     if (state.cardQueue.length > 0) {
-      const nextCard = state.cardQueue.shift();
+      const nextCard = normalizeCard(state.cardQueue.shift());
       state.currentCard = nextCard;
       renderCard(nextCard);
       prefetchBatchIfNeeded();
@@ -394,16 +461,16 @@
       const params = new URLSearchParams();
       if (state.subjectId) params.set("subject_id", state.subjectId);
       if (state.topicId) params.set("topic_id", state.topicId);
-      if (finishedCard && finishedCard.currentIndex) {
-        params.set("current_index", finishedCard.currentIndex.toString());
+      if (finishedCard && (finishedCard.currentIndex || finishedCard.current_index)) {
+        params.set("current_index", (finishedCard.currentIndex || finishedCard.current_index).toString());
       }
 
       const resp = await fetch(`/api/v1/study/next?${params.toString()}`);
       if (resp.ok) {
-        const nextCard = await resp.json();
+        const nextCard = normalizeCard(await resp.json());
         const wasLastCard =
           finishedCard && finishedCard.currentIndex >= state.totalCards;
-        if (nextCard.round_shuffled || nextCard.current_index === 1 || wasLastCard) {
+        if (nextCard.round_shuffled || nextCard.currentIndex === 1 || wasLastCard) {
           // Rodada concluiu! Salva o primeiro card da próxima rodada para quando o usuário clicar
           state.nextRoundFirstCard = nextCard;
           showVictoryState(finishedCard ? finishedCard.roundNumber : state.roundNumber);
@@ -425,13 +492,14 @@
     hideVictoryState();
     state.hasMore = true;
     state.cardQueue = [];
+    bindCardEvents();
 
     if (state.nextRoundFirstCard) {
-      const nextCard = state.nextRoundFirstCard;
+      const nextCard = normalizeCard(state.nextRoundFirstCard);
       state.nextRoundFirstCard = null;
       state.currentCard = nextCard;
-      state.roundNumber = nextCard.round_number;
-      state.totalCards = nextCard.total_cards;
+      state.roundNumber = nextCard.roundNumber;
+      state.totalCards = nextCard.totalCards;
       renderCard(nextCard, true);
       prefetchBatchIfNeeded();
       return;
@@ -444,10 +512,10 @@
 
       const resp = await fetch(`/api/v1/study/next?${params.toString()}`);
       if (resp.ok) {
-        const nextCard = await resp.json();
+        const nextCard = normalizeCard(await resp.json());
         state.currentCard = nextCard;
-        state.roundNumber = nextCard.round_number;
-        state.totalCards = nextCard.total_cards;
+        state.roundNumber = nextCard.roundNumber;
+        state.totalCards = nextCard.totalCards;
         renderCard(nextCard, true);
         prefetchBatchIfNeeded();
       } else {
@@ -594,16 +662,16 @@
     state.isAdvancing = false;
 
     if (els.surface) {
-      state.currentCard = {
+      state.currentCard = normalizeCard({
         id: els.surface.getAttribute("data-card-id"),
         sessionId: els.surface.getAttribute("data-session-id") || null,
-        front: els.frontText ? els.frontText.textContent : "",
-        back: els.backText ? els.backText.textContent : "",
+        front: els.frontText ? els.frontText.textContent.trim() : "",
+        back: els.backText ? els.backText.textContent.trim() : "",
         currentIndex: parseInt(els.surface.getAttribute("data-current-index") || "1", 10),
         totalCards: parseInt(els.surface.getAttribute("data-total-cards") || "1", 10),
         roundNumber: parseInt(els.surface.getAttribute("data-round-number") || "1", 10),
         position: parseInt(els.surface.getAttribute("data-position") || "100", 10),
-      };
+      });
       state.sessionId = state.currentCard.sessionId;
       state.totalCards = state.currentCard.totalCards;
       state.roundNumber = state.currentCard.roundNumber;
@@ -633,16 +701,16 @@
 
     // Inicializa dados do card ativo se presente no DOM
     if (els.surface) {
-      state.currentCard = {
+      state.currentCard = normalizeCard({
         id: els.surface.getAttribute("data-card-id"),
         sessionId: els.surface.getAttribute("data-session-id") || null,
-        front: els.frontText ? els.frontText.textContent : "",
-        back: els.backText ? els.backText.textContent : "",
+        front: els.frontText ? els.frontText.textContent.trim() : "",
+        back: els.backText ? els.backText.textContent.trim() : "",
         currentIndex: parseInt(els.surface.getAttribute("data-current-index") || "1", 10),
         totalCards: parseInt(els.surface.getAttribute("data-total-cards") || "1", 10),
         roundNumber: parseInt(els.surface.getAttribute("data-round-number") || "1", 10),
         position: parseInt(els.surface.getAttribute("data-position") || "100", 10),
-      };
+      });
       state.sessionId = state.currentCard.sessionId;
       state.totalCards = state.currentCard.totalCards;
       state.roundNumber = state.currentCard.roundNumber;
