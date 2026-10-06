@@ -36,6 +36,11 @@ Parameters:
     Default: ""
     Description: 'Google OAuth Client Secret'
 
+  GoogleRedirectUri:
+    Type: String
+    Default: ""
+    Description: 'URI de redirecionamento do Google OAuth (opcional; se omitido, sera inferido dinamicamente)'
+
   LambdaRoleArn:
     Type: String
     Default: ""
@@ -122,6 +127,7 @@ Resources:
           SECRET_KEY: !Ref SecretKey
           GOOGLE_CLIENT_ID: !Ref GoogleClientId
           GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
+          GOOGLE_REDIRECT_URI: !Ref GoogleRedirectUri
           STUDY_EVENTS_BACKEND: "dynamodb"
           DYNAMODB_TABLE_STUDY_EVENTS: !Ref StudyEventsTable
           DYNAMODB_TTL_DAYS: "90"

@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # Google OAuth 2.0 / OIDC
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/callback"
+    GOOGLE_REDIRECT_URI: str = ""
 
     # Redis Cache & Efêmero
     REDIS_URL: str = "redis://localhost:6379/0"
