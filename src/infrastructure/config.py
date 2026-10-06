@@ -28,5 +28,12 @@ class Settings(BaseSettings):
     # Redis Cache & Efêmero
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Backend de Eventos de Estudo: 'postgres' ou 'dynamodb'
+    STUDY_EVENTS_BACKEND: str = "postgres"
+    DYNAMODB_TABLE_STUDY_EVENTS: str = "study_events"
+    AWS_REGION: str = "us-east-1"
+    DYNAMODB_ENDPOINT_URL: str | None = None
+    DYNAMODB_TTL_DAYS: int = 90
+
 
 settings = Settings()

@@ -24,6 +24,7 @@ from src.application.dto.study_dto import (
 )
 from src.application.dto.subject_dto import CreateSubjectDTO, SubjectDTO
 from src.application.dto.topic_dto import CreateTopicDTO, TopicDTO
+from src.application.ports.repositories import IStudyEventRepository
 from src.application.use_cases.auth_use_cases import ToggleSubjectPublicUseCase
 from src.application.use_cases.flashcard_use_cases import CreateFlashcardUseCase
 from src.application.use_cases.study_session_use_cases import (
@@ -47,6 +48,7 @@ from src.domain.exceptions import (
     EntityNotFoundError,
     ResourceOwnershipError,
 )
+from src.infrastructure.config import settings
 from src.infrastructure.database import get_db
 from src.infrastructure.rng import default_rng
 from src.infrastructure.security.dependencies import get_current_user
@@ -201,12 +203,24 @@ def mark_card_read_api(
     return {"status": "ok"}
 
 
+def get_study_event_repo(db: Session = Depends(get_db)) -> IStudyEventRepository:
+    """Resolve o repositório de eventos de estudo (DynamoDB ou PostgreSQL)."""
+    if settings.STUDY_EVENTS_BACKEND == "dynamodb":
+        from src.adapters.persistence.dynamodb_study_event_repository import (
+            DynamoDbStudyEventRepository,
+        )
+
+        return DynamoDbStudyEventRepository()
+    return SqlAlchemyStudyEventRepository(db)
+
+
 @api_router.post("/study/sync-answers", response_model=SyncAnswersResponseModel)
 def sync_answers_api(
     request: Request,
     payload: SyncAnswersPayload,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    event_repo: IStudyEventRepository = Depends(get_study_event_repo),
 ) -> SyncAnswersResponseModel:
     """Ingestão em lote de respostas com blindagem anti-IDOR, rate limit e idempotência."""
     content_length = request.headers.get("content-length")
@@ -224,7 +238,9 @@ def sync_answers_api(
             headers={"Retry-After": "60"},
         )
 
-    event_repo = SqlAlchemyStudyEventRepository(db)
+    if getattr(event_repo, "bulk_insert", None) is None:
+        event_repo = get_study_event_repo(db)
+
     session_repo = SqlAlchemySessionRepository(db)
     use_case = SyncStudyAnswersUseCase(event_repo, session_repo)
 

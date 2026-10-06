@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from src.adapters.api.controllers import (
     SyncAnswersPayload,
     SyncAnswersResponseModel,
+    get_study_event_repo,
     sync_answers_api,
 )
 from src.adapters.persistence.repositories import (
@@ -24,6 +25,7 @@ from src.application.dto.flashcard_dto import CreateFlashcardDTO
 from src.application.dto.study_dto import GetNextCardDTO, StudyCardDTO
 from src.application.dto.subject_dto import CreateSubjectDTO
 from src.application.dto.topic_dto import CreateTopicDTO
+from src.application.ports.repositories import IStudyEventRepository
 from src.application.use_cases.auth_use_cases import ToggleSubjectPublicUseCase
 from src.application.use_cases.flashcard_use_cases import CreateFlashcardUseCase
 from src.application.use_cases.study_session_use_cases import (
@@ -204,9 +206,12 @@ def sync_answers_web_alias(
     payload: SyncAnswersPayload,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    event_repo: IStudyEventRepository = Depends(get_study_event_repo),
 ) -> SyncAnswersResponseModel:
     """Alias direto para /study/sync-answers delegando para o controlador de API (Seção 9.2)."""
-    return sync_answers_api(request, payload, db=db, current_user=current_user)
+    return sync_answers_api(
+        request, payload, db=db, current_user=current_user, event_repo=event_repo
+    )
 
 
 @web_router.get("/flashcards/new", response_class=HTMLResponse)

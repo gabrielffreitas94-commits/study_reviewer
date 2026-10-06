@@ -536,3 +536,42 @@ def test_sync_answers_use_case_direct_validations(db_session: Session) -> None:
             ),
             user_id=dummy_user.id,
         )
+
+
+@pytest.mark.unit
+def test_sync_answers_api_direct_call_fallback_event_repo(
+    db_session: Session, test_user: User
+) -> None:
+    """Verifica que sync_answers_api resolve get_study_event_repo quando event_repo é None."""
+    from unittest.mock import MagicMock
+
+    from src.adapters.api.controllers import (
+        StudyEventItemRequest,
+        SyncAnswersPayload,
+        sync_answers_api,
+    )
+
+    study_session, cards = _seed_study_session(db_session, test_user)
+    mock_request = MagicMock()
+    mock_request.headers.get.return_value = None
+
+    payload = SyncAnswersPayload(
+        session_id=study_session.id,
+        events=[
+            StudyEventItemRequest(
+                id=uuid4(),
+                card_id=cards[0].id,
+                reviewed_at=datetime.now(UTC),
+                status="viewed",
+            )
+        ],
+    )
+    res = sync_answers_api(
+        request=mock_request,
+        payload=payload,
+        db=db_session,
+        current_user=test_user,
+        event_repo=None,  # type: ignore[arg-type]
+    )
+    assert res.status == "ok"
+    assert res.synced_count == 1

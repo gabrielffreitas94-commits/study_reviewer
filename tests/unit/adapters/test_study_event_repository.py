@@ -1,11 +1,16 @@
-"""Testes unitários para o SqlAlchemyStudyEventRepository."""
+"""Testes unitários para o SqlAlchemyStudyEventRepository e factory de repositório."""
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from moto import mock_aws
 
+from src.adapters.api.controllers import get_study_event_repo
+from src.adapters.persistence.dynamodb_study_event_repository import (
+    DynamoDbStudyEventRepository,
+)
 from src.adapters.persistence.repositories import SqlAlchemyStudyEventRepository
 
 
@@ -45,3 +50,24 @@ def test_study_event_repository_bulk_insert_postgresql_dialect() -> None:
     assert res == 1
     mock_session.execute.assert_called_once()
     mock_session.commit.assert_called_once()
+
+
+@pytest.mark.unit
+def test_get_study_event_repo_returns_dynamodb_when_configured() -> None:
+    """Verifica resolução do repositório DynamoDB quando STUDY_EVENTS_BACKEND é 'dynamodb'."""
+    with (
+        mock_aws(),
+        patch("src.adapters.api.controllers.settings.STUDY_EVENTS_BACKEND", "dynamodb"),
+    ):
+        mock_session = MagicMock()
+        repo = get_study_event_repo(mock_session)
+        assert isinstance(repo, DynamoDbStudyEventRepository)
+
+
+@pytest.mark.unit
+def test_get_study_event_repo_returns_sqlalchemy_when_postgres() -> None:
+    """Verifica resolução do repositório SQLAlchemy quando STUDY_EVENTS_BACKEND é 'postgres'."""
+    with patch("src.adapters.api.controllers.settings.STUDY_EVENTS_BACKEND", "postgres"):
+        mock_session = MagicMock()
+        repo = get_study_event_repo(mock_session)
+        assert isinstance(repo, SqlAlchemyStudyEventRepository)
