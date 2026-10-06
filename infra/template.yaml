@@ -115,7 +115,6 @@ Resources:
           GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
           STUDY_EVENTS_BACKEND: "dynamodb"
           DYNAMODB_TABLE_STUDY_EVENTS: !Ref StudyEventsTable
-          AWS_REGION: !Ref "AWS::Region"
           DYNAMODB_TTL_DAYS: "90"
       Tags:
         - Key: Project
