@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 import src.adapters.persistence.models  # noqa: F401
 from alembic import context
 from src.infrastructure.config import settings
-from src.infrastructure.database import Base
+from src.infrastructure.database import Base, normalize_database_url
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -19,7 +19,7 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 target_metadata = Base.metadata
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", normalize_database_url(settings.DATABASE_URL))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

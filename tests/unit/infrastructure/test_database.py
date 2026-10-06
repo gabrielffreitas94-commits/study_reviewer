@@ -4,7 +4,30 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.infrastructure.database import _setup_sqlite_functions, get_db, get_engine_args
+from src.infrastructure.database import (
+    _setup_sqlite_functions,
+    get_db,
+    get_engine_args,
+    normalize_database_url,
+)
+
+
+@pytest.mark.unit
+def test_normalize_database_url() -> None:
+    """Verifica normalização de dialetos para postgresql+psycopg2."""
+    assert (
+        normalize_database_url("postgres://user:pass@host/db")
+        == "postgresql+psycopg2://user:pass@host/db"
+    )
+    assert (
+        normalize_database_url("postgresql://user:pass@host/db")
+        == "postgresql+psycopg2://user:pass@host/db"
+    )
+    assert (
+        normalize_database_url("postgresql+asyncpg://user:pass@host/db")
+        == "postgresql+asyncpg://user:pass@host/db"
+    )
+    assert normalize_database_url("sqlite:///./test.db") == "sqlite:///./test.db"
 
 
 @pytest.mark.unit

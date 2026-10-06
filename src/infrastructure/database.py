@@ -21,6 +21,15 @@ def _setup_sqlite_functions(dbapi_connection: Any, connection_record: Any) -> No
         dbapi_connection.create_function("lower", 1, str.lower)
 
 
+def normalize_database_url(url: str) -> str:
+    """Normaliza URLs de postgres/postgresql para postgresql+psycopg2."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return url
+
+
 def get_engine_args(url: str) -> dict[str, Any]:
     """Retorna argumentos de conexão adequados para o dialeto do banco de dados."""
     if url.startswith("sqlite"):
@@ -28,7 +37,8 @@ def get_engine_args(url: str) -> dict[str, Any]:
     return {"pool_pre_ping": True}
 
 
-engine = create_engine(settings.DATABASE_URL, **get_engine_args(settings.DATABASE_URL))
+db_url = normalize_database_url(settings.DATABASE_URL)
+engine = create_engine(db_url, **get_engine_args(db_url))
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
