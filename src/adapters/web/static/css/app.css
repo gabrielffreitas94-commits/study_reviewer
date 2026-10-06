@@ -83,10 +83,11 @@ html.dark body {
   min-height: 380px;
   transition: transform 0.25s ease-in-out;
   transform-style: preserve-3d;
+  transform: rotateY(0deg);
 }
 
 .card-inner.is-flipped, .card-inner.card-flipped {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) !important;
 }
 
 .card-face, .card-front, .card-back {

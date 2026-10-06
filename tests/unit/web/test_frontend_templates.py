@@ -65,3 +65,27 @@ def test_base_template_enforces_csp_and_security_meta() -> None:
         or "pular para o conteúdo" in content.lower()
     )
     assert has_skip
+
+
+@pytest.mark.unit
+def test_card_flip_css_and_study_js_transform_hygiene() -> None:
+    """Garante que app.css e study.js preservem o flip 3D sem conflito com transforms."""
+    app_css = Path("src/adapters/web/static/css/app.css")
+    assert app_css.exists(), "src/adapters/web/static/css/app.css deve existir!"
+    css_content = app_css.read_text(encoding="utf-8")
+    assert "transform: rotateY(180deg) !important;" in css_content, (
+        ".card-inner.is-flipped deve conter '!important' no rotateY(180deg)."
+    )
+    assert "transform: rotateY(0deg);" in css_content, (
+        ".card-inner deve definir rotação base 'transform: rotateY(0deg);'."
+    )
+
+    study_js = Path("src/adapters/web/static/js/study.js")
+    assert study_js.exists(), "src/adapters/web/static/js/study.js deve existir!"
+    js_content = study_js.read_text(encoding="utf-8")
+    assert 'els.surface.style.removeProperty("transform");' in js_content, (
+        "study.js deve limpar qualquer propriedade transform inline no card-surface."
+    )
+    assert "normalizeCard(" in js_content, (
+        "study.js deve utilizar normalizeCard para garantir consistência entre rodadas."
+    )
