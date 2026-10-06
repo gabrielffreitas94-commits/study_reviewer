@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "Study Reviewer"
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     DATABASE_URL: str = "sqlite:///./study_reviewer.db"
     SECRET_KEY: str = "super-secret-key-study-reviewer-32b-length!"  # noqa: S105
     HOST: str = "0.0.0.0"  # noqa: S104

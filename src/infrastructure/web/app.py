@@ -1,5 +1,6 @@
 """Fábrica da aplicação FastAPI (Camada 4 - Frameworks & Drivers)."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -10,6 +11,8 @@ from src.adapters.web.controllers import web_router
 from src.infrastructure.config import settings
 from src.infrastructure.database import Base, engine
 from src.infrastructure.security.middleware import SecurityHeadersMiddleware
+
+logger = logging.getLogger("study_reviewer")
 
 
 @asynccontextmanager
@@ -23,7 +26,7 @@ def create_app() -> FastAPI:
     """Cria e configura a instância do FastAPI com middlewares e roteadores."""
     app = FastAPI(
         title=settings.APP_NAME,
-        debug=settings.DEBUG,
+        debug=False,
         lifespan=lifespan,
     )
 
@@ -69,6 +72,28 @@ def create_app() -> FastAPI:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         return RedirectResponse(url="/auth/login", status_code=303)
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception) -> Response:
+        logger.exception(
+            "Erro interno não tratado ao processar %s %s: %s",
+            request.method,
+            request.url.path,
+            exc,
+        )
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal Server Error"},
+            )
+        html_content = (
+            "<!DOCTYPE html><html><body>"
+            "<h1>500 Erro Interno do Servidor</h1>"
+            "<p>Ocorreu um erro inesperado no servidor.</p>"
+            "<a href='/study'>Voltar ao Estudo</a>"
+            "</body></html>"
+        )
+        return HTMLResponse(status_code=500, content=html_content)
 
     app.include_router(auth_router)
     app.include_router(api_auth_router)

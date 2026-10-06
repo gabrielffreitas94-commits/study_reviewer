@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 from datetime import UTC
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -55,7 +56,7 @@ def client(test_user: User) -> Generator[TestClient]:
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
-    with TestClient(app) as test_client:
+    with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
 
     app.dependency_overrides.clear()
@@ -331,3 +332,31 @@ def test_study_sync_answers_web_alias(client: TestClient) -> None:
     data = resp.json()
     assert data["status"] == "ok"
     assert data["synced_count"] == 1
+
+
+def test_global_exception_handler_web(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifica que exceções não tratadas em rotas Web retornam HTML 500 amigável."""
+    from src.application.use_cases.subject_use_cases import ListSubjectsUseCase
+
+    def mock_execute(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("Erro inesperado simulado no banco")
+
+    monkeypatch.setattr(ListSubjectsUseCase, "execute", mock_execute)
+
+    response = client.get("/study")
+    assert response.status_code == 500
+    assert "500 Erro Interno do Servidor" in response.text
+
+
+def test_global_exception_handler_api(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifica que exceções não tratadas em rotas API retornam JSON 500 estruturado."""
+    from src.application.use_cases.subject_use_cases import ListSubjectsUseCase
+
+    def mock_execute(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("Falha de conexão com banco de dados")
+
+    monkeypatch.setattr(ListSubjectsUseCase, "execute", mock_execute)
+
+    response = client.get("/api/v1/subjects")
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Internal Server Error"}
