@@ -360,3 +360,31 @@ def test_global_exception_handler_api(client: TestClient, monkeypatch: pytest.Mo
     response = client.get("/api/v1/subjects")
     assert response.status_code == 500
     assert response.json() == {"detail": "Internal Server Error"}
+
+
+@pytest.mark.integration
+def test_study_view_btn_next_does_not_have_hx_post_and_victory_state_is_interactive(
+    client: TestClient,
+) -> None:
+    """Verifica que btn-next é desacoplado do HTMX (prevenindo flash do victory state)."""
+    sub = client.post("/api/v1/subjects", json={"name": "Biologia"}).json()
+    top = client.post("/api/v1/topics", json={"subject_id": sub["id"], "name": "Genética"}).json()
+    client.post(
+        "/api/v1/flashcards",
+        json={"topic_id": top["id"], "front": "DNA", "back": "Ácido Desoxirribonucleico"},
+    )
+
+    resp = client.get(f"/study?topic_id={top['id']}")
+    assert resp.status_code == 200
+    assert 'id="btn-next"' in resp.text
+    assert 'hx-post="/study/next"' not in resp.text
+    assert 'id="victory-state"' in resp.text
+    assert "cursor-pointer" in resp.text
+
+    # Verifica avanço HTMX suportando current_index
+    resp_next = client.post(
+        "/study/next",
+        data={"topic_id": top["id"], "current_index": 1},
+    )
+    assert resp_next.status_code == 200
+    assert "flashcard-container" in resp_next.text

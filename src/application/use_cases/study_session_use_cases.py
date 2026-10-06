@@ -68,6 +68,9 @@ class GetNextFlashcardUseCase:
             else:
                 session.current_index = 0
 
+        if input_dto.current_index is not None and input_dto.current_index > 0:
+            session.current_index = max(session.current_index, input_dto.current_index)
+
         round_shuffled = False
         if session.is_round_finished():
             # Fim de rodada: projeta e embaralha lista escalar de UUIDs exclusivamente na sessão

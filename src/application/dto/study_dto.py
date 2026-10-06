@@ -11,6 +11,7 @@ class GetNextCardDTO:
 
     subject_id: UUID | None = None
     topic_id: UUID | None = None
+    current_index: int | None = None
 
 
 @dataclass(frozen=True)

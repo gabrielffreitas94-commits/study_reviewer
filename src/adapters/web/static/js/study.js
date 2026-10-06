@@ -19,6 +19,7 @@
   const state = {
     cardQueue: [],
     currentCard: null,
+    nextRoundFirstCard: null,
     sessionId: null,
     subjectId: null,
     topicId: null,
@@ -281,15 +282,18 @@
   }
 
   // Exibe a tela de vitória / conclusão de rodada (Victory State)
-  function showVictoryState() {
+  function showVictoryState(completedRound) {
     if (els.surface && els.surface.parentElement) {
       els.surface.parentElement.classList.add("hidden");
     }
     const actionBtns = els.btnFlip ? els.btnFlip.parentElement : null;
     if (actionBtns) actionBtns.classList.add("hidden");
 
+    const roundToShow =
+      completedRound ||
+      (state.currentCard ? state.currentCard.roundNumber : state.roundNumber);
     if (els.statCards) els.statCards.textContent = state.totalCards;
-    if (els.statRound) els.statRound.textContent = state.roundNumber;
+    if (els.statRound) els.statRound.textContent = roundToShow;
     if (els.victoryState) els.victoryState.classList.remove("hidden");
 
     if (els.announcer) {
@@ -371,8 +375,10 @@
       state.isAdvancing = false;
     }, 130);
 
+    const finishedCard = state.currentCard;
+
     // 1. Enfileira o evento do card que acaba de ser estudado
-    dispatchStudyEvent(state.currentCard);
+    dispatchStudyEvent(finishedCard);
 
     // 2. Se a fila em memória tiver o próximo card, avança imediatamente
     if (state.cardQueue.length > 0) {
@@ -388,29 +394,49 @@
       const params = new URLSearchParams();
       if (state.subjectId) params.set("subject_id", state.subjectId);
       if (state.topicId) params.set("topic_id", state.topicId);
+      if (finishedCard && finishedCard.currentIndex) {
+        params.set("current_index", finishedCard.currentIndex.toString());
+      }
 
       const resp = await fetch(`/api/v1/study/next?${params.toString()}`);
       if (resp.ok) {
         const nextCard = await resp.json();
-        if (nextCard.round_shuffled || nextCard.current_index === 1) {
-          // Rodada concluiu!
-          showVictoryState();
+        const wasLastCard =
+          finishedCard && finishedCard.currentIndex >= state.totalCards;
+        if (nextCard.round_shuffled || nextCard.current_index === 1 || wasLastCard) {
+          // Rodada concluiu! Salva o primeiro card da próxima rodada para quando o usuário clicar
+          state.nextRoundFirstCard = nextCard;
+          showVictoryState(finishedCard ? finishedCard.roundNumber : state.roundNumber);
         } else {
           state.currentCard = nextCard;
           renderCard(nextCard);
           prefetchBatchIfNeeded();
         }
       } else {
-        showVictoryState();
+        showVictoryState(finishedCard ? finishedCard.roundNumber : state.roundNumber);
       }
     } catch (e) {
-      showVictoryState();
+      showVictoryState(finishedCard ? finishedCard.roundNumber : state.roundNumber);
     }
   }
 
-  // Reinicia a rodada após a tela de vitória
+  // Reinicia a rodada após a tela de vitória (ou avança para a próxima lista)
   async function restartRound() {
     hideVictoryState();
+    state.hasMore = true;
+    state.cardQueue = [];
+
+    if (state.nextRoundFirstCard) {
+      const nextCard = state.nextRoundFirstCard;
+      state.nextRoundFirstCard = null;
+      state.currentCard = nextCard;
+      state.roundNumber = nextCard.round_number;
+      state.totalCards = nextCard.total_cards;
+      renderCard(nextCard, true);
+      prefetchBatchIfNeeded();
+      return;
+    }
+
     try {
       const params = new URLSearchParams();
       if (state.subjectId) params.set("subject_id", state.subjectId);
@@ -421,6 +447,7 @@
         const nextCard = await resp.json();
         state.currentCard = nextCard;
         state.roundNumber = nextCard.round_number;
+        state.totalCards = nextCard.total_cards;
         renderCard(nextCard, true);
         prefetchBatchIfNeeded();
       } else {
@@ -440,14 +467,18 @@
         return;
       }
 
-      // Espaço: Virar card
+      // Espaço: Virar card (ou reiniciar rodada se na tela de vitória)
       if (e.code === "Space") {
         e.preventDefault();
-        flipCard();
+        if (els.victoryState && !els.victoryState.classList.contains("hidden")) {
+          restartRound();
+        } else {
+          flipCard();
+        }
         return;
       }
 
-      // Enter ou Seta Direita: Próximo card
+      // Enter ou Seta Direita: Próximo card (ou reiniciar rodada se na tela de vitória)
       if (e.code === "Enter" || e.code === "ArrowRight") {
         e.preventDefault();
         if (els.victoryState && !els.victoryState.classList.contains("hidden")) {
@@ -504,6 +535,86 @@
     );
   }
 
+  function onVictoryClick() {
+    restartRound();
+  }
+
+  function onRetryClick() {
+    if (state.worker) state.worker.postMessage({ type: "FLUSH" });
+  }
+
+  // Vincula ouvintes aos elementos do card atual (seguro contra swaps HTMX)
+  function bindCardEvents() {
+    if (els.surface) {
+      els.surface.removeEventListener("click", flipCard);
+      els.surface.addEventListener("click", flipCard);
+    }
+    if (els.btnFlip) {
+      els.btnFlip.removeEventListener("click", flipCard);
+      els.btnFlip.addEventListener("click", flipCard);
+    }
+    if (els.btnNext) {
+      els.btnNext.removeEventListener("click", advanceCard);
+      els.btnNext.addEventListener("click", advanceCard);
+    }
+    if (els.btnRestart) {
+      els.btnRestart.removeEventListener("click", restartRound);
+      els.btnRestart.addEventListener("click", function (e) {
+        e.stopPropagation();
+        restartRound();
+      });
+    }
+    if (els.victoryState) {
+      els.victoryState.removeEventListener("click", onVictoryClick);
+      els.victoryState.addEventListener("click", onVictoryClick);
+    }
+    if (els.btnRetry) {
+      els.btnRetry.removeEventListener("click", onRetryClick);
+      els.btnRetry.addEventListener("click", onRetryClick);
+    }
+  }
+
+  // Tratamento de swaps do HTMX (mudança de filtros de matéria / tema)
+  function onHtmxSwap() {
+    queryElements();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    state.subjectId =
+      (els.filterSubject && els.filterSubject.value) ||
+      urlParams.get("subject_id") ||
+      null;
+    state.topicId =
+      (els.filterTopic && els.filterTopic.value) ||
+      urlParams.get("topic_id") ||
+      null;
+
+    state.cardQueue = [];
+    state.hasMore = true;
+    state.nextRoundFirstCard = null;
+    state.isAdvancing = false;
+
+    if (els.surface) {
+      state.currentCard = {
+        id: els.surface.getAttribute("data-card-id"),
+        sessionId: els.surface.getAttribute("data-session-id") || null,
+        front: els.frontText ? els.frontText.textContent : "",
+        back: els.backText ? els.backText.textContent : "",
+        currentIndex: parseInt(els.surface.getAttribute("data-current-index") || "1", 10),
+        totalCards: parseInt(els.surface.getAttribute("data-total-cards") || "1", 10),
+        roundNumber: parseInt(els.surface.getAttribute("data-round-number") || "1", 10),
+        position: parseInt(els.surface.getAttribute("data-position") || "100", 10),
+      };
+      state.sessionId = state.currentCard.sessionId;
+      state.totalCards = state.currentCard.totalCards;
+      state.roundNumber = state.currentCard.roundNumber;
+
+      bindCardEvents();
+      prefetchBatchIfNeeded();
+    } else {
+      state.currentCard = null;
+    }
+  }
+
   // Inicialização principal da aplicação de estudo
   function init() {
     queryElements();
@@ -511,8 +622,14 @@
 
     // Lê parâmetros da URL para subject e topic
     const urlParams = new URLSearchParams(window.location.search);
-    state.subjectId = urlParams.get("subject_id") || null;
-    state.topicId = urlParams.get("topic_id") || null;
+    state.subjectId =
+      (els.filterSubject && els.filterSubject.value) ||
+      urlParams.get("subject_id") ||
+      null;
+    state.topicId =
+      (els.filterTopic && els.filterTopic.value) ||
+      urlParams.get("topic_id") ||
+      null;
 
     // Inicializa dados do card ativo se presente no DOM
     if (els.surface) {
@@ -530,16 +647,7 @@
       state.totalCards = state.currentCard.totalCards;
       state.roundNumber = state.currentCard.roundNumber;
 
-      // Eventos de clique
-      els.surface.addEventListener("click", flipCard);
-      if (els.btnFlip) els.btnFlip.addEventListener("click", flipCard);
-      if (els.btnNext) els.btnNext.addEventListener("click", advanceCard);
-      if (els.btnRestart) els.btnRestart.addEventListener("click", restartRound);
-      if (els.btnRetry) {
-        els.btnRetry.addEventListener("click", () => {
-          if (state.worker) state.worker.postMessage({ type: "FLUSH" });
-        });
-      }
+      bindCardEvents();
 
       // Inicializa Web Worker e prefetch
       initWorker();
@@ -548,6 +656,11 @@
 
     initKeyboardShortcuts();
     initTouchGestures();
+
+    // Ouvintes de ciclo de vida HTMX e histórico para troca ágil de matérias/temas
+    document.body.addEventListener("htmx:afterSwap", onHtmxSwap);
+    document.body.addEventListener("htmx:historyRestore", onHtmxSwap);
+    window.addEventListener("popstate", onHtmxSwap);
   }
 
   // Executa ao carregar o DOM

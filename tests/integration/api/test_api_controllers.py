@@ -299,3 +299,28 @@ def test_health_check_endpoint(client: TestClient) -> None:
     assert "app" in data
     assert "environment" in data
     assert "storage" in data
+
+
+@pytest.mark.integration
+def test_api_study_next_with_current_index_completes_round(client: TestClient) -> None:
+    """Verifica que a API /study/next reconhece current_index e conclui a rodada."""
+    sub = client.post("/api/v1/subjects", json={"name": "Física"}).json()
+    top = client.post("/api/v1/topics", json={"subject_id": sub["id"], "name": "Mecânica"}).json()
+    client.post(
+        "/api/v1/flashcards",
+        json={"topic_id": top["id"], "front": "Velocidade", "back": "v = d/t"},
+    )
+
+    # Inicia a sessão
+    resp1 = client.get(f"/api/v1/study/next?topic_id={top['id']}")
+    assert resp1.status_code == 200
+    assert resp1.json()["current_index"] == 1
+    assert resp1.json()["round_number"] == 1
+
+    # Próximo card informando que completou o card 1 (total = 1 card)
+    resp2 = client.get(f"/api/v1/study/next?topic_id={top['id']}&current_index=1")
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    assert data2["round_shuffled"] is True
+    assert data2["round_number"] == 2
+    assert data2["current_index"] == 1

@@ -114,6 +114,7 @@ def _parse_uuid(val: str | None) -> UUID | None:
 def get_next_study_card_api(
     subject_id: str | None = None,
     topic_id: str | None = None,
+    current_index: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StudyCardDTO:
@@ -134,7 +135,7 @@ def get_next_study_card_api(
             subject_repo=subject_repo,
         )
         return use_case.execute(
-            GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid),
+            GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid, current_index=current_index),
             user_id=current_user.id,
         )
     except EmptyPoolError as exc:

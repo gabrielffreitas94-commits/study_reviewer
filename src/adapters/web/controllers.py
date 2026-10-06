@@ -159,6 +159,7 @@ def next_card(
     request: Request,
     subject_id: Annotated[str | None, Form()] = None,
     topic_id: Annotated[str | None, Form()] = None,
+    current_index: Annotated[int | None, Form()] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
@@ -181,7 +182,7 @@ def next_card(
             subject_repo=subject_repo,
         )
         card = get_next_uc.execute(
-            GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid),
+            GetNextCardDTO(subject_id=sub_uuid, topic_id=top_uuid, current_index=current_index),
             user_id=current_user.id,
         )
     except (EmptyPoolError, DomainException):

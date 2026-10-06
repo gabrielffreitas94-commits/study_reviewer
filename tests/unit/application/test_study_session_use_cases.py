@@ -505,3 +505,34 @@ def test_get_study_batch_uninitialized_session_and_fallbacks() -> None:
     session_repo.save_session(session)
     batch3 = use_case.execute(GetNextCardDTO(topic_id=t_id), limit=10)
     assert len(batch3.cards) == 2
+
+
+@pytest.mark.unit
+def test_get_next_flashcard_with_current_index_completes_round() -> None:
+    """Valida avanço determinístico de rodada quando current_index é fornecido."""
+    card_repo = FakeFlashcardRepository()
+    session_repo = FakeSessionRepository()
+    rng = FakeRandomGenerator()
+
+    t_id = uuid4()
+    c1 = Flashcard(topic_id=t_id, front="C1", back="1", position=100)
+    c2 = Flashcard(topic_id=t_id, front="C2", back="2", position=200)
+    card_repo.save(c1)
+    card_repo.save(c2)
+
+    session = FlashcardPoolSession(
+        topic_id_filter=t_id,
+        current_position=100,
+        current_index=1,
+        card_queue=[c1.id, c2.id],
+        round_number=1,
+    )
+    session_repo.save_session(session)
+
+    use_case = GetNextFlashcardUseCase(card_repo, session_repo, rng)
+    # Informa que o cliente revisou o card 2 (último card da fila de 2 cards)
+    result = use_case.execute(GetNextCardDTO(topic_id=t_id, current_index=2))
+    assert result.round_shuffled is True
+    assert result.round_number == 2
+    assert result.current_index == 1
+    assert result.total_cards == 2
