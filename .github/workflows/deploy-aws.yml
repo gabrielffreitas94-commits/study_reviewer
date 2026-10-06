@@ -30,7 +30,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          aws-region: ${{ secrets.AWS_REGION || 'sa-east-1' }}
 
       - name: Install uv and Python
         uses: astral-sh/setup-uv@v3
@@ -58,7 +58,7 @@ jobs:
 
       - name: Ensure ECR Repository Exists
         env:
-          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
         run: |
           aws ecr describe-repositories --repository-names study-reviewer --region $AWS_REGION || \
           aws ecr create-repository --repository-name study-reviewer --region $AWS_REGION
@@ -76,7 +76,7 @@ jobs:
       - name: Deploy CloudFormation Stack (Lambda + Function URL + DynamoDB)
         env:
           ENV_NAME: ${{ github.event.inputs.environment || 'staging' }}
-          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
         run: |
           aws cloudformation deploy \
             --template-file infra/template.yaml \
@@ -94,7 +94,7 @@ jobs:
       - name: Output Public Production URL
         env:
           ENV_NAME: ${{ github.event.inputs.environment || 'staging' }}
-          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
         run: |
           echo "=========================================================="
           echo "🎉 DEPLOY CONCLUÍDO COM SUCESSO NA AWS (CUSTO R$ 0,00)!"

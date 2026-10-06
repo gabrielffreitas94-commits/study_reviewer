@@ -17,7 +17,8 @@ Parameters:
   RedisUrl:
     Type: String
     NoEcho: true
-    Description: URL de conexão do Redis Serverless (ex: Upstash Free Tier)
+    Default: ""
+    Description: URL de conexão do Redis Serverless (ex: Upstash Free Tier - Opcional)
 
   SecretKey:
     Type: String
