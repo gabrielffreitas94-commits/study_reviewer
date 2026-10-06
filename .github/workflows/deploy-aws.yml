@@ -93,9 +93,10 @@ jobs:
             --region $AWS_REGION
 
           echo "==> Atualizando código da função Lambda com o digest mais recente do ECR..."
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           aws lambda update-function-code \
             --function-name study-reviewer-$ENV_NAME \
-            --image-uri $ECR_REGISTRY/study-reviewer:$IMAGE_TAG \
+            --image-uri "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/study-reviewer:${ENV_NAME}" \
             --region $AWS_REGION
           aws lambda wait function-updated \
             --function-name study-reviewer-$ENV_NAME \
