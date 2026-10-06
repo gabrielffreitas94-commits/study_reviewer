@@ -89,6 +89,7 @@ jobs:
                 SecretKey="${{ secrets.SECRET_KEY }}" \
                 GoogleClientId="${{ secrets.GOOGLE_CLIENT_ID }}" \
                 GoogleClientSecret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+                LambdaRoleArn="arn:aws:iam::324427252295:role/study-reviewer-lambda-role-$ENV_NAME" \
             --region $AWS_REGION
 
       - name: Output Public Production URL

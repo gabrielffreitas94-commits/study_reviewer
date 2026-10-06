@@ -36,6 +36,14 @@ Parameters:
     Default: ""
     Description: 'Google OAuth Client Secret'
 
+  LambdaRoleArn:
+    Type: String
+    Default: ""
+    Description: 'ARN da Role IAM de execucao do Lambda (se omitido, sera criada pelo template)'
+
+Conditions:
+  CreateLambdaRole: !Equals [!Ref LambdaRoleArn, ""]
+
 Resources:
   # 1. Tabela DynamoDB para Histórico de Eventos de Estudo (Always Free Tier)
   StudyEventsTable:
@@ -65,6 +73,7 @@ Resources:
   # 2. IAM Role para Execução da Função Lambda com Permissões Mínimas
   LambdaExecutionRole:
     Type: AWS::IAM::Role
+    Condition: CreateLambdaRole
     Properties:
       RoleName: !Sub 'study-reviewer-lambda-role-${EnvironmentName}'
       AssumeRolePolicyDocument:
@@ -100,7 +109,7 @@ Resources:
       PackageType: Image
       Code:
         ImageUri: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/study-reviewer:${EnvironmentName}'
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Role: !If [CreateLambdaRole, !GetAtt LambdaExecutionRole.Arn, !Ref LambdaRoleArn]
       MemorySize: 512
       Timeout: 30
       Environment:
