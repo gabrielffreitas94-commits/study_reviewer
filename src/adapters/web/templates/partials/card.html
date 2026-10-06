@@ -205,9 +205,7 @@
             <button
                 type="button"
                 id="btn-next"
-                hx-post="/study/next"
-                hx-vals='{"subject_id": "{{ subject_id or '' }}", "topic_id": "{{ topic_id or '' }}"}'
-                class="min-h-[48px] px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow hover:shadow-md flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                class="min-h-[48px] px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow hover:shadow-md flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer"
             >
                 <span>Próximo Card</span>
                 <span aria-hidden="true">➔</span>
@@ -215,7 +213,7 @@
         </div>
 
         <!-- Tela de Vitória / Conclusão de Rodada (Victory State - Seção 7.1) -->
-        <div id="victory-state" class="hidden flex-1 min-h-[380px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-sm">
+        <div id="victory-state" class="hidden flex-1 min-h-[380px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-sm cursor-pointer" role="region" aria-label="Rodada Concluída">
             <span class="text-6xl mb-4" aria-hidden="true">🎉</span>
             <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Parabéns! Rodada Concluída!</h2>
             <p class="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6">
@@ -238,7 +236,7 @@
             <button
                 type="button"
                 id="btn-restart-round"
-                class="min-h-[48px] px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow inline-flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                class="min-h-[48px] px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow inline-flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
                 <span aria-hidden="true">🔄</span>
                 <span>Iniciar Próxima Rodada</span>
