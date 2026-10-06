@@ -305,9 +305,7 @@ def test_health_check_endpoint(client: TestClient) -> None:
 def test_api_study_next_with_current_index_completes_round(client: TestClient) -> None:
     """Verifica que a API /study/next reconhece current_index e conclui a rodada."""
     sub = client.post("/api/v1/subjects", json={"name": "Física"}).json()
-    top = client.post(
-        "/api/v1/topics", json={"subject_id": sub["id"], "name": "Mecânica"}
-    ).json()
+    top = client.post("/api/v1/topics", json={"subject_id": sub["id"], "name": "Mecânica"}).json()
     client.post(
         "/api/v1/flashcards",
         json={"topic_id": top["id"], "front": "Velocidade", "back": "v = d/t"},
