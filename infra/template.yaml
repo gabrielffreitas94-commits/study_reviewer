@@ -133,10 +133,16 @@ Resources:
         AllowOrigins:
           - '*'
         AllowMethods:
-          - '*'
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
         AllowHeaders:
-          - '*'
-        AllowCredentials: true
+          - Content-Type
+          - Authorization
+          - X-Requested-With
+        AllowCredentials: false
 
   # 5. Permissão Pública para Invocação da Function URL
   StudyReviewerFunctionUrlPermission:
