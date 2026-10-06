@@ -75,6 +75,16 @@ def create_app() -> FastAPI:
     app.include_router(web_router)
     app.include_router(api_router)
 
+    @app.get("/health", tags=["Health"])
+    async def health_check() -> dict[str, str]:
+        """Endpoint público de monitoramento de integridade e liveness (R$ 0,00)."""
+        return {
+            "status": "healthy",
+            "app": settings.APP_NAME,
+            "environment": settings.ENVIRONMENT,
+            "storage": settings.STUDY_EVENTS_BACKEND,
+        }
+
     return app
 
 

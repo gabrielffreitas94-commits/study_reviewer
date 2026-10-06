@@ -92,6 +92,15 @@ jobs:
                 LambdaRoleArn="arn:aws:iam::324427252295:role/study-reviewer-lambda-role-$ENV_NAME" \
             --region $AWS_REGION
 
+          echo "==> Atualizando código da função Lambda com o digest mais recente do ECR..."
+          aws lambda update-function-code \
+            --function-name study-reviewer-$ENV_NAME \
+            --image-uri $ECR_REGISTRY/study-reviewer:$IMAGE_TAG \
+            --region $AWS_REGION
+          aws lambda wait function-updated \
+            --function-name study-reviewer-$ENV_NAME \
+            --region $AWS_REGION
+
       - name: Output Public Production URL
         env:
           ENV_NAME: ${{ github.event.inputs.environment || 'staging' }}

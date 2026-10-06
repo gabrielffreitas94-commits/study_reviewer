@@ -288,3 +288,14 @@ def test_api_mark_card_read(client: TestClient) -> None:
     )
     assert read_resp.status_code == 200
     assert read_resp.json() == {"status": "ok"}
+
+
+def test_health_check_endpoint(client: TestClient) -> None:
+    """Verifica que o endpoint /health responde 200 com status healthy."""
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert "app" in data
+    assert "environment" in data
+    assert "storage" in data

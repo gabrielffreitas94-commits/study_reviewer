@@ -162,6 +162,14 @@ Resources:
       Action: lambda:InvokeFunctionUrl
       Principal: '*'
 
+  # 6. Permissão Pública para Invocação da Função Lambda
+  StudyReviewerFunctionPublicInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudyReviewerFunction
+      Action: lambda:InvokeFunction
+      Principal: '*'
+
 Outputs:
   ProductionUrl:
     Description: 'URL Pública HTTPS de Produção do Study Reviewer (R$ 0,00 de Custo Fixo)'
