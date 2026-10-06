@@ -1,0 +1,108 @@
+name: CD — Deploy Serverless AWS (Always Free)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente de Deploy (staging ou production)'
+        required: true
+        default: 'staging'
+  push:
+    branches:
+      - staging
+
+concurrency:
+  group: deploy-aws-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-aws-serverless:
+    name: Deploy to AWS Lambda & DynamoDB (R$ 0,00)
+    runs-on: ubuntu-latest
+    if: github.repository == 'gabrielffreitas94-commits/study_reviewer'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Execute Alembic Database Migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -n "$DATABASE_URL" ]; then
+            echo "==> Aplicando migrações no banco com Alembic..."
+            uv run alembic upgrade head
+          else
+            echo "==> DATABASE_URL não configurada nos secrets do repositório; pulando etapa de migração."
+          fi
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR Repository Exists
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+        run: |
+          aws ecr describe-repositories --repository-names study-reviewer --region $AWS_REGION || \
+          aws ecr create-repository --repository-name study-reviewer --region $AWS_REGION
+
+      - name: Build, Tag and Push Container Image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.event.inputs.environment || 'staging' }}
+        run: |
+          echo "==> Construindo imagem Dockerfile.lambda..."
+          docker build -f Dockerfile.lambda -t $ECR_REGISTRY/study-reviewer:$IMAGE_TAG .
+          echo "==> Enviando imagem para o Amazon ECR..."
+          docker push $ECR_REGISTRY/study-reviewer:$IMAGE_TAG
+
+      - name: Deploy CloudFormation Stack (Lambda + Function URL + DynamoDB)
+        env:
+          ENV_NAME: ${{ github.event.inputs.environment || 'staging' }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/template.yaml \
+            --stack-name study-reviewer-$ENV_NAME \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+                EnvironmentName=$ENV_NAME \
+                DatabaseUrl="${{ secrets.DATABASE_URL }}" \
+                RedisUrl="${{ secrets.REDIS_URL }}" \
+                SecretKey="${{ secrets.SECRET_KEY }}" \
+                GoogleClientId="${{ secrets.GOOGLE_CLIENT_ID }}" \
+                GoogleClientSecret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+            --region $AWS_REGION
+
+      - name: Output Public Production URL
+        env:
+          ENV_NAME: ${{ github.event.inputs.environment || 'staging' }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+        run: |
+          echo "=========================================================="
+          echo "🎉 DEPLOY CONCLUÍDO COM SUCESSO NA AWS (CUSTO R$ 0,00)!"
+          echo "=========================================================="
+          PROD_URL=$(aws cloudformation describe-stacks \
+            --stack-name study-reviewer-$ENV_NAME \
+            --region $AWS_REGION \
+            --query "Stacks[0].Outputs[?OutputKey=='ProductionUrl'].OutputValue" \
+            --output text)
+          echo "URL Pública: $PROD_URL"
+          echo "production_url=$PROD_URL" >> $GITHUB_ENV

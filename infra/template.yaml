@@ -1,0 +1,156 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Study Reviewer — Infraestrutura Serverless 100% Custo R$ 0,00 na AWS
+  (AWS Lambda + Function URL + DynamoDB On-Demand com TTL + CloudWatch)
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: staging
+    Description: Nome do ambiente de implantação (staging ou production)
+
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Description: URL de conexão do PostgreSQL Serverless (ex: Neon Free Tier)
+
+  RedisUrl:
+    Type: String
+    NoEcho: true
+    Description: URL de conexão do Redis Serverless (ex: Upstash Free Tier)
+
+  SecretKey:
+    Type: String
+    NoEcho: true
+    Description: Chave de 32 bytes para criptografia AES-256-GCM das sessões
+
+  GoogleClientId:
+    Type: String
+    Default: ""
+    Description: Google OAuth Client ID para autenticação
+
+  GoogleClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Google OAuth Client Secret
+
+Resources:
+  # 1. Tabela DynamoDB para Histórico de Eventos de Estudo (Always Free Tier)
+  StudyEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'study_events_${EnvironmentName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: StudyReviewer
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # 2. IAM Role para Execução da Função Lambda com Permissões Mínimas
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'study-reviewer-lambda-role-${EnvironmentName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBStudyEventsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:BatchWriteItem
+                Resource: !GetAtt StudyEventsTable.Arn
+
+  # 3. Função AWS Lambda Executando o Study Reviewer
+  StudyReviewerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'study-reviewer-${EnvironmentName}'
+      Description: 'Backend Study Reviewer FastAPI (Serverless Always Free)'
+      PackageType: Image
+      Code:
+        ImageUri: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/study-reviewer:${EnvironmentName}'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          DEBUG: "False"
+          APP_NAME: "Study Reviewer"
+          DATABASE_URL: !Ref DatabaseUrl
+          REDIS_URL: !Ref RedisUrl
+          SECRET_KEY: !Ref SecretKey
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
+          STUDY_EVENTS_BACKEND: "dynamodb"
+          DYNAMODB_TABLE_STUDY_EVENTS: !Ref StudyEventsTable
+          AWS_REGION: !Ref "AWS::Region"
+          DYNAMODB_TTL_DAYS: "90"
+      Tags:
+        - Key: Project
+          Value: StudyReviewer
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # 4. Lambda Function URL (Endpoint HTTPS Público Gratuito - Sem ALB)
+  StudyReviewerFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt StudyReviewerFunction.Arn
+      AuthType: NONE
+      Cors:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - '*'
+        AllowHeaders:
+          - '*'
+        AllowCredentials: true
+
+  # 5. Permissão Pública para Invocação da Function URL
+  StudyReviewerFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudyReviewerFunction
+      FunctionUrlAuthType: NONE
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+
+Outputs:
+  ProductionUrl:
+    Description: 'URL Pública HTTPS de Produção do Study Reviewer (R$ 0,00 de Custo Fixo)'
+    Value: !GetAtt StudyReviewerFunctionUrl.FunctionUrl
+
+  DynamoDBTableName:
+    Description: 'Nome da tabela DynamoDB provisionada para eventos de estudo'
+    Value: !Ref StudyEventsTable
