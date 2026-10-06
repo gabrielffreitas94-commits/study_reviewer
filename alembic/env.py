@@ -19,7 +19,13 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 target_metadata = Base.metadata
-config.set_main_option("sqlalchemy.url", normalize_database_url(settings.DATABASE_URL))
+current_url = config.get_main_option("sqlalchemy.url")
+resolved_url = (
+    current_url
+    if current_url and current_url != "driver://user:pass@localhost/dbname"
+    else settings.DATABASE_URL
+)
+config.set_main_option("sqlalchemy.url", normalize_database_url(resolved_url))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
