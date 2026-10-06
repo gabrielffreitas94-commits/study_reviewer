@@ -7,34 +7,34 @@ Parameters:
   EnvironmentName:
     Type: String
     Default: staging
-    Description: Nome do ambiente de implantação (staging ou production)
+    Description: 'Nome do ambiente de implantacao (staging ou production)'
 
   DatabaseUrl:
     Type: String
     NoEcho: true
-    Description: URL de conexão do PostgreSQL Serverless (ex: Neon Free Tier)
+    Description: 'URL de conexao do PostgreSQL Serverless (ex: Neon Free Tier)'
 
   RedisUrl:
     Type: String
     NoEcho: true
     Default: ""
-    Description: URL de conexão do Redis Serverless (ex: Upstash Free Tier - Opcional)
+    Description: 'URL de conexao do Redis Serverless (ex: Upstash Free Tier - Opcional)'
 
   SecretKey:
     Type: String
     NoEcho: true
-    Description: Chave de 32 bytes para criptografia AES-256-GCM das sessões
+    Description: 'Chave de 32 bytes para criptografia AES-256-GCM das sessoes'
 
   GoogleClientId:
     Type: String
     Default: ""
-    Description: Google OAuth Client ID para autenticação
+    Description: 'Google OAuth Client ID para autenticacao'
 
   GoogleClientSecret:
     Type: String
     NoEcho: true
     Default: ""
-    Description: Google OAuth Client Secret
+    Description: 'Google OAuth Client Secret'
 
 Resources:
   # 1. Tabela DynamoDB para Histórico de Eventos de Estudo (Always Free Tier)
