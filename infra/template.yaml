@@ -136,8 +136,9 @@ Resources:
           - GET
           - POST
           - PUT
+          - PATCH
           - DELETE
-          - OPTIONS
+          - HEAD
         AllowHeaders:
           - Content-Type
           - Authorization
