@@ -64,6 +64,9 @@ markers = [
     "integration: Testes de integração de adaptadores, banco e controllers",
     "e2e: Testes ponta a ponta",
 ]
+filterwarnings = [
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
+]
 
 [tool.coverage.run]
 source = ["src"]
