@@ -270,6 +270,12 @@
                     closeMenu();
                 }
             });
+
+            container.addEventListener('focusout', (e) => {
+                if (!container.contains(e.relatedTarget)) {
+                    closeMenu();
+                }
+            });
         })();
     </script>
 

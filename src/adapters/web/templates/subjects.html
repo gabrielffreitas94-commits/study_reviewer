@@ -190,10 +190,10 @@
                                 {% if sub_topics and sub_topics|length > 0 %}
                                     {% for t in sub_topics[:5] %}
                                         <span class="inline-flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden text-xs text-slate-600 dark:text-slate-300 font-medium transition hover:bg-slate-200 dark:hover:bg-slate-600">
-                                            <a href="/study?topic_id={{ t.id }}" class="px-2.5 py-1 hover:text-indigo-600 dark:hover:text-indigo-400 break-words break-words-anywhere max-w-full" title="Estudar este tema">
+                                            <a href="/study?topic_id={{ t.id }}" class="px-2.5 py-1.5 hover:text-indigo-600 dark:hover:text-indigo-400 break-words break-words-anywhere max-w-full" title="Estudar este tema">
                                                 🏷️ {{ t.name }}
                                             </a>
-                                            <a href="/topics/{{ t.id }}/questions" class="px-1.5 py-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border-l border-slate-200 dark:border-slate-600" title="Gerenciar perguntas de {{ t.name }}" aria-label="Gerenciar perguntas de {{ t.name }}">
+                                            <a href="/topics/{{ t.id }}/questions" class="px-2 py-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border-l border-slate-200 dark:border-slate-600" title="Gerenciar perguntas de {{ t.name }}" aria-label="Gerenciar perguntas de {{ t.name }}">
                                                 ❓
                                             </a>
                                         </span>
@@ -324,13 +324,13 @@
 
         const aStudy = document.createElement('a');
         aStudy.href = `/study?topic_id=${topic.id}`;
-        aStudy.className = 'px-2.5 py-1 hover:text-indigo-600 dark:hover:text-indigo-400 break-words break-words-anywhere max-w-full';
+        aStudy.className = 'px-2.5 py-1.5 hover:text-indigo-600 dark:hover:text-indigo-400 break-words break-words-anywhere max-w-full';
         aStudy.title = 'Estudar este tema';
         aStudy.textContent = `🏷️ ${topic.name}`;
 
         const aQuestions = document.createElement('a');
         aQuestions.href = `/topics/${topic.id}/questions`;
-        aQuestions.className = 'px-1.5 py-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border-l border-slate-200 dark:border-slate-600';
+        aQuestions.className = 'px-2 py-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border-l border-slate-200 dark:border-slate-600';
         aQuestions.title = `Gerenciar perguntas de ${topic.name}`;
         aQuestions.setAttribute('aria-label', `Gerenciar perguntas de ${topic.name}`);
         aQuestions.textContent = '❓';

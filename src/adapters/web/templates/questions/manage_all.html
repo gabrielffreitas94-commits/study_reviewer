@@ -270,5 +270,18 @@
             }
         });
     }
+
+    // Atualiza contagem do badge dinamicamente ao deletar pergunta via HTMX
+    document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+        if (evt.detail.successful && evt.detail.xhr.status === 200) {
+            setTimeout(() => {
+                const badge = document.getElementById('questions-count-badge');
+                if (badge) {
+                    const currentCards = document.querySelectorAll('.question-entry').length;
+                    badge.textContent = Math.max(0, currentCards);
+                }
+            }, 50);
+        }
+    });
 </script>
 {% endblock %}
