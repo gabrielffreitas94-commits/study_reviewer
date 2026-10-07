@@ -257,4 +257,4 @@ def test_audit_logs_htmx_partial_domain_validation_error(db_engine: Any, test_us
         )
         resp = get_audit_logs_partial(request=req, db=session, current_user=test_user, page=0)
         assert resp.status_code == 400
-        assert "maior ou igual a 1" in resp.body.decode("utf-8")
+        assert "maior ou igual a 1" in bytes(resp.body).decode("utf-8")

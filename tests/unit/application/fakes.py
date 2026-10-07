@@ -400,8 +400,11 @@ class FakeReviewAuditRepository(IReviewAuditRepository):
 
     def __init__(self) -> None:
         self.logs: list[ReviewAuditLog] = []
+        self.fail_on_save: bool = False
 
     def save(self, log: ReviewAuditLog) -> None:
+        if self.fail_on_save:
+            raise RuntimeError("Falha de I/O na tabela de auditoria")
         self.logs.append(log)
 
     def list_by_user(

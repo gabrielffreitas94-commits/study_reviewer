@@ -39,9 +39,7 @@ from tests.unit.application.fakes import (
     FakeUserRepository,
 )
 
-
-@pytest.fixture
-def performance_repos() -> tuple[
+PerformanceReposTuple = tuple[
     FakeUserRepository,
     FakeSubjectRepository,
     FakeTopicRepository,
@@ -50,7 +48,11 @@ def performance_repos() -> tuple[
     FakeReviewAuditRepository,
     FakeUnitOfWork,
     FakeClockService,
-]:
+]
+
+
+@pytest.fixture
+def performance_repos() -> PerformanceReposTuple:
     """Fixture com repositórios e serviços em memória para testes de performance."""
     user_repo = FakeUserRepository()
     subj_repo = FakeSubjectRepository()
@@ -70,7 +72,7 @@ def performance_repos() -> tuple[
 
 @pytest.mark.unit
 def test_review_question_creates_audit_log_atomically(
-    performance_repos: tuple,
+    performance_repos: PerformanceReposTuple,
 ) -> None:
     """UC-S04-01 e UC-S04-44: Grava log de auditoria com nomes congelados e commita via UoW."""
     _, subj_repo, top_repo, q_repo, prog_repo, audit_repo, uow, clock = performance_repos
@@ -115,7 +117,7 @@ def test_review_question_creates_audit_log_atomically(
 
 @pytest.mark.unit
 def test_review_question_rollback_on_audit_failure(
-    performance_repos: tuple,
+    performance_repos: PerformanceReposTuple,
 ) -> None:
     """UC-S04-44: Falha na gravação do log reverte o progresso (Rollback ACID)."""
     _, subj_repo, top_repo, q_repo, prog_repo, audit_repo, uow, clock = performance_repos
@@ -132,10 +134,7 @@ def test_review_question_rollback_on_audit_failure(
     prog_repo.save(prog)
 
     # Força erro na gravação do log
-    def failing_save(log: ReviewAuditLog) -> None:
-        raise RuntimeError("Falha de I/O na tabela de auditoria")
-
-    audit_repo.save = failing_save  # type: ignore[method-assign]
+    audit_repo.fail_on_save = True
 
     use_case = ReviewQuestionUseCase(
         progress_repo=prog_repo,
@@ -155,7 +154,7 @@ def test_review_question_rollback_on_audit_failure(
 
 @pytest.mark.unit
 def test_review_question_zero_side_effects_on_validation_failure(
-    performance_repos: tuple,
+    performance_repos: PerformanceReposTuple,
 ) -> None:
     """UC-S04-34: Nenhuma auditoria fantasma é gerada se a pergunta não estiver vencida."""
     _, subj_repo, top_repo, q_repo, prog_repo, audit_repo, uow, clock = performance_repos
@@ -193,7 +192,7 @@ def test_review_question_zero_side_effects_on_validation_failure(
 
 
 @pytest.mark.unit
-def test_get_user_study_statistics_nominal(performance_repos: tuple) -> None:
+def test_get_user_study_statistics_nominal(performance_repos: PerformanceReposTuple) -> None:
     """UC-S04-02: Retorna KPIs consolidados, distribuição e histórico de Retenção Madura."""
     _, subj_repo, _, _, prog_repo, audit_repo, _, _ = performance_repos
     user_id = uuid4()
@@ -254,7 +253,7 @@ def test_get_user_study_statistics_nominal(performance_repos: tuple) -> None:
 
 
 @pytest.mark.unit
-def test_get_user_study_statistics_empty_state(performance_repos: tuple) -> None:
+def test_get_user_study_statistics_empty_state(performance_repos: PerformanceReposTuple) -> None:
     """UC-S04-05: Trata estudante novato sem revisões."""
     _, _, _, _, prog_repo, audit_repo, _, _ = performance_repos
     user_id = uuid4()
@@ -278,7 +277,7 @@ def test_get_user_study_statistics_empty_state(performance_repos: tuple) -> None
 
 
 @pytest.mark.unit
-def test_list_user_review_audit_logs_pagination(performance_repos: tuple) -> None:
+def test_list_user_review_audit_logs_pagination(performance_repos: PerformanceReposTuple) -> None:
     """UC-S04-16: Retorna lista paginada e contagem correta."""
     _, _, _, _, _, audit_repo, _, _ = performance_repos
     user_id = uuid4()
@@ -314,7 +313,9 @@ def test_list_user_review_audit_logs_pagination(performance_repos: tuple) -> Non
 
 @pytest.mark.unit
 @pytest.mark.security
-def test_list_user_review_audit_logs_anti_idor_filter(performance_repos: tuple) -> None:
+def test_list_user_review_audit_logs_anti_idor_filter(
+    performance_repos: PerformanceReposTuple,
+) -> None:
     """Vulnerabilidade prevenida: IDOR na filtragem de histórico por matéria (CWE-639 / CWE-209).
 
     Garantia de segurança: Se o estudante informar subject_id pertencente a outro aluno,
@@ -350,7 +351,9 @@ def test_list_user_review_audit_logs_anti_idor_filter(performance_repos: tuple) 
 
 
 @pytest.mark.unit
-def test_list_user_review_audit_logs_invalid_pagination(performance_repos: tuple) -> None:
+def test_list_user_review_audit_logs_invalid_pagination(
+    performance_repos: PerformanceReposTuple,
+) -> None:
     """UC-S04-09: Rejeita página <= 0 ou page_size fora do intervalo permitido."""
     _, _, _, _, _, audit_repo, _, _ = performance_repos
     user_id = uuid4()
@@ -372,7 +375,9 @@ def test_list_user_review_audit_logs_invalid_pagination(performance_repos: tuple
 
 @pytest.mark.unit
 @pytest.mark.security
-def test_export_user_data_csv_anti_formula_injection(performance_repos: tuple) -> None:
+def test_export_user_data_csv_anti_formula_injection(
+    performance_repos: PerformanceReposTuple,
+) -> None:
     """Vulnerabilidade prevenida: CSV Formula Injection (CWE-1236).
 
     Garantia de segurança: Células iniciadas por '=', '+', '-', '@', '\t', '\r'
@@ -433,7 +438,7 @@ def test_export_user_data_csv_anti_formula_injection(performance_repos: tuple) -
 
 @pytest.mark.unit
 @pytest.mark.security
-def test_export_user_data_json_lgpd_sanitization(performance_repos: tuple) -> None:
+def test_export_user_data_json_lgpd_sanitization(performance_repos: PerformanceReposTuple) -> None:
     """Vulnerabilidade prevenida: Vazamento de dados de terceiros na portabilidade LGPD (Art. 18).
 
     Garantia de segurança: O JSON exportado não inclui IDs ou e-mails de outros usuários,
@@ -487,7 +492,9 @@ def test_export_user_data_json_lgpd_sanitization(performance_repos: tuple) -> No
 
 
 @pytest.mark.unit
-def test_export_user_data_invalid_format_raises_error(performance_repos: tuple) -> None:
+def test_export_user_data_invalid_format_raises_error(
+    performance_repos: PerformanceReposTuple,
+) -> None:
     """UC-S04-08: Rejeita formatos não suportados (ex: XML, PDF)."""
     user_repo, _, _, q_repo, _, audit_repo, _, clock = performance_repos
     user_id = uuid4()
@@ -503,7 +510,9 @@ def test_export_user_data_invalid_format_raises_error(performance_repos: tuple) 
 
 
 @pytest.mark.unit
-def test_export_user_data_user_not_found_raises_error(performance_repos: tuple) -> None:
+def test_export_user_data_user_not_found_raises_error(
+    performance_repos: PerformanceReposTuple,
+) -> None:
     """Valida erro quando usuário não existe para exportação."""
     from src.domain.exceptions import EntityNotFoundError
 
@@ -519,7 +528,9 @@ def test_export_user_data_user_not_found_raises_error(performance_repos: tuple) 
 
 
 @pytest.mark.unit
-def test_export_user_data_multiple_logs_json_formatting(performance_repos: tuple) -> None:
+def test_export_user_data_multiple_logs_json_formatting(
+    performance_repos: PerformanceReposTuple,
+) -> None:
     """Valida formatação JSON com múltiplos logs de auditoria (separador vírgula)."""
     import json
 
@@ -556,7 +567,9 @@ def test_export_user_data_multiple_logs_json_formatting(performance_repos: tuple
 
 
 @pytest.mark.unit
-def test_export_user_data_csv_empty_question_or_values(performance_repos: tuple) -> None:
+def test_export_user_data_csv_empty_question_or_values(
+    performance_repos: PerformanceReposTuple,
+) -> None:
     """Valida exportação CSV quando question_id é nulo ou a questão não existe mais."""
     user_repo, _, _, q_repo, _, audit_repo, _, clock = performance_repos
     user_id = uuid4()
