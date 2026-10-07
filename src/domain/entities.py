@@ -268,3 +268,53 @@ class UserQuestionProgress:
         self.current_level = new_level
         self.next_review_date = next_date
         self.last_reviewed_at = reviewed_at
+
+
+@dataclass(slots=True, frozen=True)
+class ReviewAuditLog:
+    """Entidade indelével representando uma tentativa de revisão de pergunta aberta.
+
+    Preserva snapshot textual congelado da matéria e do tema no instante da avaliação,
+    garantindo imunidade analítica a edições ou exclusões posteriores do catálogo.
+    """
+
+    user_id: UUID | None
+    question_id: UUID | None
+    subject_id: UUID | None
+    topic_id: UUID | None
+    historical_subject_name: str
+    historical_topic_name: str
+    review_date: date
+    score: int
+    level_before: int
+    level_after: int
+    evaluation_mode: str = "MANUAL"
+    logged_at: datetime | None = None
+    id: UUID = field(default_factory=uuid4)
+
+    def __post_init__(self) -> None:
+        if not (0 <= self.score <= 100):
+            raise DomainValidationError(f"O score deve estar entre 0 e 100. Recebido: {self.score}")
+        if not (0 <= self.level_before <= 6):
+            raise DomainValidationError(
+                f"O level_before deve estar entre 0 e 6. Recebido: {self.level_before}"
+            )
+        if not (0 <= self.level_after <= 6):
+            raise DomainValidationError(
+                f"O level_after deve estar entre 0 e 6. Recebido: {self.level_after}"
+            )
+        if not self.historical_subject_name or not self.historical_subject_name.strip():
+            raise DomainValidationError("O nome histórico da matéria não pode ser vazio.")
+        if not self.historical_topic_name or not self.historical_topic_name.strip():
+            raise DomainValidationError("O nome histórico do tema não pode ser vazio.")
+        if self.evaluation_mode not in ("MANUAL", "AI_TEXT", "AI_AUDIO"):
+            raise DomainValidationError(f"Modo de avaliação inválido: {self.evaluation_mode}")
+
+    @property
+    def is_promoted(self) -> bool:
+        return self.level_after > self.level_before
+
+    @property
+    def is_regressed(self) -> bool:
+        return self.level_after < self.level_before
+
