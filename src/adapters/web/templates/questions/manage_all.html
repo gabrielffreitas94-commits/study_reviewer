@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Gerenciar Perguntas Abertas — Study Reviewer{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto w-full py-4 space-y-8">
+    <!-- Breadcrumb e Cabeçalho -->
+    <div>
+        <nav class="flex text-xs text-slate-500 dark:text-slate-400 space-x-2 mb-2" aria-label="Breadcrumb">
+            <a href="/cadastros" class="hover:text-indigo-600 dark:hover:text-indigo-400">Cadastros</a>
+            <span>/</span>
+            <span class="text-slate-800 dark:text-slate-200 font-semibold">Perguntas Abertas</span>
+        </nav>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                    <span aria-hidden="true">❓</span>
+                    <span>Gerenciar Perguntas Abertas</span>
+                </h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Cadastre perguntas com gabarito para praticar com Active Recall e repetição espaçada.
+                </p>
+            </div>
+            {% if selected_topic %}
+            <a href="/questions/study?topic_id={{ selected_topic.id }}" class="inline-flex items-center px-4 py-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm shrink-0 self-start sm:self-auto min-h-[44px]">
+                <span>Revisar este Tema</span>
+                <span class="ml-1.5" aria-hidden="true">➔</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Feedback de Mensagem / Erro -->
+    {% if error %}
+    <div class="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-800 dark:text-rose-300 text-sm flex items-center space-x-2" role="alert">
+        <span class="text-lg" aria-hidden="true">⚠️</span>
+        <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    {% if not subjects %}
+    <!-- Empty State: Sem Matérias Cadastradas (Prevenção de Beco sem Saída) -->
+    <div class="bg-white dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 sm:p-12 text-center max-w-lg mx-auto">
+        <div class="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold" aria-hidden="true">
+            📂
+        </div>
+        <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-2">
+            Nenhuma Matéria Cadastrada
+        </h2>
+        <p class="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+            Para cadastrar perguntas abertas, você precisa primeiro criar ao menos uma matéria e um tema para organizá-las.
+        </p>
+        <a href="/subjects" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm min-h-[44px]">
+            <span>Criar Primeira Matéria e Tema</span>
+            <span class="ml-1.5" aria-hidden="true">➔</span>
+        </a>
+    </div>
+    {% else %}
+
+    <!-- Formulário de Cadastro de Nova Pergunta -->
+    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+            <span aria-hidden="true">➕</span>
+            <span>Cadastrar Nova Pergunta</span>
+        </h2>
+        <form method="POST" action="/questions/manage" class="space-y-4">
+            <!-- Seletor de Matéria e Tema em Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="select_subject" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
+                        Matéria
+                    </label>
+                    <select
+                        id="select_subject"
+                        name="subject_id"
+                        onchange="onSubjectChange(this.value)"
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        {% for sub in subjects %}
+                        <option value="{{ sub.id }}" {% if selected_subject and sub.id == selected_subject.id %}selected{% endif %}>
+                            {{ sub.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="select_topic" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
+                        Tema
+                    </label>
+                    <select
+                        id="select_topic"
+                        name="topic_id"
+                        required
+                        onchange="onTopicChange(this.value)"
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        {% set current_sub_id = selected_subject.id|string if selected_subject else '' %}
+                        {% for top in topics_by_subject.get(current_sub_id, []) %}
+                        <option value="{{ top.id }}" {% if selected_topic and top.id == selected_topic.id %}selected{% endif %}>
+                            {{ top.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Aviso se tema vazio -->
+            <div id="no-topics-warning" class="{% if selected_topic %}hidden{% endif %} p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+                Esta matéria ainda não possui temas. <a href="/subjects" class="underline font-semibold">Cadastre um tema para continuar.</a>
+            </div>
+
+            <div>
+                <label for="prompt" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
+                    Enunciado / Pergunta (Markdown e imagens HTTPS permitidos)
+                </label>
+                <textarea
+                    id="prompt"
+                    name="prompt"
+                    required
+                    rows="3"
+                    placeholder="Ex: Quais são os pressupostos processuais de validade?"
+                    class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                ></textarea>
+            </div>
+
+            <div>
+                <label for="expected_answer" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
+                    Resposta Esperada / Gabarito Detalhado
+                </label>
+                <textarea
+                    id="expected_answer"
+                    name="expected_answer"
+                    required
+                    rows="4"
+                    placeholder="Ex: Os pressupostos processuais de validade intrínsecos são: petição apta, citação válida, capacidade postulatória e competência do juízo."
+                    class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                ></textarea>
+            </div>
+
+            <div class="flex justify-end">
+                <button
+                    type="submit"
+                    class="min-h-[44px] px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition shadow text-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                    <span>Salvar Pergunta</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Lista de Perguntas do Tema Selecionado -->
+    <div class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white flex items-center space-x-2">
+                <span>Perguntas do Tema</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold" id="questions-count-badge">
+                    {{ questions | length }}
+                </span>
+            </h2>
+
+            <!-- Busca Rápida no Cliente -->
+            {% if questions %}
+            <div class="relative w-full sm:w-64">
+                <input
+                    type="search"
+                    id="search-questions-input"
+                    oninput="filterQuestions(this.value)"
+                    placeholder="Filtrar perguntas..."
+                    class="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    aria-label="Filtrar perguntas deste tema"
+                >
+            </div>
+            {% endif %}
+        </div>
+
+        {% if questions %}
+        <div class="space-y-3" id="questions-list">
+            {% for q in questions %}
+            <div id="question-item-{{ q.id }}" class="question-entry bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div class="space-y-2 flex-1">
+                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-100 question-prompt-text">
+                        {{ q.prompt | safe }}
+                    </div>
+                    <div class="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800 question-answer-text">
+                        <span class="font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Gabarito:</span>
+                        {{ q.expected_answer | safe }}
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 self-end md:self-start">
+                    <button
+                        type="button"
+                        hx-delete="/questions/{{ q.id }}"
+                        hx-target="#question-item-{{ q.id }}"
+                        hx-swap="outerHTML"
+                        hx-confirm="Deseja realmente excluir esta pergunta do catálogo?"
+                        class="p-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                        title="Excluir pergunta"
+                    >
+                        🗑️ Excluir
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-sm text-slate-500 dark:text-slate-400">
+            Nenhuma pergunta cadastrada para este tema ainda. Utilize o formulário acima para adicionar sua primeira pergunta.
+        </div>
+        {% endif %}
+    </div>
+
+    {% endif %}
+</div>
+
+<!-- Dados de Tópicos por Matéria para o Seletor Reativo -->
+<script id="topics-map-data" type="application/json">
+{
+    {% for sub_id, tops in topics_by_subject.items() %}
+    "{{ sub_id }}": [
+        {% for t in tops %}
+        {"id": "{{ t.id }}", "name": {{ t.name|tojson }}}{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ]{% if not loop.last %},{% endif %}
+    {% endfor %}
+}
+</script>
+
+<script>
+    const topicsMap = JSON.parse(document.getElementById('topics-map-data')?.textContent || '{}');
+
+    function onSubjectChange(selectedSubId) {
+        const topicSelect = document.getElementById('select_topic');
+        const warning = document.getElementById('no-topics-warning');
+        if (!topicSelect) return;
+
+        topicSelect.innerHTML = '';
+        const topics = topicsMap[selectedSubId] || [];
+
+        if (topics.length === 0) {
+            if (warning) warning.classList.remove('hidden');
+        } else {
+            if (warning) warning.classList.add('hidden');
+            topics.forEach((t, idx) => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.name;
+                topicSelect.appendChild(opt);
+            });
+            // Recarrega lista com o primeiro tema da matéria
+            window.location.href = `/questions/manage?subject_id=${selectedSubId}&topic_id=${topics[0].id}`;
+        }
+    }
+
+    function onTopicChange(selectedTopicId) {
+        const subSelect = document.getElementById('select_subject');
+        const subId = subSelect ? subSelect.value : '';
+        window.location.href = `/questions/manage?subject_id=${subId}&topic_id=${selectedTopicId}`;
+    }
+
+    function filterQuestions(term) {
+        const cleanTerm = term.trim().toLowerCase();
+        const entries = document.querySelectorAll('.question-entry');
+        entries.forEach(entry => {
+            const prompt = entry.querySelector('.question-prompt-text')?.textContent?.toLowerCase() || '';
+            const answer = entry.querySelector('.question-answer-text')?.textContent?.toLowerCase() || '';
+            if (prompt.includes(cleanTerm) || answer.includes(cleanTerm)) {
+                entry.classList.remove('hidden');
+            } else {
+                entry.classList.add('hidden');
+            }
+        });
+    }
+
+    // Atualiza contagem do badge dinamicamente ao deletar pergunta via HTMX
+    document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+        if (evt.detail.successful && evt.detail.xhr.status === 200) {
+            setTimeout(() => {
+                const badge = document.getElementById('questions-count-badge');
+                if (badge) {
+                    const currentCards = document.querySelectorAll('.question-entry').length;
+                    badge.textContent = Math.max(0, currentCards);
+                }
+            }, 50);
+        }
+    });
+</script>
+{% endblock %}
