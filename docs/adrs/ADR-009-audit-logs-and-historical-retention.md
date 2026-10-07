@@ -19,7 +19,7 @@ Com a conclusão da Sprint 03, o sistema opera o algoritmo de Repetição Espaç
 
 ---
 
-## 2. Decisões Arquiteturais
+## 2. Decisão Arquitetural
 
 ### 2.1 Modelo de Dados `review_audit_logs` e Desacoplamento Relacional
 Adota-se a tabela append-only `review_audit_logs` no PostgreSQL com o seguinte contrato estrutural:
