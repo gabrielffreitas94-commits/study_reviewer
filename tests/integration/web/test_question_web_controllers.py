@@ -344,3 +344,135 @@ def test_web_questions_edge_cases_and_error_branches(
     )
     assert res_bad_create.status_code == 400
     assert "Enunciado deve ter entre 1 e 10.000 caracteres" in res_bad_create.text
+
+
+@pytest.mark.integration
+def test_cadastros_hub_view(client: TestClient, test_user: User, db_engine: Any) -> None:
+    """Verifica renderização da Central de Cadastros (Hub) com os 3 cards generosos."""
+    res = client.get("/cadastros")
+    assert res.status_code == 200
+    assert "Central de Cadastros" in res.text
+    assert "Temas e Matérias" in res.text
+    assert "Perguntas Abertas" in res.text
+    assert "Novo Flashcard" in res.text
+    assert "/subjects" in res.text
+    assert "/questions/manage" in res.text
+    assert "/flashcards/new" in res.text
+
+
+@pytest.mark.integration
+def test_questions_manage_view_empty_state_and_with_topics(
+    client: TestClient, test_user: User, db_engine: Any
+) -> None:
+    """Verifica tela centralizada de perguntas (empty state e com matérias/temas)."""
+    # 1. Sem matérias cadastradas: Empty State explicativo com CTA
+    res_empty = client.get("/questions/manage")
+    assert res_empty.status_code == 200
+    assert "Nenhuma Matéria Cadastrada" in res_empty.text
+    assert "Criar Primeira Matéria e Tema" in res_empty.text
+    assert "/subjects" in res_empty.text
+
+    # 2. Com matérias e temas cadastrados
+    with Session(db_engine) as session:
+        subj = Subject(name="Direito Constitucional", owner_id=test_user.id)
+        SqlAlchemySubjectRepository(session).save(subj)
+        top1 = Topic(subject_id=subj.id, name="Controle de Constitucionalidade")
+        top2 = Topic(subject_id=subj.id, name="Direitos Fundamentais")
+        SqlAlchemyTopicRepository(session).save(top1)
+        SqlAlchemyTopicRepository(session).save(top2)
+
+    # Acesso padrão: pré-seleciona primeiro tema
+    res = client.get("/questions/manage")
+    assert res.status_code == 200
+    assert "Direito Constitucional" in res.text
+    assert "Controle de Constitucionalidade" in res.text
+    assert "Cadastrar Nova Pergunta" in res.text
+
+    # Acesso com query param específico
+    res_param = client.get(f"/questions/manage?subject_id={subj.id}&topic_id={top2.id}")
+    assert res_param.status_code == 200
+    assert "Direitos Fundamentais" in res_param.text
+
+
+@pytest.mark.integration
+def test_create_question_from_manage_view_lifecycle_and_errors(
+    client: TestClient, test_user: User, db_engine: Any
+) -> None:
+    """Verifica criação de pergunta a partir de /questions/manage e tratamento de erros."""
+    with Session(db_engine) as session:
+        subj = Subject(name="Biologia", owner_id=test_user.id)
+        SqlAlchemySubjectRepository(session).save(subj)
+        top = Topic(subject_id=subj.id, name="Citologia")
+        SqlAlchemyTopicRepository(session).save(top)
+
+    # Sucesso: cadastra pergunta e redireciona 303 com subject_id e topic_id
+    res = client.post(
+        "/questions/manage",
+        data={
+            "topic_id": str(top.id),
+            "prompt": "Qual a função do ribossomo?",
+            "expected_answer": "Síntese de proteínas.",
+        },
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    assert f"/questions/manage?subject_id={subj.id}&topic_id={top.id}" in res.headers["location"]
+
+    with Session(db_engine) as session:
+        questions = SqlAlchemyQuestionRepository(session).list_by_topic(top.id)
+        assert len(questions) == 1
+        assert questions[0].prompt == "Qual a função do ribossomo?"
+        # Progresso SRS criado
+        prog_repo = SqlAlchemyQuestionProgressRepository(session)
+        prog = prog_repo.get_by_user_and_question(test_user.id, questions[0].id)
+        assert prog is not None
+
+    # Erro: tema inexistente
+    res_bad_topic = client.post(
+        "/questions/manage",
+        data={
+            "topic_id": str(uuid4()),
+            "prompt": "Pergunta sem tema?",
+            "expected_answer": "Resposta",
+        },
+        follow_redirects=False,
+    )
+    assert res_bad_topic.status_code == 303
+    assert "Tema+n%C3%A3o+encontrado" in res_bad_topic.headers["location"]
+
+    # Erro: validação de domínio (prompt em branco)
+    res_bad_prompt = client.post(
+        "/questions/manage",
+        data={
+            "topic_id": str(top.id),
+            "prompt": "   ",
+            "expected_answer": "Resposta",
+        },
+        follow_redirects=False,
+    )
+    assert res_bad_prompt.status_code == 303
+    assert "error=" in res_bad_prompt.headers["location"]
+
+
+@pytest.mark.integration
+def test_navigation_three_tabs_and_active_highlighting(client: TestClient) -> None:
+    """Verifica conformidade estrita da navegação com 3 abas principais e 3 colunas mobile."""
+    # 1. Tela /study: "Flashcards" ativo
+    res_study = client.get("/study")
+    assert res_study.status_code == 200
+    assert "Flashcards" in res_study.text
+    assert "Revisão" in res_study.text
+    assert "Cadastros" in res_study.text
+    assert "grid-cols-3" in res_study.text
+
+    # 2. Tela /questions/study: "Revisão" ativo
+    res_rev = client.get("/questions/study")
+    assert res_rev.status_code == 200
+    assert "Revisão" in res_rev.text
+
+    # 3. Tela /cadastros: "Cadastros" ativo
+    res_cad = client.get("/cadastros")
+    assert res_cad.status_code == 200
+    assert "cadastros-dropdown-menu" in res_cad.text
+    assert "Temas e matérias" in res_cad.text
+    assert "Novo Flashcard" in res_cad.text

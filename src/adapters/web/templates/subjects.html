@@ -189,9 +189,14 @@
                                 {% set sub_topics = topics_by_subject.get(sub.id, []) %}
                                 {% if sub_topics and sub_topics|length > 0 %}
                                     {% for t in sub_topics[:5] %}
-                                        <a href="/study?topic_id={{ t.id }}" class="text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg text-slate-600 dark:text-slate-300 font-medium transition break-words break-words-anywhere max-w-full" title="Estudar este tema">
-                                            🏷️ {{ t.name }}
-                                        </a>
+                                        <span class="inline-flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden text-xs text-slate-600 dark:text-slate-300 font-medium transition hover:bg-slate-200 dark:hover:bg-slate-600">
+                                            <a href="/study?topic_id={{ t.id }}" class="px-2.5 py-1 hover:text-indigo-600 dark:hover:text-indigo-400 break-words break-words-anywhere max-w-full" title="Estudar este tema">
+                                                🏷️ {{ t.name }}
+                                            </a>
+                                            <a href="/topics/{{ t.id }}/questions" class="px-1.5 py-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border-l border-slate-200 dark:border-slate-600" title="Gerenciar perguntas de {{ t.name }}" aria-label="Gerenciar perguntas de {{ t.name }}">
+                                                ❓
+                                            </a>
+                                        </span>
                                     {% endfor %}
                                     {% if sub_topics|length > 5 %}
                                         <button 
@@ -217,9 +222,14 @@
                                     {{ '🔒 Tornar Privada' if sub.is_public else '🌐 Compartilhar' }}
                                 </button>
                             </form>
-                            <a href="/flashcards/new?subject_id={{ sub.id }}" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
-                                + Adicionar Card
-                            </a>
+                            <div class="flex items-center space-x-3">
+                                <a href="/questions/manage?subject_id={{ sub.id }}" class="text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors" title="Gerenciar perguntas desta matéria">
+                                    + Perguntas
+                                </a>
+                                <a href="/flashcards/new?subject_id={{ sub.id }}" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+                                    + Adicionar Card
+                                </a>
+                            </div>
                             {% else %}
                             <span class="text-[11px] text-slate-400">Somente-leitura</span>
                             <span class="text-[11px] text-slate-400">Não editável</span>
@@ -309,12 +319,25 @@
     const noResults = document.getElementById('no-search-results');
 
     function createTopicElement(topic) {
-        const a = document.createElement('a');
-        a.href = `/study?topic_id=${topic.id}`;
-        a.className = 'text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg text-slate-600 dark:text-slate-300 font-medium transition break-words break-words-anywhere max-w-full';
-        a.title = 'Estudar este tema';
-        a.textContent = `🏷️ ${topic.name}`;
-        return a;
+        const span = document.createElement('span');
+        span.className = 'inline-flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden text-xs text-slate-600 dark:text-slate-300 font-medium transition hover:bg-slate-200 dark:hover:bg-slate-600';
+
+        const aStudy = document.createElement('a');
+        aStudy.href = `/study?topic_id=${topic.id}`;
+        aStudy.className = 'px-2.5 py-1 hover:text-indigo-600 dark:hover:text-indigo-400 break-words break-words-anywhere max-w-full';
+        aStudy.title = 'Estudar este tema';
+        aStudy.textContent = `🏷️ ${topic.name}`;
+
+        const aQuestions = document.createElement('a');
+        aQuestions.href = `/topics/${topic.id}/questions`;
+        aQuestions.className = 'px-1.5 py-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border-l border-slate-200 dark:border-slate-600';
+        aQuestions.title = `Gerenciar perguntas de ${topic.name}`;
+        aQuestions.setAttribute('aria-label', `Gerenciar perguntas de ${topic.name}`);
+        aQuestions.textContent = '❓';
+
+        span.appendChild(aStudy);
+        span.appendChild(aQuestions);
+        return span;
     }
 
     function createSubjectCard(sub) {
@@ -421,13 +444,24 @@
             toggleBtn.textContent = sub.is_public ? '🔒 Tornar Privada' : '🌐 Compartilhar';
             form.appendChild(toggleBtn);
 
+            const linksDiv = document.createElement('div');
+            linksDiv.className = 'flex items-center space-x-3';
+
+            const questionsLink = document.createElement('a');
+            questionsLink.href = `/questions/manage?subject_id=${sub.id}`;
+            questionsLink.className = 'text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors';
+            questionsLink.textContent = '+ Perguntas';
+
             const addCardLink = document.createElement('a');
             addCardLink.href = `/flashcards/new?subject_id=${sub.id}`;
             addCardLink.className = 'text-indigo-600 dark:text-indigo-400 hover:underline font-medium';
             addCardLink.textContent = '+ Adicionar Card';
 
+            linksDiv.appendChild(questionsLink);
+            linksDiv.appendChild(addCardLink);
+
             footer.appendChild(form);
-            footer.appendChild(addCardLink);
+            footer.appendChild(linksDiv);
         } else {
             const roSpan = document.createElement('span');
             roSpan.className = 'text-[11px] text-slate-400';

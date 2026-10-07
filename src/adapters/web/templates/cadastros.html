@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Central de Cadastros — Study Reviewer{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto w-full py-4 space-y-8">
+    <!-- Cabeçalho da Central de Cadastros -->
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 dark:text-white flex items-center space-x-2.5">
+            <span aria-hidden="true">📂</span>
+            <span>Central de Cadastros</span>
+        </h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Gerencie suas matérias, temas, perguntas abertas e flashcards em um só lugar.
+        </p>
+    </div>
+
+    <!-- Grid dos 3 Cards de Gestão -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Card 1: Temas e Matérias -->
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+            <div>
+                <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center text-2xl font-bold mb-4" aria-hidden="true">
+                    🏷️
+                </div>
+                <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                    Temas e Matérias
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                    Estruture sua árvore de conhecimento criando matérias e temas para organizar seus estudos e categorizar conteúdos.
+                </p>
+            </div>
+            <a href="/subjects" class="w-full min-h-[44px] bg-slate-900 dark:bg-slate-700 hover:bg-indigo-600 dark:hover:bg-indigo-600 text-white font-medium rounded-xl transition shadow text-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <span>Gerenciar Taxonomia</span>
+                <span aria-hidden="true">➔</span>
+            </a>
+        </div>
+
+        <!-- Card 2: Perguntas Abertas -->
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+            <div>
+                <div class="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center text-2xl font-bold mb-4" aria-hidden="true">
+                    ❓
+                </div>
+                <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                    Perguntas Abertas
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                    Cadastre perguntas com gabarito detalhado para treinar seu resgate mental com repetição espaçada (SRS).
+                </p>
+            </div>
+            <a href="/questions/manage" class="w-full min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition shadow text-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <span>Gerenciar Perguntas</span>
+                <span aria-hidden="true">➔</span>
+            </a>
+        </div>
+
+        <!-- Card 3: Novo Flashcard -->
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+            <div>
+                <div class="w-12 h-12 bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 rounded-xl flex items-center justify-center text-2xl font-bold mb-4" aria-hidden="true">
+                    📇
+                </div>
+                <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                    Novo Flashcard
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                    Crie novos cartões de memorização com frente e verso vinculados aos seus temas para estudo rápido.
+                </p>
+            </div>
+            <a href="/flashcards/new" class="w-full min-h-[44px] bg-slate-900 dark:bg-slate-700 hover:bg-indigo-600 dark:hover:bg-indigo-600 text-white font-medium rounded-xl transition shadow text-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <span>Cadastrar Flashcard</span>
+                <span aria-hidden="true">➔</span>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

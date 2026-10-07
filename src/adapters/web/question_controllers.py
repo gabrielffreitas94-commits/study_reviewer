@@ -3,9 +3,10 @@ Camada 3 - Adaptadores.
 """
 
 from pathlib import Path
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -218,6 +219,142 @@ def review_question_submission(
             "pending_questions_count": 0,
         },
     )
+
+
+@web_question_router.get("/questions/manage", response_model=None)
+def manage_all_questions_view(
+    request: Request,
+    subject_id: str | None = Query(None),
+    topic_id: str | None = Query(None),
+    error: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Visão centralizada para cadastro e gerenciamento de perguntas abertas."""
+    subj_repo = SqlAlchemySubjectRepository(db)
+    top_repo = SqlAlchemyTopicRepository(db)
+    q_repo = SqlAlchemyQuestionRepository(db)
+    prog_repo = SqlAlchemyQuestionProgressRepository(db)
+
+    subjects = subj_repo.list_by_owner(current_user.id)
+    total_due = prog_repo.count_due_questions(current_user.id, system_clock.today())
+
+    if not subjects:
+        return templates.TemplateResponse(
+            request=request,
+            name="questions/manage_all.html",
+            context={
+                "current_user": current_user,
+                "subjects": [],
+                "topics_by_subject": {},
+                "selected_subject": None,
+                "selected_topic": None,
+                "questions": [],
+                "pending_questions_count": total_due,
+                "error": error,
+            },
+        )
+
+    sub_uuid = _parse_uuid(subject_id)
+    selected_subject = None
+    if sub_uuid:
+        for s in subjects:
+            if s.id == sub_uuid:
+                selected_subject = s
+                break
+    if not selected_subject:
+        selected_subject = subjects[0]
+
+    topics_by_subject = {}
+    for s in subjects:
+        topics_by_subject[str(s.id)] = top_repo.list_by_subject(s.id)
+
+    current_topics = topics_by_subject.get(str(selected_subject.id), [])
+
+    top_uuid = _parse_uuid(topic_id)
+    selected_topic = None
+    if top_uuid:
+        for t in current_topics:
+            if t.id == top_uuid:
+                selected_topic = t
+                break
+    if not selected_topic and current_topics:
+        selected_topic = current_topics[0]
+
+    questions = []
+    if selected_topic:
+        use_case = ListQuestionsByTopicUseCase(q_repo, top_repo, subj_repo)
+        questions = use_case.execute(selected_topic.id, current_user.id)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="questions/manage_all.html",
+        context={
+            "current_user": current_user,
+            "subjects": subjects,
+            "topics_by_subject": topics_by_subject,
+            "selected_subject": selected_subject,
+            "selected_topic": selected_topic,
+            "questions": questions,
+            "pending_questions_count": total_due,
+            "error": error,
+        },
+    )
+
+
+@web_question_router.post("/questions/manage", response_model=None)
+def create_question_from_manage_view(
+    request: Request,
+    topic_id: Annotated[UUID, Form()],
+    prompt: Annotated[str, Form()],
+    expected_answer: Annotated[str, Form()],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Cadastra nova pergunta aberta a partir da visão centralizada."""
+    clean_prompt = MarkdownSanitizerService.sanitize(prompt)
+    clean_answer = MarkdownSanitizerService.sanitize(expected_answer)
+
+    q_repo = SqlAlchemyQuestionRepository(db)
+    prog_repo = SqlAlchemyQuestionProgressRepository(db)
+    top_repo = SqlAlchemyTopicRepository(db)
+    subj_repo = SqlAlchemySubjectRepository(db)
+
+    topic = top_repo.get_by_id(topic_id)
+    if not topic:
+        return RedirectResponse(
+            url="/questions/manage?error=Tema+n%C3%A3o+encontrado.",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    use_case = CreateQuestionUseCase(
+        question_repo=q_repo,
+        progress_repo=prog_repo,
+        topic_repo=top_repo,
+        subject_repo=subj_repo,
+        clock=system_clock,
+    )
+
+    try:
+        use_case.execute(
+            CreateQuestionDTO(topic_id=topic_id, prompt=clean_prompt, expected_answer=clean_answer),
+            user_id=current_user.id,
+        )
+        return RedirectResponse(
+            url=f"/questions/manage?subject_id={topic.subject_id}&topic_id={topic_id}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    except (
+        InvalidPromptError,
+        InvalidExpectedAnswerError,
+        DomainValidationError,
+        EntityNotFoundError,
+        ResourceOwnershipError,
+    ) as exc:
+        return RedirectResponse(
+            url=f"/questions/manage?subject_id={topic.subject_id}&topic_id={topic_id}&error={exc}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
 
 
 @web_question_router.get("/topics/{topic_id}/questions", response_model=None)

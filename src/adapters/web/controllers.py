@@ -17,6 +17,7 @@ from src.adapters.api.controllers import (
 )
 from src.adapters.persistence.repositories import (
     SqlAlchemyFlashcardRepository,
+    SqlAlchemyQuestionProgressRepository,
     SqlAlchemySessionRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
@@ -42,6 +43,7 @@ from src.application.use_cases.topic_use_cases import (
 )
 from src.domain.entities import User
 from src.domain.exceptions import DomainException, EmptyPoolError
+from src.infrastructure.clock import system_clock
 from src.infrastructure.database import get_db
 from src.infrastructure.rng import default_rng
 from src.infrastructure.security.dependencies import get_current_user
@@ -61,6 +63,26 @@ def _parse_uuid(val: str | None) -> UUID | None:
     except (ValueError, AttributeError, TypeError):
         return None
     return None
+
+
+@web_router.get("/cadastros", response_class=HTMLResponse)
+def cadastros_hub_view(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> HTMLResponse:
+    """Renderiza a Central de Cadastros (Hub de Gestão de Conteúdo)."""
+    prog_repo = SqlAlchemyQuestionProgressRepository(db)
+    pending_count = prog_repo.count_due_questions(current_user.id, system_clock.today())
+
+    return templates.TemplateResponse(
+        request=request,
+        name="cadastros.html",
+        context={
+            "current_user": current_user,
+            "pending_questions_count": pending_count,
+        },
+    )
 
 
 @web_router.get("/", response_class=RedirectResponse)

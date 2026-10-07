@@ -39,22 +39,65 @@
                     <span aria-hidden="true">🧠</span>
                     <span>Study Reviewer</span>
                 </a>
-                <nav class="hidden md:flex space-x-4" aria-label="Navegação Principal">
-                    <a href="/study" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/study' %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
-                        Estudar
+                <nav class="hidden md:flex items-center space-x-2" aria-label="Navegação Principal">
+                    <a href="/study" class="px-3 py-2 rounded-md text-sm font-medium transition-colors {% if request.url.path == '/study' %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
+                        Flashcards
                     </a>
-                    <a href="/questions/study" class="relative inline-flex items-center px-3 py-2 rounded-md text-sm font-medium {% if request.url.path.startswith('/questions') %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
+                    <a href="/questions/study" class="relative inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors {% if request.url.path.startswith('/questions/study') %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
                         <span>Revisão</span>
                         <span id="review-badge" class="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full {% if not pending_questions_count %}hidden{% endif %}">
                             {{ pending_questions_count or 0 }}
                         </span>
                     </a>
-                    <a href="/flashcards/new" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path.startswith('/flashcards') %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
-                        Novo Flashcard
-                    </a>
-                    <a href="/subjects" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path.startswith('/subjects') %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
-                        Matérias & Temas
-                    </a>
+
+                    <!-- Dropdown Cadastros -->
+                    <div class="relative inline-block text-left" id="cadastros-dropdown-container">
+                        <a 
+                            href="/cadastros" 
+                            id="cadastros-menu-btn" 
+                            role="button" 
+                            aria-haspopup="true" 
+                            aria-expanded="false" 
+                            aria-controls="cadastros-dropdown-menu" 
+                            class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors {% if request.url.path in ['/cadastros', '/subjects', '/flashcards/new', '/questions/manage'] or request.url.path.startswith('/topics') or request.url.path.startswith('/flashcards') or (request.url.path.startswith('/questions') and not request.url.path.startswith('/questions/study')) %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}"
+                        >
+                            <span>Cadastros</span>
+                            <svg class="ml-1 w-4 h-4 text-slate-500 dark:text-slate-400 transition-transform duration-200" id="cadastros-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </a>
+                        <div 
+                            id="cadastros-dropdown-menu" 
+                            role="menu" 
+                            aria-orientation="vertical" 
+                            aria-labelledby="cadastros-menu-btn" 
+                            class="hidden absolute left-0 mt-1.5 w-60 rounded-xl shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black/5 dark:ring-slate-700 divide-y divide-slate-100 dark:divide-slate-700/60 focus:outline-none z-50 transition-all"
+                        >
+                            <div class="py-1.5" role="none">
+                                <a href="/subjects" role="menuitem" class="group flex items-center px-4 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                    <span class="mr-3 text-lg" aria-hidden="true">🏷️</span>
+                                    <div>
+                                        <div class="font-medium text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Temas e matérias</div>
+                                        <div class="text-[11px] text-slate-400 dark:text-slate-500">Organize matérias e tópicos</div>
+                                    </div>
+                                </a>
+                                <a href="/questions/manage" role="menuitem" class="group flex items-center px-4 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                    <span class="mr-3 text-lg" aria-hidden="true">❓</span>
+                                    <div>
+                                        <div class="font-medium text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Perguntas</div>
+                                        <div class="text-[11px] text-slate-400 dark:text-slate-500">Perguntas abertas e gabaritos</div>
+                                    </div>
+                                </a>
+                                <a href="/flashcards/new" role="menuitem" class="group flex items-center px-4 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                    <span class="mr-3 text-lg" aria-hidden="true">📇</span>
+                                    <div>
+                                        <div class="font-medium text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Flashcards</div>
+                                        <div class="text-[11px] text-slate-400 dark:text-slate-500">Criar cartões de memorização</div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </nav>
             </div>
 
@@ -112,28 +155,24 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Barra Inferior de Navegação Mobile (Ergonomia Mobile-First 4 colunas) -->
-    <nav class="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 grid grid-cols-4 py-2 sticky bottom-0 z-30" aria-label="Navegação Inferior Mobile">
-        <a href="/study" class="flex flex-col items-center justify-center py-1 text-xs font-medium {% if request.url.path == '/study' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
-            <span class="text-lg" aria-hidden="true">📖</span>
-            <span>Estudo</span>
+    <!-- Barra Inferior de Navegação Mobile (Ergonomia Mobile-First 3 colunas) -->
+    <nav class="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 grid grid-cols-3 py-2 sticky bottom-0 z-30" aria-label="Navegação Inferior Mobile">
+        <a href="/study" class="flex flex-col items-center justify-center py-1 min-h-[48px] text-xs font-medium {% if request.url.path == '/study' %}text-indigo-600 dark:text-indigo-400 font-semibold{% else %}text-slate-500 dark:text-slate-400{% endif %}">
+            <span class="text-xl" aria-hidden="true">🗂️</span>
+            <span>Flashcards</span>
         </a>
-        <a href="/questions/study" class="relative flex flex-col items-center justify-center py-1 text-xs font-medium {% if request.url.path.startswith('/questions') %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
-            <span class="text-lg relative" aria-hidden="true">
+        <a href="/questions/study" class="relative flex flex-col items-center justify-center py-1 min-h-[48px] text-xs font-medium {% if request.url.path.startswith('/questions/study') %}text-indigo-600 dark:text-indigo-400 font-semibold{% else %}text-slate-500 dark:text-slate-400{% endif %}">
+            <span class="text-xl relative inline-block" aria-hidden="true">
                 🔄
-                <span id="review-badge-mobile" class="absolute -top-1 -right-2 inline-flex items-center justify-center px-1 py-0.5 text-[10px] font-bold leading-none text-white bg-indigo-600 rounded-full min-w-[16px] h-4 {% if not pending_questions_count %}hidden{% endif %}">
+                <span id="review-badge-mobile" class="absolute -top-1 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-indigo-600 rounded-full min-w-[16px] h-4 {% if not pending_questions_count %}hidden{% endif %}">
                     {{ pending_questions_count or 0 }}
                 </span>
             </span>
             <span>Revisão</span>
         </a>
-        <a href="/flashcards/new" class="flex flex-col items-center justify-center py-1 text-xs font-medium {% if request.url.path.startswith('/flashcards') %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
-            <span class="text-lg" aria-hidden="true">➕</span>
-            <span>Cadastrar</span>
-        </a>
-        <a href="/subjects" class="flex flex-col items-center justify-center py-1 text-xs font-medium {% if request.url.path.startswith('/subjects') %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
-            <span class="text-lg" aria-hidden="true">📚</span>
-            <span>Matérias</span>
+        <a href="/cadastros" class="flex flex-col items-center justify-center py-1 min-h-[48px] text-xs font-medium {% if request.url.path in ['/cadastros', '/subjects', '/flashcards/new', '/questions/manage'] or request.url.path.startswith('/topics') or request.url.path.startswith('/flashcards') or (request.url.path.startswith('/questions') and not request.url.path.startswith('/questions/study')) %}text-indigo-600 dark:text-indigo-400 font-semibold{% else %}text-slate-500 dark:text-slate-400{% endif %}">
+            <span class="text-xl" aria-hidden="true">📂</span>
+            <span>Cadastros</span>
         </a>
     </nav>
 
@@ -165,6 +204,73 @@
             }
             updateIcons();
         });
+
+        // Dropdown Cadastros com Acessibilidade WAI-ARIA
+        (function() {
+            const container = document.getElementById('cadastros-dropdown-container');
+            const btn = document.getElementById('cadastros-menu-btn');
+            const menu = document.getElementById('cadastros-dropdown-menu');
+            const chevron = document.getElementById('cadastros-chevron');
+            if (!container || !btn || !menu) return;
+
+            let timeoutId = null;
+
+            function openMenu() {
+                if (timeoutId) clearTimeout(timeoutId);
+                menu.classList.remove('hidden');
+                btn.setAttribute('aria-expanded', 'true');
+                if (chevron) chevron.classList.add('rotate-180');
+            }
+
+            function closeMenu() {
+                if (timeoutId) clearTimeout(timeoutId);
+                menu.classList.add('hidden');
+                btn.setAttribute('aria-expanded', 'false');
+                if (chevron) chevron.classList.remove('rotate-180');
+            }
+
+            container.addEventListener('mouseenter', openMenu);
+            container.addEventListener('mouseleave', () => {
+                timeoutId = setTimeout(closeMenu, 150);
+            });
+
+            btn.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown' || e.key === ' ') {
+                    e.preventDefault();
+                    openMenu();
+                    const firstItem = menu.querySelector('[role="menuitem"]');
+                    if (firstItem) firstItem.focus();
+                } else if (e.key === 'Escape') {
+                    closeMenu();
+                    btn.focus();
+                }
+            });
+
+            menu.addEventListener('keydown', (e) => {
+                const items = Array.from(menu.querySelectorAll('[role="menuitem"]'));
+                const currentIndex = items.indexOf(document.activeElement);
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const nextIndex = (currentIndex + 1) % items.length;
+                    items[nextIndex].focus();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prevIndex = (currentIndex - 1 + items.length) % items.length;
+                    items[prevIndex].focus();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeMenu();
+                    btn.focus();
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!container.contains(e.target)) {
+                    closeMenu();
+                }
+            });
+        })();
     </script>
 
     {% block scripts %}{% endblock %}
