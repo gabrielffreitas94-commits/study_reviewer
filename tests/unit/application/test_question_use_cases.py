@@ -34,15 +34,17 @@ from tests.unit.application.fakes import (
     FakeTopicRepository,
 )
 
-
-@pytest.fixture
-def repos() -> tuple[
+RepoFixture = tuple[
     FakeSubjectRepository,
     FakeTopicRepository,
     FakeQuestionRepository,
     FakeQuestionProgressRepository,
     FakeClockService,
-]:
+]
+
+
+@pytest.fixture
+def repos() -> RepoFixture:
     subj_repo = FakeSubjectRepository()
     top_repo = FakeTopicRepository()
     q_repo = FakeQuestionRepository()
@@ -57,7 +59,7 @@ def repos() -> tuple[
 
 
 @pytest.mark.unit
-def test_create_question_success(repos) -> None:
+def test_create_question_success(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     owner_id = uuid4()
     subj = Subject(id=uuid4(), name="Direito", owner_id=owner_id)
@@ -84,7 +86,7 @@ def test_create_question_success(repos) -> None:
 
 
 @pytest.mark.unit
-def test_create_question_topic_not_found(repos) -> None:
+def test_create_question_topic_not_found(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     use_case = CreateQuestionUseCase(q_repo, prog_repo, top_repo, subj_repo, clock)
     dto = CreateQuestionDTO(topic_id=uuid4(), prompt="P", expected_answer="R")
@@ -95,7 +97,7 @@ def test_create_question_topic_not_found(repos) -> None:
 
 @pytest.mark.unit
 @pytest.mark.security
-def test_create_question_non_owner_forbidden(repos) -> None:
+def test_create_question_non_owner_forbidden(repos: RepoFixture) -> None:
     """Vulnerabilidade prevenida: IDOR na criação de perguntas em temas alheios.
     Garantia de segurança: Apenas o proprietário da matéria pode adicionar perguntas.
     """
@@ -120,7 +122,7 @@ def test_create_question_non_owner_forbidden(repos) -> None:
 
 
 @pytest.mark.unit
-def test_update_question_success(repos) -> None:
+def test_update_question_success(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, _, _ = repos
     owner_id = uuid4()
     subj = Subject(id=uuid4(), name="Matemática", owner_id=owner_id)
@@ -139,12 +141,13 @@ def test_update_question_success(repos) -> None:
     assert updated.prompt == "Quanto é 1+1?"
     assert updated.expected_answer == "Dois"
     saved = q_repo.get_by_id(q.id)
+    assert saved is not None
     assert saved.prompt == "Quanto é 1+1?"
 
 
 @pytest.mark.unit
 @pytest.mark.security
-def test_update_question_non_owner_forbidden(repos) -> None:
+def test_update_question_non_owner_forbidden(repos: RepoFixture) -> None:
     """Vulnerabilidade prevenida: IDOR na edição de perguntas de outros usuários.
     Garantia de segurança: Tentativa de update por não-proprietário rejeitada com 403.
     """
@@ -166,7 +169,7 @@ def test_update_question_non_owner_forbidden(repos) -> None:
 
 
 @pytest.mark.unit
-def test_update_question_not_found(repos) -> None:
+def test_update_question_not_found(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, _, _ = repos
     use_case = UpdateQuestionUseCase(q_repo, top_repo, subj_repo)
     with pytest.raises(QuestionNotFoundError):
@@ -177,7 +180,7 @@ def test_update_question_not_found(repos) -> None:
 
 
 @pytest.mark.unit
-def test_delete_question_success(repos) -> None:
+def test_delete_question_success(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, _, _ = repos
     owner_id = uuid4()
     subj = Subject(id=uuid4(), name="Química", owner_id=owner_id)
@@ -195,7 +198,7 @@ def test_delete_question_success(repos) -> None:
 
 @pytest.mark.unit
 @pytest.mark.security
-def test_delete_question_non_owner_forbidden(repos) -> None:
+def test_delete_question_non_owner_forbidden(repos: RepoFixture) -> None:
     """Vulnerabilidade prevenida: IDOR na exclusão de perguntas alheias.
     Garantia de segurança: Tentativa de delete por terceiros rejeitada com 403.
     """
@@ -219,7 +222,7 @@ def test_delete_question_non_owner_forbidden(repos) -> None:
 
 
 @pytest.mark.unit
-def test_list_questions_by_topic_owner_and_public(repos) -> None:
+def test_list_questions_by_topic_owner_and_public(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, _, _ = repos
     owner_id = uuid4()
     visitor_id = uuid4()
@@ -250,7 +253,7 @@ def test_list_questions_by_topic_owner_and_public(repos) -> None:
 
 
 @pytest.mark.unit
-def test_get_question_by_id(repos) -> None:
+def test_get_question_by_id(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, _, _ = repos
     owner_id = uuid4()
     subj = Subject(id=uuid4(), name="Biologia", owner_id=owner_id, is_public=False)
@@ -281,7 +284,7 @@ def test_get_question_by_id(repos) -> None:
 
 
 @pytest.mark.unit
-def test_get_due_questions_deterministic_ordering(repos) -> None:
+def test_get_due_questions_deterministic_ordering(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     user_id = uuid4()
     subj = Subject(id=uuid4(), name="História", owner_id=user_id)
@@ -325,7 +328,7 @@ def test_get_due_questions_deterministic_ordering(repos) -> None:
 
 
 @pytest.mark.unit
-def test_get_due_questions_filter_public_subject_auto_initializes_batch(repos) -> None:
+def test_get_due_questions_filter_public_subject_auto_initializes_batch(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     owner_id = uuid4()
     student_id = uuid4()
@@ -357,7 +360,7 @@ def test_get_due_questions_filter_public_subject_auto_initializes_batch(repos) -
 
 
 @pytest.mark.unit
-def test_review_question_promotion_success(repos) -> None:
+def test_review_question_promotion_success(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     user_id = uuid4()
     subj = Subject(id=uuid4(), name="Sociologia", owner_id=user_id)
@@ -383,7 +386,7 @@ def test_review_question_promotion_success(repos) -> None:
 
 
 @pytest.mark.unit
-def test_review_question_level_6_penalty_regression(repos) -> None:
+def test_review_question_level_6_penalty_regression(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     user_id = uuid4()
     subj = Subject(id=uuid4(), name="Filosofia", owner_id=user_id)
@@ -410,7 +413,7 @@ def test_review_question_level_6_penalty_regression(repos) -> None:
 
 @pytest.mark.unit
 @pytest.mark.security
-def test_review_question_premature_review_rejected(repos) -> None:
+def test_review_question_premature_review_rejected(repos: RepoFixture) -> None:
     """Vulnerabilidade prevenida: Exploit temporal de SRS (saltar níveis no mesmo dia).
     Garantia de segurança: Submissões em perguntas cuja data de vencimento é futura são rejeitadas.
     """
@@ -435,7 +438,7 @@ def test_review_question_premature_review_rejected(repos) -> None:
 
 @pytest.mark.unit
 @pytest.mark.security
-def test_review_question_private_subject_idor_forbidden(repos) -> None:
+def test_review_question_private_subject_idor_forbidden(repos: RepoFixture) -> None:
     """Vulnerabilidade prevenida: IDOR na revisão de perguntas privadas de outros alunos.
     Garantia de segurança: Se a matéria for privada de terceiro, o acesso é rejeitado com 403.
     """
@@ -455,7 +458,7 @@ def test_review_question_private_subject_idor_forbidden(repos) -> None:
 
 
 @pytest.mark.unit
-def test_review_question_public_subject_jit_creation(repos) -> None:
+def test_review_question_public_subject_jit_creation(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     author_id = uuid4()
     student_id = uuid4()
@@ -476,7 +479,7 @@ def test_review_question_public_subject_jit_creation(repos) -> None:
 
 
 @pytest.mark.unit
-def test_use_cases_orphan_and_missing_entities_coverage(repos) -> None:
+def test_use_cases_orphan_and_missing_entities_coverage(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     user_id = uuid4()
 
@@ -511,7 +514,7 @@ def test_use_cases_orphan_and_missing_entities_coverage(repos) -> None:
 
 
 @pytest.mark.unit
-def test_use_cases_missing_subject_coverage(repos) -> None:
+def test_use_cases_missing_subject_coverage(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     user_id = uuid4()
 
@@ -549,7 +552,7 @@ def test_use_cases_missing_subject_coverage(repos) -> None:
 
 
 @pytest.mark.unit
-def test_get_due_questions_topic_filter_and_error_cases(repos) -> None:
+def test_get_due_questions_topic_filter_and_error_cases(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     user_id = uuid4()
     other_id = uuid4()
@@ -590,7 +593,7 @@ def test_get_due_questions_topic_filter_and_error_cases(repos) -> None:
 
 
 @pytest.mark.unit
-def test_missing_question_or_topic_not_found_errors(repos) -> None:
+def test_missing_question_or_topic_not_found_errors(repos: RepoFixture) -> None:
     subj_repo, top_repo, q_repo, prog_repo, clock = repos
     user_id = uuid4()
 

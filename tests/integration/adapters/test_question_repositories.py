@@ -4,6 +4,7 @@ e Progresso SRS (Camada 3).
 
 from collections.abc import Generator
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -84,7 +85,9 @@ def test_question_repository_crud(db_session: Session) -> None:
         expected_answer="Nova resposta",
     )
     q_repo.save(updated_q1)
-    assert q_repo.get_by_id(q1.id).prompt == "O que é evicção civil?"
+    saved = q_repo.get_by_id(q1.id)
+    assert saved is not None
+    assert saved.prompt == "O que é evicção civil?"
 
     # 4. Deletar
     q_repo.delete(q1.id)
@@ -226,7 +229,9 @@ def test_get_due_questions_zero_n_plus_one_query(db_session: Session) -> None:
     # Monitorar queries executadas
     query_count = 0
 
-    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    def before_cursor_execute(
+        conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: bool
+    ) -> None:
         nonlocal query_count
         query_count += 1
 

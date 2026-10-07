@@ -24,4 +24,96 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+    window.isAnswerRevealed = false;
+
+    function revealAnswer() {
+        const answerSection = document.getElementById('expected-answer-section');
+        const revealBtn = document.getElementById('btn-reveal-answer');
+        const form = document.getElementById('srs-evaluation-form');
+        const announcer = document.getElementById('srs-announcer');
+
+        if (answerSection && form && revealBtn) {
+            answerSection.classList.remove('hidden');
+            revealBtn.setAttribute('aria-expanded', 'true');
+            const actionContainer = document.getElementById('reveal-action-container');
+            if (actionContainer) actionContainer.classList.add('hidden');
+
+            form.classList.remove('opacity-40', 'pointer-events-none');
+            window.isAnswerRevealed = true;
+
+            if (announcer) {
+                announcer.textContent = "Resposta esperada revelada. Painel de avaliação habilitado.";
+            }
+
+            const slider = document.getElementById('score-slider');
+            if (slider) {
+                slider.focus();
+            }
+        }
+    }
+
+    function applyPreset(val) {
+        const slider = document.getElementById('score-slider');
+        const display = document.getElementById('score-display');
+        if (slider && display) {
+            slider.value = val;
+            display.textContent = val + '%';
+            updatePresetButtons(val);
+        }
+    }
+
+    function syncSlider(val) {
+        const display = document.getElementById('score-display');
+        if (display) {
+            display.textContent = val + '%';
+            updatePresetButtons(parseInt(val, 10));
+        }
+    }
+
+    function updatePresetButtons(activeVal) {
+        const buttons = document.querySelectorAll('.btn-preset');
+        buttons.forEach(btn => {
+            const btnVal = parseInt(btn.getAttribute('data-value'), 10);
+            if (btnVal === activeVal) {
+                btn.setAttribute('aria-pressed', 'true');
+                btn.className = 'btn-preset min-h-[44px] py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
+            } else {
+                btn.setAttribute('aria-pressed', 'false');
+                btn.className = 'btn-preset min-h-[44px] py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
+            }
+        });
+    }
+
+    if (!window.__srsShortcutsBound) {
+        window.__srsShortcutsBound = true;
+        document.addEventListener('keydown', function handleSrsShortcuts(e) {
+            const activeTag = document.activeElement ? document.activeElement.tagName : '';
+            if (activeTag === 'INPUT' && document.activeElement.type !== 'range') return;
+            if (activeTag === 'TEXTAREA') return;
+
+            if (!window.isAnswerRevealed) {
+                if (e.code === 'Space' || e.code === 'Enter') {
+                    if (document.activeElement && document.activeElement.id === 'btn-reveal-answer') {
+                        return;
+                    }
+                    const btn = document.getElementById('btn-reveal-answer');
+                    const container = document.getElementById('reveal-action-container');
+                    if (btn && container && !container.classList.contains('hidden')) {
+                        e.preventDefault();
+                        revealAnswer();
+                    }
+                }
+                return;
+            }
+
+            const presets = { '1': 0, '2': 25, '3': 50, '4': 75, '5': 100 };
+            if (presets.hasOwnProperty(e.key)) {
+                e.preventDefault();
+                applyPreset(presets[e.key]);
+            }
+        });
+    }
+</script>
 {% endblock %}

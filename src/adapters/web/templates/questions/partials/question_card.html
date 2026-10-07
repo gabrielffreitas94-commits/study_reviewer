@@ -26,6 +26,7 @@
             <button
                 type="button"
                 id="btn-reveal-answer"
+                autofocus
                 aria-expanded="false"
                 aria-controls="expected-answer-section"
                 onclick="revealAnswer()"
@@ -69,19 +70,19 @@
                     Autoavaliação de Domínio (Atalhos 1 a 5):
                 </label>
                 <div class="grid grid-cols-5 gap-2" role="group" aria-label="Presets rápidos de autoavaliação">
-                    <button type="button" class="btn-preset py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="0" onclick="applyPreset(0)" aria-pressed="false">
+                    <button type="button" class="btn-preset min-h-[44px] py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="0" onclick="applyPreset(0)" aria-pressed="false">
                         0%
                     </button>
-                    <button type="button" class="btn-preset py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="25" onclick="applyPreset(25)" aria-pressed="false">
+                    <button type="button" class="btn-preset min-h-[44px] py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="25" onclick="applyPreset(25)" aria-pressed="false">
                         25%
                     </button>
-                    <button type="button" class="btn-preset py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="50" onclick="applyPreset(50)" aria-pressed="false">
+                    <button type="button" class="btn-preset min-h-[44px] py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="50" onclick="applyPreset(50)" aria-pressed="false">
                         50%
                     </button>
-                    <button type="button" class="btn-preset py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="75" onclick="applyPreset(75)" aria-pressed="false">
+                    <button type="button" class="btn-preset min-h-[44px] py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="75" onclick="applyPreset(75)" aria-pressed="false">
                         75%
                     </button>
-                    <button type="button" class="btn-preset py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="100" onclick="applyPreset(100)" aria-pressed="true">
+                    <button type="button" class="btn-preset min-h-[44px] py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" data-value="100" onclick="applyPreset(100)" aria-pressed="true">
                         100%
                     </button>
                 </div>
@@ -126,102 +127,14 @@
 <span id="review-badge" hx-swap-oob="outerHTML" class="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full {% if not total_due %}hidden{% endif %}">
     {{ total_due }}
 </span>
-<span id="review-badge-mobile" hx-swap-oob="outerHTML" class="absolute -top-1 -right-2 inline-flex items-center justify-center px-1 py-0.2 text-[10px] font-bold leading-none text-white bg-indigo-600 rounded-full min-w-[16px] h-4 {% if not total_due %}hidden{% endif %}">
+<span id="review-badge-mobile" hx-swap-oob="outerHTML" class="absolute -top-1 -right-2 inline-flex items-center justify-center px-1 py-0.5 text-[10px] font-bold leading-none text-white bg-indigo-600 rounded-full min-w-[16px] h-4 {% if not total_due %}hidden{% endif %}">
     {{ total_due }}
 </span>
 
-<!-- Script local de controle do Card -->
+<!-- WAI-ARIA Live Announcer Out-of-Band update para leitores de tela -->
+<div id="srs-announcer" hx-swap-oob="innerHTML">Pergunta {{ current_num }} de {{ total_due }}: {{ card.subject_name }} / {{ card.topic_name }}. Pressione Espaço ou Enter para revelar a resposta esperada.</div>
+
+<!-- Redefine estado de resposta no swap HTMX sem acumular listeners -->
 <script>
     window.isAnswerRevealed = false;
-
-    function revealAnswer() {
-        const answerSection = document.getElementById('expected-answer-section');
-        const revealBtn = document.getElementById('btn-reveal-answer');
-        const form = document.getElementById('srs-evaluation-form');
-        const announcer = document.getElementById('srs-announcer');
-
-        if (answerSection && form && revealBtn) {
-            answerSection.classList.remove('hidden');
-            revealBtn.setAttribute('aria-expanded', 'true');
-            document.getElementById('reveal-action-container').classList.add('hidden');
-
-            // Habilita controles de avaliação
-            form.classList.remove('opacity-40', 'pointer-events-none');
-            window.isAnswerRevealed = true;
-
-            // Anuncia no leitor de tela
-            if (announcer) {
-                announcer.textContent = "Resposta esperada revelada. Painel de avaliação habilitado.";
-            }
-
-            // Foco programático no slider sem perder o contexto
-            const slider = document.getElementById('score-slider');
-            if (slider) {
-                slider.focus();
-            }
-        }
-    }
-
-    function applyPreset(val) {
-        const slider = document.getElementById('score-slider');
-        const display = document.getElementById('score-display');
-        if (slider && display) {
-            slider.value = val;
-            display.textContent = val + '%';
-            updatePresetButtons(val);
-        }
-    }
-
-    function syncSlider(val) {
-        const display = document.getElementById('score-display');
-        if (display) {
-            display.textContent = val + '%';
-            updatePresetButtons(parseInt(val, 10));
-        }
-    }
-
-    function updatePresetButtons(activeVal) {
-        const buttons = document.querySelectorAll('.btn-preset');
-        buttons.forEach(btn => {
-            const btnVal = parseInt(btn.getAttribute('data-value'), 10);
-            if (btnVal === activeVal) {
-                btn.setAttribute('aria-pressed', 'true');
-                btn.className = 'btn-preset py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
-            } else {
-                btn.setAttribute('aria-pressed', 'false');
-                btn.className = 'btn-preset py-2 px-1 text-xs sm:text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
-            }
-        });
-    }
-
-    // Teclas de atalho acessíveis WCAG 2.1.4
-    document.addEventListener('keydown', function handleSrsShortcuts(e) {
-        // Ignora se estiver digitando em campo de texto
-        const activeTag = document.activeElement ? document.activeElement.tagName : '';
-        if (activeTag === 'INPUT' && document.activeElement.type !== 'range') return;
-        if (activeTag === 'TEXTAREA') return;
-
-        // Se a resposta ainda não foi revelada
-        if (!window.isAnswerRevealed) {
-            if (e.code === 'Space' || e.code === 'Enter') {
-                if (document.activeElement && document.activeElement.id === 'btn-reveal-answer') {
-                    // comportamento nativo
-                    return;
-                }
-                const btn = document.getElementById('btn-reveal-answer');
-                if (btn && !btn.closest('#reveal-action-container').classList.contains('hidden')) {
-                    e.preventDefault();
-                    revealAnswer();
-                }
-            }
-            return;
-        }
-
-        // Se a resposta já foi revelada, atalhos numéricos 1 a 5
-        const presets = { '1': 0, '2': 25, '3': 50, '4': 75, '5': 100 };
-        if (presets.hasOwnProperty(e.key)) {
-            e.preventDefault();
-            applyPreset(presets[e.key]);
-        }
-    });
 </script>

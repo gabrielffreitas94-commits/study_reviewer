@@ -121,7 +121,7 @@
         <a href="/questions/study" class="relative flex flex-col items-center justify-center py-1 text-xs font-medium {% if request.url.path.startswith('/questions') %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
             <span class="text-lg relative" aria-hidden="true">
                 🔄
-                <span id="review-badge-mobile" class="absolute -top-1 -right-2 inline-flex items-center justify-center px-1 py-0.2 text-[10px] font-bold leading-none text-white bg-indigo-600 rounded-full min-w-[16px] h-4 {% if not pending_questions_count %}hidden{% endif %}">
+                <span id="review-badge-mobile" class="absolute -top-1 -right-2 inline-flex items-center justify-center px-1 py-0.5 text-[10px] font-bold leading-none text-white bg-indigo-600 rounded-full min-w-[16px] h-4 {% if not pending_questions_count %}hidden{% endif %}">
                     {{ pending_questions_count or 0 }}
                 </span>
             </span>
