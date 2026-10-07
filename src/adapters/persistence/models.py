@@ -243,3 +243,52 @@ class UserQuestionProgressModel(Base):
 
     user: Mapped["UserModel"] = relationship("UserModel")
     question: Mapped["QuestionModel"] = relationship("QuestionModel", back_populates="progresses")
+
+
+class ReviewAuditLogModel(Base):
+    """Tabela de Auditoria Histórica de Revisões de Perguntas Abertas (Sprint 04).
+
+    Imutável e desacoplada: Chaves estrangeiras com ON DELETE SET NULL garantem
+    que o histórico e snapshots de nomes permaneçam íntegros mesmo se a matéria,
+    tema, pergunta ou usuário forem excluídos (LGPD Art. 16, IV / 18, VI).
+    """
+
+    __tablename__ = "review_audit_logs"
+    __table_args__ = (
+        Index(
+            "ix_review_audit_logs_user_date",
+            "user_id",
+            "review_date",
+            postgresql_include=["score", "level_before", "level_after", "logged_at"],
+        ),
+        Index("ix_review_audit_logs_user_subject", "user_id", "subject_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    question_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("questions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    subject_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    topic_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    historical_subject_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    historical_topic_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    review_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    level_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    level_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    evaluation_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
+    logged_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+    user: Mapped["UserModel | None"] = relationship("UserModel")
+    question: Mapped["QuestionModel | None"] = relationship("QuestionModel")
+    subject: Mapped["SubjectModel | None"] = relationship("SubjectModel")
+    topic: Mapped["TopicModel | None"] = relationship("TopicModel")

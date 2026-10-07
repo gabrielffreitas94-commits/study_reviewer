@@ -215,9 +215,7 @@ class StudyStatisticsCalculatorService:
         )
 
     @classmethod
-    def compute_subject_performances(
-        cls, logs: list["ReviewAuditLog"]
-    ) -> list[SubjectPerformance]:
+    def compute_subject_performances(cls, logs: list["ReviewAuditLog"]) -> list[SubjectPerformance]:
         """Agrupa e calcula a taxa de retenção por matéria histórica."""
         subjects_data: dict[str, list[int]] = {}
         for log in logs:
@@ -242,15 +240,13 @@ class StudyStatisticsCalculatorService:
         return performances
 
     @classmethod
-    def compute_mature_timeline(
-        cls, logs: list["ReviewAuditLog"]
-    ) -> list[MatureDataPoint]:
+    def compute_mature_timeline(cls, logs: list["ReviewAuditLog"]) -> list[MatureDataPoint]:
         """Calcula a evolução cronológica líquida de perguntas em Retenção Madura (Nível 4+)."""
         if not logs:
             return []
 
         # Ordena logs cronologicamente
-        sorted_logs = sorted(logs, key=lambda l: (l.review_date, l.id))
+        sorted_logs = sorted(logs, key=lambda log_item: (log_item.review_date, log_item.id))
         timeline_by_date: dict[date, int] = {}
         mature_questions: set[UUID] = set()
 
@@ -266,4 +262,3 @@ class StudyStatisticsCalculatorService:
             MatureDataPoint(date=d, mature_count=count)
             for d, count in sorted(timeline_by_date.items())
         ]
-

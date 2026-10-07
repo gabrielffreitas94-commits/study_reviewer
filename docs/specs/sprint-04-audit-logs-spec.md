@@ -65,10 +65,11 @@ from src.domain.exceptions import DomainValidationError
 @dataclass(slots=True, frozen=True)
 class ReviewAuditLog:
     """Entidade indelével representando uma tentativa de revisão de pergunta aberta.
-    
+
     Preserva snapshot textual congelado da matéria e do tema no instante da avaliação,
     garantindo imunidade analítica a edições ou exclusões posteriores do catálogo.
     """
+
     user_id: UUID | None
     question_id: UUID | None
     subject_id: UUID | None
@@ -87,9 +88,13 @@ class ReviewAuditLog:
         if not (0 <= self.score <= 100):
             raise DomainValidationError(f"O score deve estar entre 0 e 100. Recebido: {self.score}")
         if not (0 <= self.level_before <= 6):
-            raise DomainValidationError(f"O level_before deve estar entre 0 e 6. Recebido: {self.level_before}")
+            raise DomainValidationError(
+                f"O level_before deve estar entre 0 e 6. Recebido: {self.level_before}"
+            )
         if not (0 <= self.level_after <= 6):
-            raise DomainValidationError(f"O level_after deve estar entre 0 e 6. Recebido: {self.level_after}")
+            raise DomainValidationError(
+                f"O level_after deve estar entre 0 e 6. Recebido: {self.level_after}"
+            )
         if not self.historical_subject_name or not self.historical_subject_name.strip():
             raise DomainValidationError("O nome histórico da matéria não pode ser vazio.")
         if not self.historical_topic_name or not self.historical_topic_name.strip():
@@ -183,6 +188,7 @@ Localizado em `src/adapters/persistence/models.py`:
 ```python
 class ReviewAuditLogModel(Base):
     """Tabela de Auditoria Imutável de Revisões (Sprint 04)."""
+
     __tablename__ = "review_audit_logs"
     __table_args__ = (
         # Índice cobridor B-Tree com INCLUDE no PostgreSQL para Index-Only Scans

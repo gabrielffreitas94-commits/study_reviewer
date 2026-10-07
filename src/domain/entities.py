@@ -317,4 +317,3 @@ class ReviewAuditLog:
     @property
     def is_regressed(self) -> bool:
         return self.level_after < self.level_before
-

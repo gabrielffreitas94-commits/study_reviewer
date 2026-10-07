@@ -1,9 +1,11 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from src.adapters.persistence.models import (
     FlashcardModel,
     PoolSessionModel,
     QuestionModel,
+    ReviewAuditLogModel,
     SubjectModel,
     TopicModel,
     UserModel,
@@ -13,6 +15,7 @@ from src.domain.entities import (
     Flashcard,
     FlashcardPoolSession,
     Question,
+    ReviewAuditLog,
     Subject,
     Topic,
     User,
@@ -200,4 +203,44 @@ class QuestionProgressMapper:
             current_level=entity.current_level,
             next_review_date=entity.next_review_date,
             last_reviewed_at=entity.last_reviewed_at,
+        )
+
+
+class ReviewAuditLogMapper:
+    """Conversor para Trilha de Auditoria Histórica (Sprint 04)."""
+
+    @staticmethod
+    def to_domain(model: ReviewAuditLogModel) -> ReviewAuditLog:
+        return ReviewAuditLog(
+            id=model.id,
+            user_id=model.user_id,
+            question_id=model.question_id,
+            subject_id=model.subject_id,
+            topic_id=model.topic_id,
+            historical_subject_name=model.historical_subject_name,
+            historical_topic_name=model.historical_topic_name,
+            review_date=model.review_date,
+            score=model.score,
+            level_before=model.level_before,
+            level_after=model.level_after,
+            evaluation_mode=model.evaluation_mode,
+            logged_at=model.logged_at,
+        )
+
+    @staticmethod
+    def to_model(entity: ReviewAuditLog) -> ReviewAuditLogModel:
+        return ReviewAuditLogModel(
+            id=entity.id,
+            user_id=entity.user_id,
+            question_id=entity.question_id,
+            subject_id=entity.subject_id,
+            topic_id=entity.topic_id,
+            historical_subject_name=entity.historical_subject_name,
+            historical_topic_name=entity.historical_topic_name,
+            review_date=entity.review_date,
+            score=entity.score,
+            level_before=entity.level_before,
+            level_after=entity.level_after,
+            evaluation_mode=entity.evaluation_mode,
+            logged_at=entity.logged_at or datetime.now(UTC),
         )

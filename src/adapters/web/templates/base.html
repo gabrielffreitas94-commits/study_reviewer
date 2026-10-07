@@ -98,6 +98,10 @@
                             </div>
                         </div>
                     </div>
+
+                    <a href="/performance" class="px-3 py-2 rounded-md text-sm font-medium transition-colors {% if request.url.path.startswith('/performance') %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
+                        Desempenho
+                    </a>
                 </nav>
             </div>
 
@@ -155,8 +159,8 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Barra Inferior de Navegação Mobile (Ergonomia Mobile-First 3 colunas) -->
-    <nav class="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 grid grid-cols-3 py-2 sticky bottom-0 z-30" aria-label="Navegação Inferior Mobile">
+    <!-- Barra Inferior de Navegação Mobile (Ergonomia Mobile-First 4 colunas) -->
+    <nav class="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 grid grid-cols-4 py-2 sticky bottom-0 z-30" aria-label="Navegação Inferior Mobile">
         <a href="/study" class="flex flex-col items-center justify-center py-1 min-h-[48px] text-xs font-medium {% if request.url.path == '/study' %}text-indigo-600 dark:text-indigo-400 font-semibold{% else %}text-slate-500 dark:text-slate-400{% endif %}">
             <span class="text-xl" aria-hidden="true">🗂️</span>
             <span>Flashcards</span>
@@ -169,6 +173,10 @@
                 </span>
             </span>
             <span>Revisão</span>
+        </a>
+        <a href="/performance" class="flex flex-col items-center justify-center py-1 min-h-[48px] text-xs font-medium {% if request.url.path.startswith('/performance') %}text-indigo-600 dark:text-indigo-400 font-semibold{% else %}text-slate-500 dark:text-slate-400{% endif %}">
+            <span class="text-xl" aria-hidden="true">📊</span>
+            <span>Desempenho</span>
         </a>
         <a href="/cadastros" class="flex flex-col items-center justify-center py-1 min-h-[48px] text-xs font-medium {% if request.url.path in ['/cadastros', '/subjects', '/flashcards/new', '/questions/manage'] or request.url.path.startswith('/topics') or request.url.path.startswith('/flashcards') or (request.url.path.startswith('/questions') and not request.url.path.startswith('/questions/study')) %}text-indigo-600 dark:text-indigo-400 font-semibold{% else %}text-slate-500 dark:text-slate-400{% endif %}">
             <span class="text-xl" aria-hidden="true">📂</span>

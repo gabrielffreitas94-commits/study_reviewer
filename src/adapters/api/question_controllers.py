@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from src.adapters.persistence.repositories import (
     SqlAlchemyQuestionProgressRepository,
     SqlAlchemyQuestionRepository,
+    SqlAlchemyReviewAuditRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
+    SqlAlchemyUnitOfWork,
 )
 from src.application.dto.question_dto import (
     CreateQuestionDTO,
@@ -151,6 +153,8 @@ def review_question_api(
     prog_repo = SqlAlchemyQuestionProgressRepository(db)
     top_repo = SqlAlchemyTopicRepository(db)
     subj_repo = SqlAlchemySubjectRepository(db)
+    audit_repo = SqlAlchemyReviewAuditRepository(db)
+    uow = SqlAlchemyUnitOfWork(db)
 
     use_case = ReviewQuestionUseCase(
         progress_repo=prog_repo,
@@ -158,6 +162,8 @@ def review_question_api(
         topic_repo=top_repo,
         subject_repo=subj_repo,
         clock=system_clock,
+        audit_repo=audit_repo,
+        uow=uow,
     )
 
     try:

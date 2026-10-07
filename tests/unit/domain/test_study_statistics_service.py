@@ -1,6 +1,6 @@
 """Testes unitários para o serviço de domínio StudyStatisticsCalculatorService (Sprint 04)."""
 
-from datetime import UTC, date, datetime
+from datetime import date
 from uuid import uuid4
 
 import pytest
@@ -254,4 +254,3 @@ def test_calculate_mature_evolution_timeline_with_regression() -> None:
     assert timeline[0].mature_count == 1
     assert timeline[1].date == d2
     assert timeline[1].mature_count == 0
-

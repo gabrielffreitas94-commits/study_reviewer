@@ -77,7 +77,9 @@ def test_review_audit_log_immutability() -> None:
 
 @pytest.mark.unit
 def test_review_audit_log_unique_id_generation() -> None:
-    """Verifica que instâncias criadas sem ID explícito recebem UUIDs distintos (default_factory=uuid4)."""
+    """Verifica que instâncias criadas sem ID explícito recebem UUIDs distintos
+    (default_factory=uuid4).
+    """
     log1 = ReviewAuditLog(
         user_id=uuid4(),
         question_id=uuid4(),
@@ -106,11 +108,14 @@ def test_review_audit_log_unique_id_generation() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("score,is_promoted,is_regressed", [
-    (100, True, False),   # Nível 2 -> 3 (Promovido)
-    (50, False, False),   # Nível 2 -> 2 (Mantido)
-    (0, False, False),    # Nível 2 -> 2 (Mantido)
-])
+@pytest.mark.parametrize(
+    "score,is_promoted,is_regressed",
+    [
+        (100, True, False),  # Nível 2 -> 3 (Promovido)
+        (50, False, False),  # Nível 2 -> 2 (Mantido)
+        (0, False, False),  # Nível 2 -> 2 (Mantido)
+    ],
+)
 def test_review_audit_log_promoted_and_maintained_properties(
     score: int, is_promoted: bool, is_regressed: bool
 ) -> None:
