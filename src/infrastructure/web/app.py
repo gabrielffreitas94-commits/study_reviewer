@@ -47,8 +47,15 @@ def create_app() -> FastAPI:
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
     from src.adapters.api.auth_controllers import api_auth_router
+    from src.adapters.api.question_controllers import api_question_router
     from src.adapters.web.auth_controllers import auth_router
-    from src.domain.exceptions import ResourceOwnershipError, UnauthorizedError
+    from src.adapters.web.question_controllers import web_question_router
+    from src.domain.exceptions import (
+        QuestionNotDueError,
+        QuestionNotFoundError,
+        ResourceOwnershipError,
+        UnauthorizedError,
+    )
 
     @app.exception_handler(ResourceOwnershipError)
     async def resource_ownership_handler(request: Request, exc: ResourceOwnershipError) -> Response:
@@ -72,6 +79,20 @@ def create_app() -> FastAPI:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         return RedirectResponse(url="/auth/login", status_code=303)
+
+    @app.exception_handler(QuestionNotFoundError)
+    async def question_not_found_handler(request: Request, exc: QuestionNotFoundError) -> Response:
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(status_code=404, content={"detail": str(exc)})
+        return HTMLResponse(status_code=404, content=f"<h1>404 Não Encontrado</h1><p>{exc}</p>")
+
+    @app.exception_handler(QuestionNotDueError)
+    async def question_not_due_handler(request: Request, exc: QuestionNotDueError) -> Response:
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return HTMLResponse(
+            status_code=400, content=f"<h1>400 Requisição Inválida</h1><p>{exc}</p>"
+        )
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> Response:
@@ -99,6 +120,8 @@ def create_app() -> FastAPI:
     app.include_router(api_auth_router)
     app.include_router(web_router)
     app.include_router(api_router)
+    app.include_router(web_question_router)
+    app.include_router(api_question_router)
 
     @app.get("/health", tags=["Health"])
     async def health_check() -> dict[str, str]:

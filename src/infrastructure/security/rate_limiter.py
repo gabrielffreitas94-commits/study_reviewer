@@ -37,3 +37,6 @@ def reset_rate_limits() -> None:
 
 # Instância global padrão para sincronização de estudo (20 req/min)
 study_sync_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
+
+# Instância global padrão para submissão de revisão SRS de Perguntas Abertas (60 req/min)
+question_review_rate_limiter = RateLimiter(max_requests=60, window_seconds=60)

@@ -1,9 +1,19 @@
 """Contratos de repositórios (Portas de Saída - Clean Architecture - Camada 2)."""
 
+from datetime import date, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
-from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic, User
+from src.application.dto.question_dto import DueQuestionItemDTO
+from src.domain.entities import (
+    Flashcard,
+    FlashcardPoolSession,
+    Question,
+    Subject,
+    Topic,
+    User,
+    UserQuestionProgress,
+)
 
 
 class IUserRepository(Protocol):
@@ -156,4 +166,75 @@ class IStudyEventRepository(Protocol):
 
     def anonymize_user_events(self, user_id: UUID) -> int:
         """Anonimiza eventos desvinculando user_id e device_id (LGPD Art. 16, IV / 18, VI)."""
+        ...
+
+
+class IQuestionRepository(Protocol):
+    """Porta de persistência para o Catálogo de Perguntas Abertas."""
+
+    def save(self, question: Question) -> None:
+        """Persiste ou atualiza uma pergunta no catálogo."""
+        ...
+
+    def get_by_id(self, question_id: UUID) -> Question | None:
+        """Busca uma pergunta pelo seu UUID primário."""
+        ...
+
+    def list_by_topic(self, topic_id: UUID) -> list[Question]:
+        """Lista todas as perguntas pertencentes a um determinado tema."""
+        ...
+
+    def delete(self, question_id: UUID) -> None:
+        """Exclui permanentemente uma pergunta do catálogo."""
+        ...
+
+
+class IQuestionProgressRepository(Protocol):
+    """Porta de persistência para o Histórico e Progresso Individual no SRS."""
+
+    def save(self, progress: UserQuestionProgress) -> None:
+        """Persiste ou atualiza o progresso individual de uma pergunta."""
+        ...
+
+    def get_by_user_and_question(
+        self, user_id: UUID, question_id: UUID
+    ) -> UserQuestionProgress | None:
+        """Busca o registro de progresso para a combinação de usuário e pergunta."""
+        ...
+
+    def get_due_questions(
+        self,
+        user_id: UUID,
+        reference_date: date,
+        subject_id: UUID | None = None,
+        topic_id: UUID | None = None,
+        limit: int = 50,
+    ) -> list[DueQuestionItemDTO]:
+        """Retorna a fila de perguntas pendentes para a data informada em consulta única sem N+1."""
+        ...
+
+    def count_due_questions(self, user_id: UUID, reference_date: date) -> int:
+        """Retorna o total de perguntas pendentes para o badge dinâmico."""
+        ...
+
+    def get_next_review_date(self, user_id: UUID, reference_date: date) -> date | None:
+        """Retorna a data de vencimento mais próxima estritamente superior a reference_date."""
+        ...
+
+    def initialize_progress_for_questions(
+        self, user_id: UUID, question_ids: list[UUID], initial_date: date
+    ) -> None:
+        """Inicializa em lote o progresso de perguntas para um estudante (JIT seguro)."""
+        ...
+
+
+class IClockService(Protocol):
+    """Porta para serviços temporais desacoplados para facilidade de testes."""
+
+    def today(self) -> date:
+        """Retorna a data corrente de calendário."""
+        ...
+
+    def now(self) -> datetime:
+        """Retorna o timestamp corrente com fuso horário."""
         ...

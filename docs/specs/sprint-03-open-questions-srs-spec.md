@@ -186,19 +186,30 @@ Encapsula as regras matemáticas do algoritmo SRS com complexidade $\mathcal{O}(
 class QuestionModel(Base):
     __tablename__ = "questions"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    topic_id: Mapped[UUID] = mapped_column(ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True)
+    topic_id: Mapped[UUID] = mapped_column(
+        ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     expected_answer: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[date] = mapped_column(Date, nullable=False, server_default=func.current_date())
+    created_at: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=func.current_date()
+    )
+
 
 class UserQuestionProgressModel(Base):
     __tablename__ = "user_question_progress"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    question_id: Mapped[UUID] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id: Mapped[UUID] = mapped_column(
+        ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     current_level: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     next_review_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         UniqueConstraint("user_id", "question_id", name="uq_user_question_progress"),

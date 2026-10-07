@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Revisão de Perguntas Abertas (SRS) - Study Reviewer{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto w-full py-4">
+    <!-- Indicador Global de Carregamento HTMX (Zero CLS) -->
+    <div id="srs-spinner" class="htmx-indicator flex items-center justify-center space-x-2 py-2 mb-4 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>Atualizando fila de revisão...</span>
+    </div>
+
+    <!-- Container Principal com Transição Fluida HTMX -->
+    <div id="srs-study-container" class="relative">
+        {% if card %}
+            {% include "questions/partials/question_card.html" %}
+        {% elif state == "onboarding" %}
+            {% include "questions/partials/onboarding.html" %}
+        {% else %}
+            {% include "questions/partials/inbox_zero.html" %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
