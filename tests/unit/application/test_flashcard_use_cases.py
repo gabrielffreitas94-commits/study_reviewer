@@ -9,6 +9,8 @@ from src.application.dto.study_dto import StudyCardDTO
 from src.application.use_cases.flashcard_use_cases import (
     CreateFlashcardUseCase,
     DeleteFlashcardUseCase,
+    ListTopicFlashcardsUseCase,
+    UpdateFlashcardUseCase,
 )
 from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
 from src.domain.exceptions import (
@@ -417,3 +419,272 @@ def test_create_flashcard_by_non_owner_raises_ownership_error() -> None:
             CreateFlashcardDTO(topic_id=topic.id, front="F", back="V"),
             user_id=intruder_id,
         )
+
+
+@pytest.mark.unit
+def test_list_topic_flashcards_success() -> None:
+    """Listagem de flashcards por tema retorna DTOs paginados."""
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+
+    owner_id = uuid4()
+    subject = Subject(name="Direito Constitucional", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+
+    topic = Topic(subject_id=subject.id, name="Controle de Constitucionalidade")
+    topic_repo.save(topic)
+
+    c1 = Flashcard(topic_id=topic.id, front="Card 1", back="Verso 1", position=100)
+    c2 = Flashcard(topic_id=topic.id, front="Card 2", back="Verso 2", position=200)
+    c3 = Flashcard(topic_id=topic.id, front="Card 3", back="Verso 3", position=300)
+    card_repo.save(c1)
+    card_repo.save(c2)
+    card_repo.save(c3)
+
+    use_case = ListTopicFlashcardsUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+
+    page1 = use_case.execute(topic_id=topic.id, user_id=owner_id, limit=2, offset=0)
+    assert len(page1) == 2
+    assert page1[0].id == c1.id
+    assert page1[1].id == c2.id
+
+    page2 = use_case.execute(topic_id=topic.id, user_id=owner_id, limit=2, offset=2)
+    assert len(page2) == 1
+    assert page2[0].id == c3.id
+
+
+@pytest.mark.unit
+def test_list_topic_flashcards_topic_not_found() -> None:
+    """Lança EntityNotFoundError caso o tema solicitado não exista."""
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+
+    use_case = ListTopicFlashcardsUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+    with pytest.raises(EntityNotFoundError, match="Tema não encontrado"):
+        use_case.execute(topic_id=uuid4(), user_id=uuid4())
+
+
+@pytest.mark.unit
+def test_list_topic_flashcards_subject_not_found() -> None:
+    """Lança EntityNotFoundError se a matéria vinculada ao tema não existir."""
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+
+    topic = Topic(subject_id=uuid4(), name="Tema Órfão")
+    topic_repo.save(topic)
+
+    use_case = ListTopicFlashcardsUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+    with pytest.raises(EntityNotFoundError, match="Matéria não encontrada"):
+        use_case.execute(topic_id=topic.id, user_id=uuid4())
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_list_topic_flashcards_private_subject_by_other_user_raises_ownership_error() -> None:
+    """Bloqueia a leitura de cards de tema em matéria privada de outro usuário.
+
+    Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) e vazamento de
+    flashcards privados.
+    Garantia de segurança: Lança ResourceOwnershipError ao tentar listar cards de tema pertencente
+    a matéria privada de terceiro.
+    """
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+
+    subject = Subject(name="Matéria Sigilosa", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+    topic = Topic(subject_id=subject.id, name="Assunto Privado")
+    topic_repo.save(topic)
+    card = Flashcard(topic_id=topic.id, front="Segredo", back="Resposta", position=100)
+    card_repo.save(card)
+
+    use_case = ListTopicFlashcardsUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+    with pytest.raises(
+        ResourceOwnershipError,
+        match="Você não tem permissão para visualizar cards desta matéria privada",
+    ):
+        use_case.execute(topic_id=topic.id, user_id=intruder_id)
+
+
+@pytest.mark.unit
+def test_list_topic_flashcards_public_subject_by_other_user_allowed() -> None:
+    """Permite que qualquer usuário visualize cards de temas em matérias públicas."""
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+
+    owner_id = uuid4()
+    reader_id = uuid4()
+
+    subject = Subject(name="Matéria Compartilhada", owner_id=owner_id, is_public=True)
+    subject_repo.save(subject)
+    topic = Topic(subject_id=subject.id, name="Assunto Aberto")
+    topic_repo.save(topic)
+    card = Flashcard(
+        topic_id=topic.id, front="Pergunta Aberta", back="Resposta Aberta", position=100
+    )
+    card_repo.save(card)
+
+    use_case = ListTopicFlashcardsUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+    result = use_case.execute(topic_id=topic.id, user_id=reader_id)
+    assert len(result) == 1
+    assert result[0].id == card.id
+
+
+@pytest.mark.unit
+def test_update_flashcard_success() -> None:
+    """Proprietário da matéria consegue atualizar frente e verso de um flashcard."""
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+
+    owner_id = uuid4()
+    subject = Subject(name="Direito Civil", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+    topic = Topic(subject_id=subject.id, name="Contratos")
+    topic_repo.save(topic)
+
+    card = Flashcard(topic_id=topic.id, front="Frente Antiga", back="Verso Antigo", position=100)
+    card_repo.save(card)
+
+    use_case = UpdateFlashcardUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+    updated_dto = use_case.execute(
+        card_id=card.id,
+        front="Frente Atualizada",
+        back="Verso Atualizado",
+        user_id=owner_id,
+    )
+
+    assert updated_dto.id == card.id
+    assert updated_dto.front == "Frente Atualizada"
+    assert updated_dto.back == "Verso Atualizado"
+
+    persisted = card_repo.get_by_id(card.id)
+    assert persisted is not None
+    assert persisted.front == "Frente Atualizada"
+    assert persisted.back == "Verso Atualizado"
+
+
+@pytest.mark.unit
+def test_update_flashcard_not_found() -> None:
+    """Lança EntityNotFoundError ao tentar atualizar flashcard inexistente."""
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+
+    use_case = UpdateFlashcardUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+    with pytest.raises(EntityNotFoundError, match="Flashcard não encontrado"):
+        use_case.execute(
+            card_id=uuid4(),
+            front="Nova",
+            back="Verso",
+            user_id=uuid4(),
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_update_flashcard_by_non_owner_raises_ownership_error() -> None:
+    """Impede que usuários alterem cards de matérias pertencentes a terceiros.
+
+    Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) e adulteração não
+    autorizada de cards.
+    Garantia de segurança: Lança ResourceOwnershipError ao tentar editar card de matéria
+    pertencente a outro usuário.
+    """
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+
+    subject = Subject(name="Direito Penal", owner_id=owner_id, is_public=True)
+    subject_repo.save(subject)
+    topic = Topic(subject_id=subject.id, name="Tipicidade")
+    topic_repo.save(topic)
+
+    card = Flashcard(
+        topic_id=topic.id, front="Texto Original", back="Gabarito Original", position=100
+    )
+    card_repo.save(card)
+
+    use_case = UpdateFlashcardUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+    with pytest.raises(
+        ResourceOwnershipError,
+        match="Você não tem permissão para editar cards desta matéria",
+    ):
+        use_case.execute(
+            card_id=card.id,
+            front="Injeção Indesejada",
+            back="Adulteração",
+            user_id=intruder_id,
+        )
+
+
+@pytest.mark.unit
+def test_update_flashcard_invalid_front_or_back_raises_domain_error() -> None:
+    """Lança DomainValidationError se a frente ou verso atualizados violarem regras de domínio."""
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+
+    owner_id = uuid4()
+    subject = Subject(name="Direito Ambiental", owner_id=owner_id, is_public=False)
+    subject_repo.save(subject)
+    topic = Topic(subject_id=subject.id, name="Princípios")
+    topic_repo.save(topic)
+
+    card = Flashcard(topic_id=topic.id, front="Frente", back="Verso", position=100)
+    card_repo.save(card)
+
+    use_case = UpdateFlashcardUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+
+    with pytest.raises(DomainValidationError, match="Frente do flashcard deve ter entre 1 e 5.000"):
+        use_case.execute(card_id=card.id, front="", back="Verso válido", user_id=owner_id)
+
+    with pytest.raises(DomainValidationError, match="Verso do flashcard deve ter entre 1 e 10.000"):
+        use_case.execute(card_id=card.id, front="Frente válida", back="   ", user_id=owner_id)

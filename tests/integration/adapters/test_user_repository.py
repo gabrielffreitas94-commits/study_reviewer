@@ -171,3 +171,20 @@ def test_cascade_delete_user_removes_subjects(db_session: Session) -> None:
     db_session.commit()
 
     assert subject_repo.get_by_id(subject.id) is None
+
+
+@pytest.mark.integration
+def test_delete_user_via_repository(db_session: Session) -> None:
+    """Valida a exclusão de usuário diretamente pelo repositório SqlAlchemyUserRepository."""
+    user_repo = SqlAlchemyUserRepository(db_session)
+    user = User(google_sub="sub-delete-repo", email="repo_del@teste.com", name="User Repo Del")
+    user_repo.save(user)
+    assert user_repo.get_by_id(user.id) is not None
+
+    user_repo.delete(user.id)
+    db_session.commit()
+
+    assert user_repo.get_by_id(user.id) is None
+
+    # Deletar usuário inexistente não deve levantar exceção
+    user_repo.delete(uuid4())

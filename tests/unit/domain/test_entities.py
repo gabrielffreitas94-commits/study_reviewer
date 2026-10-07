@@ -249,3 +249,15 @@ def test_study_session_exceptions_hierarchy() -> None:
     for err in [err1, err2, err3]:
         assert isinstance(err, StudySessionError)
         assert isinstance(err, DomainException)
+
+
+@pytest.mark.unit
+def test_subject_permissions_with_none_user_id() -> None:
+    """Valida can_be_edited_by e can_be_studied_by com user_id nulo (None)."""
+    subject_private = Subject(name="Direito Civil", owner_id=uuid4(), is_public=False)
+    assert subject_private.can_be_edited_by(None) is False
+    assert subject_private.can_be_studied_by(None) is False
+
+    subject_public = Subject(name="Direito Público", owner_id=uuid4(), is_public=True)
+    assert subject_public.can_be_edited_by(None) is False
+    assert subject_public.can_be_studied_by(None) is True

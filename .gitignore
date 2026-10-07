@@ -54,3 +54,19 @@ Thumbs.db
 node_modules/
 
 .neon
+
+# Android & Flutter Mobile Secrets & Artifacts
+*.jks
+*.keystore
+android/key.properties
+android/local.properties
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+mobile/build/
+build/
+*.aab
+*.apk

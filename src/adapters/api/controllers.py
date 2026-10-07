@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -26,7 +26,12 @@ from src.application.dto.subject_dto import CreateSubjectDTO, SubjectDTO
 from src.application.dto.topic_dto import CreateTopicDTO, TopicDTO
 from src.application.ports.repositories import IStudyEventRepository
 from src.application.use_cases.auth_use_cases import ToggleSubjectPublicUseCase
-from src.application.use_cases.flashcard_use_cases import CreateFlashcardUseCase
+from src.application.use_cases.flashcard_use_cases import (
+    CreateFlashcardUseCase,
+    DeleteFlashcardUseCase,
+    ListTopicFlashcardsUseCase,
+    UpdateFlashcardUseCase,
+)
 from src.application.use_cases.study_session_use_cases import (
     GetNextFlashcardUseCase,
     GetStudyBatchUseCase,
@@ -77,6 +82,11 @@ class CreateFlashcardRequest(BaseModel):
     back: str = Field(..., min_length=1, max_length=10000)
     topic_ids: list[UUID] = Field(default_factory=list)
     topic_id: UUID | None = None
+
+
+class UpdateFlashcardRequest(BaseModel):
+    front: str = Field(..., min_length=1, max_length=5000)
+    back: str = Field(..., min_length=1, max_length=10000)
 
 
 class StudyEventItemRequest(BaseModel):
@@ -324,6 +334,71 @@ def create_flashcard_api(
         ) from exc
 
 
+@api_router.put("/flashcards/{card_id}", response_model=FlashcardDTO)
+def update_flashcard_api(
+    card_id: UUID,
+    payload: UpdateFlashcardRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FlashcardDTO:
+    """Atualização de flashcard com sanitização anti-XSS e validação de permissão."""
+    card_repo = SqlAlchemyFlashcardRepository(db)
+    topic_repo = SqlAlchemyTopicRepository(db)
+    subject_repo = SqlAlchemySubjectRepository(db)
+
+    clean_front = sanitize_html_content(payload.front)
+    clean_back = sanitize_html_content(payload.back)
+
+    try:
+        use_case = UpdateFlashcardUseCase(
+            card_repo=card_repo,
+            topic_repo=topic_repo,
+            subject_repo=subject_repo,
+        )
+        return use_case.execute(
+            card_id=card_id,
+            front=clean_front,
+            back=clean_back,
+            user_id=current_user.id,
+        )
+    except EntityNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except DomainValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+
+
+@api_router.delete("/flashcards/{card_id}")
+def delete_flashcard_api(
+    card_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    """Exclusão de flashcard com validação de permissão de escrita na matéria."""
+    card_repo = SqlAlchemyFlashcardRepository(db)
+    session_repo = SqlAlchemySessionRepository(db)
+    topic_repo = SqlAlchemyTopicRepository(db)
+    subject_repo = SqlAlchemySubjectRepository(db)
+
+    try:
+        use_case = DeleteFlashcardUseCase(
+            card_repo=card_repo,
+            session_repo=session_repo,
+            rng=default_rng,
+            topic_repo=topic_repo,
+            subject_repo=subject_repo,
+        )
+        use_case.execute(flashcard_id=card_id, user_id=current_user.id)
+        return {"message": "Flashcard excluído com sucesso."}
+    except EntityNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
 @api_router.get("/subjects", response_model=list[SubjectDTO])
 def list_subjects_api(
     db: Session = Depends(get_db),
@@ -421,3 +496,34 @@ def create_topic_api(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
+
+
+@api_router.get("/topics/{topic_id}/flashcards", response_model=list[FlashcardDTO])
+def list_topic_flashcards_api(
+    topic_id: UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[FlashcardDTO]:
+    """Lista flashcards de um tema com paginação e validação de permissão de estudo."""
+    card_repo = SqlAlchemyFlashcardRepository(db)
+    topic_repo = SqlAlchemyTopicRepository(db)
+    subject_repo = SqlAlchemySubjectRepository(db)
+
+    try:
+        use_case = ListTopicFlashcardsUseCase(
+            card_repo=card_repo,
+            topic_repo=topic_repo,
+            subject_repo=subject_repo,
+        )
+        return use_case.execute(
+            topic_id=topic_id,
+            user_id=current_user.id,
+            limit=limit,
+            offset=offset,
+        )
+    except EntityNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc

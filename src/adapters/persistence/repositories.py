@@ -84,6 +84,13 @@ class SqlAlchemyUserRepository(IUserRepository):
         model = self._session.scalars(stmt).first()
         return UserMapper.to_domain(model) if model else None
 
+    def delete(self, user_id: UUID) -> None:
+        stmt = select(UserModel).where(UserModel.id == user_id)
+        user = self._session.scalars(stmt).first()
+        if user:
+            self._session.delete(user)
+            self._session.flush()
+
 
 class SqlAlchemySubjectRepository(ISubjectRepository):
     """Repositório SQLAlchemy para Matérias com suporte a multi-tenancy e acesso público."""
@@ -269,6 +276,7 @@ class SqlAlchemyFlashcardRepository(IFlashcardRepository):
         topic_id: UUID | None,
         limit: int | None = None,
         min_position: int | None = None,
+        offset: int | None = None,
     ) -> list[Flashcard]:
         stmt = select(FlashcardModel).options(selectinload(FlashcardModel.topics))
         stmt = stmt.order_by(FlashcardModel.position.asc())
@@ -284,6 +292,9 @@ class SqlAlchemyFlashcardRepository(IFlashcardRepository):
                 .where(TopicModel.subject_id == subject_id)
                 .distinct()
             )
+
+        if offset is not None:
+            stmt = stmt.offset(offset)
 
         if limit is not None:
             stmt = stmt.limit(limit)

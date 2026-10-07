@@ -1,0 +1,83 @@
+name: CI Mobile Flutter (Lint, Test & Build)
+
+on:
+  push:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/ci-mobile-flutter.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/ci-mobile-flutter.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-lint-and-test:
+    name: Flutter Lint, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Flutter Stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+
+      - name: Cache Pub Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Cache Gradle Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Detect Flutter Project Directory
+        id: flutter-dir
+        run: |
+          if [ -d "mobile" ]; then
+            echo "path=mobile" >> $GITHUB_OUTPUT
+          else
+            echo "path=." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Flutter Dependencies
+        working-directory: ${{ steps.flutter-dir.outputs.path }}
+        run: flutter pub get
+
+      - name: Verify Code Formatting
+        working-directory: ${{ steps.flutter-dir.outputs.path }}
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Run Static Analysis
+        working-directory: ${{ steps.flutter-dir.outputs.path }}
+        run: flutter analyze --fatal-infos
+
+      - name: Run Tests with Coverage
+        working-directory: ${{ steps.flutter-dir.outputs.path }}
+        run: flutter test --coverage
+
+      - name: Build Android App Bundle (Release)
+        working-directory: ${{ steps.flutter-dir.outputs.path }}
+        run: flutter build appbundle --release --no-codesign

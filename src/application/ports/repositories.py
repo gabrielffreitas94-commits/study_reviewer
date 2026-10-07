@@ -36,6 +36,10 @@ class IUserRepository(Protocol):
         """Busca um usuário pelo seu endereço de e-mail."""
         ...
 
+    def delete(self, user_id: UUID) -> None:
+        """Remove um usuário pelo seu identificador único."""
+        ...
+
 
 class ISubjectRepository(Protocol):
     """Porta de persistência para Matérias."""
@@ -116,6 +120,7 @@ class IFlashcardRepository(Protocol):
         topic_id: UUID | None,
         limit: int | None = None,
         min_position: int | None = None,
+        offset: int | None = None,
     ) -> list[Flashcard]:
         """Lista os cards da pool ordenados por position ASC com filtros opcionais e paginação."""
         ...

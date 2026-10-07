@@ -68,6 +68,9 @@ class FakeUserRepository(IUserRepository):
                 return u
         return None
 
+    def delete(self, user_id: UUID) -> None:
+        self._users.pop(user_id, None)
+
 
 class FakeSubjectRepository(ISubjectRepository):
     """Implementação em memória de ISubjectRepository."""
@@ -166,6 +169,7 @@ class FakeFlashcardRepository(IFlashcardRepository):
         topic_id: UUID | None,
         limit: int | None = None,
         min_position: int | None = None,
+        offset: int | None = None,
     ) -> list[Flashcard]:
         cards = list(self._cards.values())
 
@@ -179,6 +183,9 @@ class FakeFlashcardRepository(IFlashcardRepository):
         sorted_cards = sorted(cards, key=lambda c: c.position)
         if min_position is not None:
             sorted_cards = [c for c in sorted_cards if c.position > min_position]
+
+        if offset is not None:
+            sorted_cards = sorted_cards[offset:]
 
         if limit is not None:
             sorted_cards = sorted_cards[:limit]

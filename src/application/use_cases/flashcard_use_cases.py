@@ -158,3 +158,104 @@ class DeleteFlashcardUseCase:
                     session.advance_to(next_card.position)
 
             self._session_repo.save_session(session)
+
+
+class ListTopicFlashcardsUseCase:
+    """Caso de uso para listagem paginada de flashcards de um determinado tema."""
+
+    def __init__(
+        self,
+        card_repo: IFlashcardRepository,
+        topic_repo: ITopicRepository,
+        subject_repo: ISubjectRepository,
+    ) -> None:
+        self._card_repo = card_repo
+        self._topic_repo = topic_repo
+        self._subject_repo = subject_repo
+
+    def execute(
+        self,
+        topic_id: UUID,
+        user_id: UUID | None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[FlashcardDTO]:
+        topic = self._topic_repo.get_by_id(topic_id)
+        if topic is None:
+            raise EntityNotFoundError("Tema não encontrado.")
+
+        subject = self._subject_repo.get_by_id(topic.subject_id)
+        if subject is None:
+            raise EntityNotFoundError("Matéria não encontrada.")
+
+        if not subject.can_be_studied_by(user_id):
+            raise ResourceOwnershipError(
+                "Você não tem permissão para visualizar cards desta matéria privada."
+            )
+
+        cards = self._card_repo.list_pool(
+            subject_id=None,
+            topic_id=topic_id,
+            limit=limit,
+            offset=offset,
+        )
+
+        return [
+            FlashcardDTO(
+                id=c.id,
+                front=c.front,
+                back=c.back,
+                position=c.position,
+                created_at=c.created_at,
+                topic_ids=list(c.topic_ids),
+                topic_id=c.primary_topic_id,
+            )
+            for c in cards
+        ]
+
+
+class UpdateFlashcardUseCase:
+    """Caso de uso para atualização de flashcard com validação de permissão de escrita."""
+
+    def __init__(
+        self,
+        card_repo: IFlashcardRepository,
+        topic_repo: ITopicRepository,
+        subject_repo: ISubjectRepository,
+    ) -> None:
+        self._card_repo = card_repo
+        self._topic_repo = topic_repo
+        self._subject_repo = subject_repo
+
+    def execute(
+        self,
+        card_id: UUID,
+        front: str,
+        back: str,
+        user_id: UUID | None,
+    ) -> FlashcardDTO:
+        card = self._card_repo.get_by_id(card_id)
+        if card is None:
+            raise EntityNotFoundError("Flashcard não encontrado.")
+
+        for t_id in card.topic_ids:
+            topic = self._topic_repo.get_by_id(t_id)
+            if topic is not None:
+                subject = self._subject_repo.get_by_id(topic.subject_id)
+                if subject is not None and not subject.can_be_edited_by(user_id):
+                    raise ResourceOwnershipError(
+                        "Você não tem permissão para editar cards desta matéria."
+                    )
+
+        card.update_content(front, back)
+        self._card_repo.save(card)
+
+        return FlashcardDTO(
+            id=card.id,
+            front=card.front,
+            back=card.back,
+            position=card.position,
+            created_at=card.created_at,
+            topic_ids=list(card.topic_ids),
+            topic_id=card.primary_topic_id,
+        )

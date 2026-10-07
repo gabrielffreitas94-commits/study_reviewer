@@ -137,6 +137,32 @@ class LogoutUseCase:
         pass
 
 
+class DeleteAccountUseCase:
+    """Caso de uso para exclusão de conta e dados pessoais (LGPD Art. 18 / Google Play Data Safety).
+
+    Valida a existência do usuário e comanda a exclusão física da conta no repositório.
+    Como o banco está configurado com ON DELETE SET NULL em review_audit_logs e study_events
+    e CASCADE em subjects e user_question_progress, a exclusão remove integralmente os dados
+    pessoais e cadastros mantendo os registros históricos anonimizados para estatísticas
+    agregadas sob o Art. 16, IV da LGPD.
+    """
+
+    def __init__(
+        self,
+        user_repo: IUserRepository,
+        session_token_service: ISessionTokenService | None = None,
+    ) -> None:
+        self._user_repo = user_repo
+        self._session_token_service = session_token_service
+
+    def execute(self, user_id: UUID) -> None:
+        user = self._user_repo.get_by_id(user_id)
+        if user is None:
+            raise EntityNotFoundError("Usuário não encontrado.")
+
+        self._user_repo.delete(user_id)
+
+
 class ToggleSubjectPublicUseCase:
     """Caso de uso para o proprietário alternar a visibilidade pública de sua matéria."""
 
