@@ -93,6 +93,9 @@ class TopicModel(Base):
         back_populates="topics",
         lazy="selectin",
     )
+    questions: Mapped[list["QuestionModel"]] = relationship(
+        "QuestionModel", back_populates="topic", cascade="all, delete-orphan", lazy="selectin"
+    )
 
 
 class FlashcardTopicModel(Base):
@@ -190,3 +193,53 @@ class StudyEventModel(Base):
     session_id: Mapped[UUID] = mapped_column(Uuid, nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False)  # 'viewed', 'completed'
     device_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+
+class QuestionModel(Base):
+    """Tabela de Perguntas Abertas (Sprint 03)."""
+
+    __tablename__ = "questions"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    topic_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    expected_answer: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
+
+    topic: Mapped["TopicModel"] = relationship("TopicModel", back_populates="questions")
+    progresses: Mapped[list["UserQuestionProgressModel"]] = relationship(
+        "UserQuestionProgressModel", back_populates="question", cascade="all, delete-orphan"
+    )
+
+
+class UserQuestionProgressModel(Base):
+    """Tabela de Progresso SRS de Perguntas Abertas por Estudante (Sprint 03)."""
+
+    __tablename__ = "user_question_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", "question_id", name="uq_user_question_progress"),
+        Index(
+            "ix_user_question_due_covering",
+            "user_id",
+            "next_review_date",
+            postgresql_include=["question_id", "current_level", "last_reviewed_at"],
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    current_level: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_review_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    user: Mapped["UserModel"] = relationship("UserModel")
+    question: Mapped["QuestionModel"] = relationship("QuestionModel", back_populates="progresses")

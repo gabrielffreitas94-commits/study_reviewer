@@ -3,11 +3,21 @@ from uuid import UUID
 from src.adapters.persistence.models import (
     FlashcardModel,
     PoolSessionModel,
+    QuestionModel,
     SubjectModel,
     TopicModel,
     UserModel,
+    UserQuestionProgressModel,
 )
-from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic, User
+from src.domain.entities import (
+    Flashcard,
+    FlashcardPoolSession,
+    Question,
+    Subject,
+    Topic,
+    User,
+    UserQuestionProgress,
+)
 
 
 class UserMapper:
@@ -140,4 +150,54 @@ class SessionMapper:
             updated_at=entity.updated_at,
             current_index=entity.current_index,
             card_queue=[str(cid) for cid in entity.card_queue],
+        )
+
+
+class QuestionMapper:
+    """Conversor para Pergunta Aberta (Sprint 03)."""
+
+    @staticmethod
+    def to_domain(model: QuestionModel) -> Question:
+        return Question(
+            id=model.id,
+            topic_id=model.topic_id,
+            prompt=str(model.prompt),
+            expected_answer=str(model.expected_answer),
+            created_at=model.created_at,
+        )
+
+    @staticmethod
+    def to_model(entity: Question) -> QuestionModel:
+        return QuestionModel(
+            id=entity.id,
+            topic_id=entity.topic_id,
+            prompt=entity.prompt,
+            expected_answer=entity.expected_answer,
+            created_at=entity.created_at,
+        )
+
+
+class QuestionProgressMapper:
+    """Conversor para Progresso de Pergunta Aberta (Sprint 03)."""
+
+    @staticmethod
+    def to_domain(model: UserQuestionProgressModel) -> UserQuestionProgress:
+        return UserQuestionProgress(
+            id=model.id,
+            user_id=model.user_id,
+            question_id=model.question_id,
+            current_level=model.current_level,
+            next_review_date=model.next_review_date,
+            last_reviewed_at=model.last_reviewed_at,
+        )
+
+    @staticmethod
+    def to_model(entity: UserQuestionProgress) -> UserQuestionProgressModel:
+        return UserQuestionProgressModel(
+            id=entity.id,
+            user_id=entity.user_id,
+            question_id=entity.question_id,
+            current_level=entity.current_level,
+            next_review_date=entity.next_review_date,
+            last_reviewed_at=entity.last_reviewed_at,
         )

@@ -1,15 +1,25 @@
-"""Repositórios fake em memória para testes unitários da camada de aplicação."""
-
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
+from src.application.dto.question_dto import DueQuestionItemDTO
 from src.application.ports.repositories import (
+    IClockService,
     IFlashcardRepository,
+    IQuestionProgressRepository,
+    IQuestionRepository,
     ISessionRepository,
     ISubjectRepository,
     ITopicRepository,
 )
-from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic
+from src.domain.entities import (
+    Flashcard,
+    FlashcardPoolSession,
+    Question,
+    Subject,
+    Topic,
+    UserQuestionProgress,
+)
 from src.domain.protocols import IRandomGenerator
 
 
@@ -196,3 +206,153 @@ class FakeSessionRepository(ISessionRepository):
             session
         )
         self._sessions[(session.subject_id_filter, session.topic_id_filter, None)] = session
+
+
+class FakeClockService(IClockService):
+    """Implementação em memória de IClockService para testes temporais."""
+
+    def __init__(
+        self, current_date: date | None = None, current_datetime: datetime | None = None
+    ) -> None:
+        self._date = current_date or date.today()
+        self._datetime = current_datetime or datetime.now(UTC)
+
+    def set_date(self, new_date: date) -> None:
+        self._date = new_date
+
+    def set_datetime(self, new_dt: datetime) -> None:
+        self._datetime = new_dt
+
+    def today(self) -> date:
+        return self._date
+
+    def now(self) -> datetime:
+        return self._datetime
+
+
+class FakeQuestionRepository(IQuestionRepository):
+    """Implementação em memória de IQuestionRepository."""
+
+    def __init__(self) -> None:
+        self._questions: dict[UUID, Question] = {}
+
+    def save(self, question: Question) -> None:
+        self._questions[question.id] = question
+
+    def get_by_id(self, question_id: UUID) -> Question | None:
+        return self._questions.get(question_id)
+
+    def list_by_topic(self, topic_id: UUID) -> list[Question]:
+        return [
+            q
+            for q in sorted(self._questions.values(), key=lambda x: x.created_at)
+            if q.topic_id == topic_id
+        ]
+
+    def delete(self, question_id: UUID) -> None:
+        self._questions.pop(question_id, None)
+
+
+class FakeQuestionProgressRepository(IQuestionProgressRepository):
+    """Implementação em memória de IQuestionProgressRepository com suporte a joins."""
+
+    def __init__(
+        self,
+        question_repo: FakeQuestionRepository | None = None,
+        topic_repo: FakeTopicRepository | None = None,
+        subject_repo: FakeSubjectRepository | None = None,
+    ) -> None:
+        self._progress: dict[tuple[UUID, UUID], UserQuestionProgress] = {}
+        self._question_repo = question_repo or FakeQuestionRepository()
+        self._topic_repo = topic_repo or FakeTopicRepository()
+        self._subject_repo = subject_repo or FakeSubjectRepository()
+
+    def save(self, progress: UserQuestionProgress) -> None:
+        self._progress[(progress.user_id, progress.question_id)] = progress
+
+    def get_by_user_and_question(
+        self, user_id: UUID, question_id: UUID
+    ) -> UserQuestionProgress | None:
+        return self._progress.get((user_id, question_id))
+
+    def get_due_questions(
+        self,
+        user_id: UUID,
+        reference_date: date,
+        subject_id: UUID | None = None,
+        topic_id: UUID | None = None,
+        limit: int = 50,
+    ) -> list[DueQuestionItemDTO]:
+        items: list[DueQuestionItemDTO] = []
+        intervals = (1, 7, 15, 30, 60, 90, 180)
+
+        user_progs = [p for (u_id, _), p in self._progress.items() if u_id == user_id]
+        due_progs = [p for p in user_progs if p.next_review_date <= reference_date]
+
+        # Ordenação determinística: next_review_date ASC, current_level ASC, question_id ASC
+        sorted_progs = sorted(
+            due_progs,
+            key=lambda p: (p.next_review_date, p.current_level, p.question_id),
+        )
+
+        for p in sorted_progs:
+            q = self._question_repo.get_by_id(p.question_id)
+            if not q:
+                continue
+            topic = self._topic_repo.get_by_id(q.topic_id)
+            topic_name = topic.name if topic else "Tema"
+            subject_name = "Matéria"
+            if topic:
+                if topic_id is not None and topic.id != topic_id:
+                    continue
+                subj = self._subject_repo.get_by_id(topic.subject_id)
+                if subj:
+                    if subject_id is not None and subj.id != subject_id:
+                        continue
+                    subject_name = subj.name
+
+            level_idx = min(p.current_level, 6)
+            items.append(
+                DueQuestionItemDTO(
+                    question_id=q.id,
+                    subject_name=subject_name,
+                    topic_name=topic_name,
+                    prompt=q.prompt,
+                    expected_answer=q.expected_answer,
+                    current_level=p.current_level,
+                    interval_days=intervals[level_idx],
+                    due_date=p.next_review_date,
+                )
+            )
+            if len(items) >= limit:
+                break
+
+        return items
+
+    def count_due_questions(self, user_id: UUID, reference_date: date) -> int:
+        return sum(
+            1
+            for (u_id, _), p in self._progress.items()
+            if u_id == user_id and p.next_review_date <= reference_date
+        )
+
+    def get_next_review_date(self, user_id: UUID, reference_date: date) -> date | None:
+        future_dates = [
+            p.next_review_date
+            for (u_id, _), p in self._progress.items()
+            if u_id == user_id and p.next_review_date > reference_date
+        ]
+        return min(future_dates) if future_dates else None
+
+    def initialize_progress_for_questions(
+        self, user_id: UUID, question_ids: list[UUID], initial_date: date
+    ) -> None:
+        for q_id in question_ids:
+            if (user_id, q_id) not in self._progress:
+                self._progress[(user_id, q_id)] = UserQuestionProgress(
+                    user_id=user_id,
+                    question_id=q_id,
+                    current_level=0,
+                    next_review_date=initial_date,
+                    last_reviewed_at=None,
+                )

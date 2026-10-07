@@ -8,7 +8,9 @@ from uuid import UUID, uuid4
 from src.domain.exceptions import (
     DomainValidationError,
     InvalidEmailError,
+    InvalidExpectedAnswerError,
     InvalidGoogleSubError,
+    InvalidPromptError,
 )
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
@@ -221,3 +223,48 @@ class FlashcardPoolSession:
         self.current_position = initial_position
         self.current_index = 0
         self.updated_at = datetime.now(UTC)
+
+
+@dataclass(slots=True)
+class Question:
+    """Entidade que representa uma Pergunta Aberta pertencente a um Tema."""
+
+    topic_id: UUID
+    prompt: str
+    expected_answer: str
+    id: UUID = field(default_factory=uuid4)
+    created_at: date = field(default_factory=date.today)
+
+    def __post_init__(self) -> None:
+        self.prompt = self.prompt.strip() if self.prompt is not None else ""
+        self.expected_answer = (
+            self.expected_answer.strip() if self.expected_answer is not None else ""
+        )
+        if not self.prompt or len(self.prompt) > 10_000:
+            raise InvalidPromptError("Enunciado deve ter entre 1 e 10.000 caracteres.")
+        if not self.expected_answer or len(self.expected_answer) > 10_000:
+            raise InvalidExpectedAnswerError("Gabarito deve ter entre 1 e 10.000 caracteres.")
+
+
+@dataclass(slots=True)
+class UserQuestionProgress:
+    """Entidade que representa o progresso individual de um Estudante no motor SRS."""
+
+    user_id: UUID
+    question_id: UUID
+    current_level: int = 0
+    next_review_date: date = field(default_factory=date.today)
+    last_reviewed_at: datetime | None = None
+    id: UUID = field(default_factory=uuid4)
+
+    def __post_init__(self) -> None:
+        if not (0 <= self.current_level <= 6):
+            raise DomainValidationError("O nível SRS deve estar estritamente entre 0 e 6.")
+
+    def apply_review(self, new_level: int, next_date: date, reviewed_at: datetime) -> None:
+        """Aplica a transição calculada pelo SpacingPolicyService preservando invariantes."""
+        if not (0 <= new_level <= 6):
+            raise DomainValidationError("O nível SRS deve pertencer ao intervalo [0, 6].")
+        self.current_level = new_level
+        self.next_review_date = next_date
+        self.last_reviewed_at = reviewed_at

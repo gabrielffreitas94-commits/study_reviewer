@@ -1,9 +1,11 @@
 """Serviço de domínio para a Pool de Flashcards com Gap Indexing (Clean Architecture - Camada 1)."""
 
 import math
+from datetime import date, timedelta
 from uuid import UUID
 
 from src.domain.entities import Flashcard
+from src.domain.exceptions import DomainValidationError, InvalidScoreError
 from src.domain.protocols import IRandomGenerator
 
 
@@ -97,3 +99,47 @@ class FlashcardPoolService:
         if upcoming:
             return upcoming[0], False
         return None, True
+
+
+class SpacingPolicyService:
+    """Motor de repetição espaçada por calendário (SRS Estrito)."""
+
+    INTERVALS: tuple[int, ...] = (1, 7, 15, 30, 60, 90, 180)
+
+    @classmethod
+    def get_interval(cls, level: int) -> int:
+        """Retorna o intervalo em dias para o nível especificado (limitado entre 0 e 6)."""
+        idx = max(0, min(level, len(cls.INTERVALS) - 1))
+        return cls.INTERVALS[idx]
+
+    @classmethod
+    def calculate_next_schedule(
+        cls, current_level: int, score: int, review_date: date
+    ) -> tuple[int, date]:
+        """Calcula o novo nível e a data da próxima revisão com base na nota atribuída.
+
+        Regras:
+        - score == 100:
+          - se level < 6: level + 1, data = review_date + INTERVALS[novo_level]
+          - se level == 6: permanece 6, data = review_date + 180 dias
+        - score < 100:
+          - se level == 6: penalidade severa -> level = 2, data = review_date + 15 dias
+          - se level < 6: permanece no nível atual, data = review_date + INTERVALS[level]
+        """
+        if not (0 <= score <= 100):
+            raise InvalidScoreError("A nota deve estar entre 0 e 100.")
+        if not (0 <= current_level <= 6):
+            raise DomainValidationError("O nível atual deve estar entre 0 e 6.")
+
+        if score == 100:
+            new_level = min(current_level + 1, 6)
+            interval_days = cls.INTERVALS[new_level]
+        else:
+            if current_level == 6:
+                new_level = 2
+                interval_days = cls.INTERVALS[2]  # 15 dias
+            else:
+                new_level = current_level
+                interval_days = cls.INTERVALS[current_level]
+
+        return new_level, review_date + timedelta(days=interval_days)

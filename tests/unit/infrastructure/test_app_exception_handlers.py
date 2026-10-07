@@ -5,7 +5,12 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 
-from src.domain.exceptions import ResourceOwnershipError, UnauthorizedError
+from src.domain.exceptions import (
+    QuestionNotDueError,
+    QuestionNotFoundError,
+    ResourceOwnershipError,
+    UnauthorizedError,
+)
 from src.infrastructure.web.app import create_app
 
 
@@ -29,7 +34,31 @@ def app_with_test_routes() -> Generator[TestClient]:
     def web_unauthorized() -> None:
         raise UnauthorizedError("Token expirado ou ausente")
 
-    with TestClient(app) as client:
+    @app.get("/api/test-question-not-found")
+    def api_question_not_found() -> None:
+        raise QuestionNotFoundError("Pergunta não encontrada")
+
+    @app.get("/web/test-question-not-found")
+    def web_question_not_found() -> None:
+        raise QuestionNotFoundError("Pergunta não encontrada")
+
+    @app.get("/api/test-question-not-due")
+    def api_question_not_due() -> None:
+        raise QuestionNotDueError("Pergunta ainda não vencida")
+
+    @app.get("/web/test-question-not-due")
+    def web_question_not_due() -> None:
+        raise QuestionNotDueError("Pergunta ainda não vencida")
+
+    @app.get("/api/test-unhandled-exception")
+    def api_unhandled() -> None:
+        raise RuntimeError("Crash inesperado")
+
+    @app.get("/web/test-unhandled-exception")
+    def web_unhandled() -> None:
+        raise RuntimeError("Crash inesperado")
+
+    with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 
 
@@ -61,3 +90,48 @@ def test_unauthorized_handler(app_with_test_routes: TestClient) -> None:
     res_web = app_with_test_routes.get("/web/test-unauthorized-error", follow_redirects=False)
     assert res_web.status_code == 303
     assert res_web.headers.get("location") == "/auth/login"
+
+
+@pytest.mark.unit
+def test_question_not_found_handler(app_with_test_routes: TestClient) -> None:
+    """Verifica respostas JSON (404) e HTML (404) do handler de QuestionNotFoundError."""
+    res_api = app_with_test_routes.get("/api/test-question-not-found")
+    assert res_api.status_code == 404
+    assert res_api.json()["detail"] == "Pergunta não encontrada"
+
+    res_web = app_with_test_routes.get("/web/test-question-not-found")
+    assert res_web.status_code == 404
+    assert "404 Não Encontrado" in res_web.text
+
+
+@pytest.mark.unit
+def test_question_not_due_handler(app_with_test_routes: TestClient) -> None:
+    """Verifica respostas JSON (400) e HTML (400) do handler de QuestionNotDueError."""
+    res_api = app_with_test_routes.get("/api/test-question-not-due")
+    assert res_api.status_code == 400
+    assert res_api.json()["detail"] == "Pergunta ainda não vencida"
+
+    res_web = app_with_test_routes.get("/web/test-question-not-due")
+    assert res_web.status_code == 400
+    assert "400 Requisição Inválida" in res_web.text
+
+
+@pytest.mark.unit
+def test_global_exception_handler(app_with_test_routes: TestClient) -> None:
+    """Verifica respostas JSON (500) e HTML (500) do handler global de exceções não tratadas."""
+    res_api = app_with_test_routes.get("/api/test-unhandled-exception")
+    assert res_api.status_code == 500
+    assert res_api.json()["detail"] == "Internal Server Error"
+
+    res_web = app_with_test_routes.get("/web/test-unhandled-exception")
+    assert res_web.status_code == 500
+    assert "500 Erro Interno do Servidor" in res_web.text
+
+
+@pytest.mark.unit
+def test_health_check_endpoint(app_with_test_routes: TestClient) -> None:
+    """Verifica que o endpoint /health retorna 200 e payload esperado."""
+    res = app_with_test_routes.get("/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "healthy"

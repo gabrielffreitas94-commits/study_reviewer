@@ -1,0 +1,48 @@
+<!-- Estado de Inbox Zero: Todas as perguntas do dia foram concluídas -->
+<div id="inbox-zero-card" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-8 sm:p-12 text-center max-w-lg mx-auto">
+    <div class="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-5 text-2xl font-bold" aria-hidden="true">
+        🎉
+    </div>
+    <h2 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+        Tudo em dia por hoje!
+    </h2>
+    <p class="text-sm text-slate-600 dark:text-slate-400 mb-6">
+        Parabéns! Você revisou todas as perguntas abertas pendentes para hoje.
+    </p>
+
+    {% if next_review_date %}
+    <div class="inline-flex items-center space-x-2 py-2 px-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-700 dark:text-slate-300 mb-8 font-medium">
+        <span aria-hidden="true">📅</span>
+        <span>Próxima revisão agendada: <strong>{{ next_review_date.strftime('%d/%m/%Y') }}</strong></span>
+    </div>
+    {% else %}
+    <div class="inline-flex items-center space-x-2 py-2 px-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 mb-8">
+        <span>Não há revisões futuras pendentes.</span>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <a href="/study" class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm">
+            <span>Estudar Flashcards</span>
+            <span class="ml-1.5" aria-hidden="true">📖</span>
+        </a>
+        <a href="/subjects" class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+            <span>Ver Matérias</span>
+            <span class="ml-1.5" aria-hidden="true">📚</span>
+        </a>
+    </div>
+</div>
+
+<!-- Out-of-band updates para zerar o badge na navbar -->
+<span id="review-badge" hx-swap-oob="outerHTML" class="ml-1.5 hidden inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full">
+    0
+</span>
+<span id="review-badge-mobile" hx-swap-oob="outerHTML" class="absolute -top-1 -right-2 hidden inline-flex items-center justify-center px-1 py-0.2 text-[10px] font-bold leading-none text-white bg-indigo-600 rounded-full min-w-[16px] h-4">
+    0
+</span>
+
+<script>
+    if (document.getElementById('srs-announcer')) {
+        document.getElementById('srs-announcer').textContent = "Todas as perguntas pendentes foram concluídas. Inbox Zero!";
+    }
+</script>

@@ -40,8 +40,14 @@
                     <span>Study Reviewer</span>
                 </a>
                 <nav class="hidden md:flex space-x-4" aria-label="Navegação Principal">
-                    <a href="/study" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path.startswith('/study') %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
+                    <a href="/study" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/study' %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
                         Estudar
+                    </a>
+                    <a href="/questions/study" class="relative inline-flex items-center px-3 py-2 rounded-md text-sm font-medium {% if request.url.path.startswith('/questions') %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
+                        <span>Revisão</span>
+                        <span id="review-badge" class="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full {% if not pending_questions_count %}hidden{% endif %}">
+                            {{ pending_questions_count or 0 }}
+                        </span>
                     </a>
                     <a href="/flashcards/new" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path.startswith('/flashcards') %}text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40{% else %}text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400{% endif %}">
                         Novo Flashcard
@@ -98,16 +104,28 @@
         </div>
     </header>
 
+    <!-- WAI-ARIA Live Announcer para leitores de tela -->
+    <div id="srs-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
     <!-- Conteúdo Principal -->
     <main id="main-content" class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col focus:outline-none" tabindex="-1">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Barra Inferior de Navegação Mobile (Ergonomia Mobile-First) -->
-    <nav class="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 grid grid-cols-3 py-2 sticky bottom-0 z-30" aria-label="Navegação Inferior Mobile">
-        <a href="/study" class="flex flex-col items-center justify-center py-1 text-xs font-medium {% if request.url.path.startswith('/study') %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
+    <!-- Barra Inferior de Navegação Mobile (Ergonomia Mobile-First 4 colunas) -->
+    <nav class="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 grid grid-cols-4 py-2 sticky bottom-0 z-30" aria-label="Navegação Inferior Mobile">
+        <a href="/study" class="flex flex-col items-center justify-center py-1 text-xs font-medium {% if request.url.path == '/study' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
             <span class="text-lg" aria-hidden="true">📖</span>
             <span>Estudo</span>
+        </a>
+        <a href="/questions/study" class="relative flex flex-col items-center justify-center py-1 text-xs font-medium {% if request.url.path.startswith('/questions') %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
+            <span class="text-lg relative" aria-hidden="true">
+                🔄
+                <span id="review-badge-mobile" class="absolute -top-1 -right-2 inline-flex items-center justify-center px-1 py-0.5 text-[10px] font-bold leading-none text-white bg-indigo-600 rounded-full min-w-[16px] h-4 {% if not pending_questions_count %}hidden{% endif %}">
+                    {{ pending_questions_count or 0 }}
+                </span>
+            </span>
+            <span>Revisão</span>
         </a>
         <a href="/flashcards/new" class="flex flex-col items-center justify-center py-1 text-xs font-medium {% if request.url.path.startswith('/flashcards') %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
             <span class="text-lg" aria-hidden="true">➕</span>

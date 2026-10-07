@@ -1,13 +1,16 @@
 """Implementações concretas dos repositórios utilizando SQLAlchemy 2.0 (Camada 3 - Adaptadores)."""
 
+from datetime import date
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from src.adapters.persistence.mappers import (
     FlashcardMapper,
+    QuestionMapper,
+    QuestionProgressMapper,
     SessionMapper,
     SubjectMapper,
     TopicMapper,
@@ -17,20 +20,34 @@ from src.adapters.persistence.models import (
     FlashcardModel,
     FlashcardTopicModel,
     PoolSessionModel,
+    QuestionModel,
     StudyEventModel,
     SubjectModel,
     TopicModel,
     UserModel,
+    UserQuestionProgressModel,
 )
+from src.application.dto.question_dto import DueQuestionItemDTO
 from src.application.ports.repositories import (
     IFlashcardRepository,
+    IQuestionProgressRepository,
+    IQuestionRepository,
     ISessionRepository,
     IStudyEventRepository,
     ISubjectRepository,
     ITopicRepository,
     IUserRepository,
 )
-from src.domain.entities import Flashcard, FlashcardPoolSession, Subject, Topic, User
+from src.domain.entities import (
+    Flashcard,
+    FlashcardPoolSession,
+    Question,
+    Subject,
+    Topic,
+    User,
+    UserQuestionProgress,
+)
+from src.domain.services import SpacingPolicyService
 
 
 class SqlAlchemyUserRepository(IUserRepository):
@@ -408,3 +425,167 @@ class SqlAlchemyStudyEventRepository(IStudyEventRepository):
         self._session.commit()
         rowcount = getattr(res, "rowcount", -1)
         return int(rowcount) if rowcount != -1 else 0
+
+
+class SqlAlchemyQuestionRepository(IQuestionRepository):
+    """Repositório SQLAlchemy para o Catálogo de Perguntas Abertas."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def save(self, question: Question) -> None:
+        model = QuestionMapper.to_model(question)
+        self._session.merge(model)
+        self._session.commit()
+
+    def get_by_id(self, question_id: UUID) -> Question | None:
+        stmt = select(QuestionModel).where(QuestionModel.id == question_id)
+        model = self._session.scalars(stmt).first()
+        return QuestionMapper.to_domain(model) if model else None
+
+    def list_by_topic(self, topic_id: UUID) -> list[Question]:
+        stmt = (
+            select(QuestionModel)
+            .where(QuestionModel.topic_id == topic_id)
+            .order_by(QuestionModel.created_at.asc(), QuestionModel.id.asc())
+        )
+        models = self._session.scalars(stmt).all()
+        return [QuestionMapper.to_domain(m) for m in models]
+
+    def delete(self, question_id: UUID) -> None:
+        stmt = select(QuestionModel).where(QuestionModel.id == question_id)
+        model = self._session.scalars(stmt).first()
+        if model:
+            self._session.delete(model)
+            self._session.commit()
+
+
+class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
+    """Repositório SQLAlchemy para o Histórico e Progresso Individual no SRS."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def save(self, progress: UserQuestionProgress) -> None:
+        model = QuestionProgressMapper.to_model(progress)
+        self._session.merge(model)
+        self._session.commit()
+
+    def get_by_user_and_question(
+        self, user_id: UUID, question_id: UUID
+    ) -> UserQuestionProgress | None:
+        stmt = select(UserQuestionProgressModel).where(
+            UserQuestionProgressModel.user_id == user_id,
+            UserQuestionProgressModel.question_id == question_id,
+        )
+        model = self._session.scalars(stmt).first()
+        return QuestionProgressMapper.to_domain(model) if model else None
+
+    def get_due_questions(
+        self,
+        user_id: UUID,
+        reference_date: date,
+        subject_id: UUID | None = None,
+        topic_id: UUID | None = None,
+        limit: int = 50,
+    ) -> list[DueQuestionItemDTO]:
+        stmt = (
+            select(
+                QuestionModel.id,
+                SubjectModel.name.label("subject_name"),
+                TopicModel.name.label("topic_name"),
+                QuestionModel.prompt,
+                QuestionModel.expected_answer,
+                UserQuestionProgressModel.current_level,
+                UserQuestionProgressModel.next_review_date,
+            )
+            .join(QuestionModel, UserQuestionProgressModel.question_id == QuestionModel.id)
+            .join(TopicModel, QuestionModel.topic_id == TopicModel.id)
+            .join(SubjectModel, TopicModel.subject_id == SubjectModel.id)
+            .where(
+                UserQuestionProgressModel.user_id == user_id,
+                UserQuestionProgressModel.next_review_date <= reference_date,
+            )
+        )
+        if subject_id is not None:
+            stmt = stmt.where(SubjectModel.id == subject_id)
+        if topic_id is not None:
+            stmt = stmt.where(TopicModel.id == topic_id)
+
+        stmt = stmt.order_by(
+            UserQuestionProgressModel.next_review_date.asc(),
+            UserQuestionProgressModel.current_level.asc(),
+            QuestionModel.id.asc(),
+        ).limit(limit)
+
+        rows = self._session.execute(stmt).all()
+        return [
+            DueQuestionItemDTO(
+                question_id=row.id,
+                subject_name=row.subject_name,
+                topic_name=row.topic_name,
+                prompt=row.prompt,
+                expected_answer=row.expected_answer,
+                current_level=row.current_level,
+                interval_days=SpacingPolicyService.get_interval(row.current_level),
+                due_date=row.next_review_date,
+            )
+            for row in rows
+        ]
+
+    def count_due_questions(self, user_id: UUID, reference_date: date) -> int:
+        stmt = select(func.count(UserQuestionProgressModel.id)).where(
+            UserQuestionProgressModel.user_id == user_id,
+            UserQuestionProgressModel.next_review_date <= reference_date,
+        )
+        count = self._session.scalar(stmt)
+        return int(count) if count is not None else 0
+
+    def get_next_review_date(self, user_id: UUID, reference_date: date) -> date | None:
+        stmt = select(func.min(UserQuestionProgressModel.next_review_date)).where(
+            UserQuestionProgressModel.user_id == user_id,
+            UserQuestionProgressModel.next_review_date > reference_date,
+        )
+        return self._session.scalar(stmt)
+
+    def initialize_progress_for_questions(
+        self, user_id: UUID, question_ids: list[UUID], initial_date: date
+    ) -> None:
+        if not question_ids:
+            return
+
+        bind = self._session.get_bind()
+        dialect_name = bind.dialect.name if bind else "sqlite"
+
+        records = [
+            {
+                "id": uuid4(),
+                "user_id": user_id,
+                "question_id": q_id,
+                "current_level": 0,
+                "next_review_date": initial_date,
+                "last_reviewed_at": None,
+            }
+            for q_id in question_ids
+        ]
+
+        insert_stmt: Any
+        if dialect_name == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            insert_stmt = (
+                pg_insert(UserQuestionProgressModel)
+                .values(records)
+                .on_conflict_do_nothing(index_elements=["user_id", "question_id"])
+            )
+        else:
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+            insert_stmt = (
+                sqlite_insert(UserQuestionProgressModel)
+                .values(records)
+                .on_conflict_do_nothing(index_elements=["user_id", "question_id"])
+            )
+
+        self._session.execute(insert_stmt)
+        self._session.commit()

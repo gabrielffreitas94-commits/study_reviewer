@@ -58,3 +58,23 @@ class SessionQueueEmptyError(StudySessionError):
 
 class SessionDesynchronizedError(StudySessionError):
     """Inconsistência detectada entre cursor local e estado remoto."""
+
+
+class InvalidScoreError(DomainValidationError):
+    """Nota informada fora do intervalo fechado [0, 100]."""
+
+
+class QuestionNotFoundError(EntityNotFoundError):
+    """Pergunta aberta não encontrada para o identificador fornecido."""
+
+
+class QuestionNotDueError(DomainException):
+    """Tentativa de revisar pergunta com agendamento futuro (anti-exploit temporal)."""
+
+
+class InvalidPromptError(DomainValidationError):
+    """Enunciado de pergunta vazio ou ultrapassando 10.000 caracteres."""
+
+
+class InvalidExpectedAnswerError(DomainValidationError):
+    """Gabarito de pergunta vazio ou ultrapassando 10.000 caracteres."""

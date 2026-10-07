@@ -57,11 +57,72 @@ def test_sanitize_preserves_safe_formatting_tags() -> None:
     assert "<em>crucial</em>" in clean
     assert "<code>x = 10</code>" in clean
 
+    assert sanitize_html_content("") == ""
+
 
 @pytest.mark.security
-def test_sanitize_empty_or_none_input() -> None:
-    """Vulnerabilidade prevenida: Negação de serviço ou crash por valores nulos na sanitização.
+def test_markdown_sanitizer_service_removes_scripts_and_malicious_protocols() -> None:
+    """Vulnerabilidade prevenida: XSS e injeção de scripts via Markdown em perguntas abertas.
 
-    Garantia de segurança: Assegura que strings vazias retornem string vazia sem exceções.
+    Garantia de segurança: Assegura que tags de script, esquemas javascript: e handlers inline
+    sejam neutralizados.
     """
-    assert sanitize_html_content("") == ""
+    from src.infrastructure.security.sanitization import MarkdownSanitizerService
+
+    malicious = (
+        "Enunciado normal <script>alert(1)</script>"
+        '<img src="javascript:alert(2)" onerror="alert(3)">'
+        '<a href="javascript:void(0)">Link</a>'
+    )
+    clean = MarkdownSanitizerService.sanitize(malicious)
+    assert "<script>" not in clean
+    assert "javascript:" not in clean
+    assert "onerror" not in clean
+
+
+@pytest.mark.security
+def test_markdown_sanitizer_service_allows_https_images_and_safe_tags() -> None:
+    """Vulnerabilidade prevenida: Quebra indevida de conteúdo com formatação legítima.
+
+    Garantia de segurança: Permite imagens HTTPS e formatação semântica H1..H3, blockquote, code.
+    """
+    from src.infrastructure.security.sanitization import MarkdownSanitizerService
+
+    safe_md = (
+        "<h1>Título da Pergunta</h1>"
+        "<blockquote>Citação importante</blockquote>"
+        '<p>Veja a imagem: <img src="https://cdn.example.com/diagram.png" '
+        'alt="Diagrama" title="Legenda"></p>'
+        "<pre><code>print('ok')</code></pre>"
+    )
+    clean = MarkdownSanitizerService.sanitize(safe_md)
+    assert "<h1>Título da Pergunta</h1>" in clean
+    assert "<blockquote>Citação importante</blockquote>" in clean
+    assert 'src="https://cdn.example.com/diagram.png"' in clean
+    assert 'alt="Diagrama"' in clean
+    assert "<pre><code>print('ok')</code></pre>" in clean
+
+
+@pytest.mark.security
+def test_markdown_sanitizer_service_rejects_insecure_http_images() -> None:
+    """Vulnerabilidade prevenida: Mixed Content e interceptação insegura via HTTP não criptografado.
+
+    Garantia de segurança: Rejeita e extirpa o atributo src com protocolo http://, aceitando apenas https://.
+    """
+    from src.infrastructure.security.sanitization import MarkdownSanitizerService
+
+    insecure_img = '<img src="http://insecure.example.com/bad.png" alt="Inseguro">'
+    clean = MarkdownSanitizerService.sanitize(insecure_img)
+    assert "http://insecure.example.com/bad.png" not in clean
+    assert 'alt="Inseguro"' in clean
+
+
+@pytest.mark.security
+def test_markdown_sanitizer_service_handles_empty_input() -> None:
+    """Vulnerabilidade prevenida: Negação de serviço ou crash por input vazio em perguntas abertas.
+
+    Garantia de segurança: Assegura que strings vazias retornem string vazia sem exceção.
+    """
+    from src.infrastructure.security.sanitization import MarkdownSanitizerService
+
+    assert MarkdownSanitizerService.sanitize("") == ""
