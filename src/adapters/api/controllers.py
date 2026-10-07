@@ -1,5 +1,6 @@
 """Controladores de API REST (JSON para mobile e clientes externos - Camada 3)."""
 
+import logging
 from datetime import datetime
 from uuid import UUID
 
@@ -59,6 +60,8 @@ from src.infrastructure.rng import default_rng
 from src.infrastructure.security.dependencies import get_current_user
 from src.infrastructure.security.rate_limiter import study_sync_rate_limiter
 from src.infrastructure.security.sanitization import sanitize_html_content
+
+logger = logging.getLogger("study_reviewer.api")
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -273,6 +276,17 @@ def sync_answers_api(
 
     try:
         result = use_case.execute(input_dto, user_id=current_user.id)
+        x_correlation_id = request.headers.get("x-correlation-id")
+        logger.info(
+            "Lote de sincronização offline processado com sucesso",
+            extra={
+                "event": "study_sync_batch_received",
+                "correlation_id": x_correlation_id,
+                "batch_size": len(payload.events),
+                "synced_count": result.synced_count,
+                "user_id": str(current_user.id),
+            },
+        )
         return SyncAnswersResponseModel(
             status=result.status,
             synced_count=result.synced_count,

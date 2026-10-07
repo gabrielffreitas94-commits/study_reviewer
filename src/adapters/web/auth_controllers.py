@@ -1,5 +1,4 @@
-"""Controlador Web para autenticação via Google OAuth2 / OIDC (Camada 3 - Adaptadores)."""
-
+import logging
 import urllib.parse
 from pathlib import Path
 from typing import Annotated
@@ -33,6 +32,8 @@ from src.infrastructure.security.dependencies import (
     get_google_client,
     get_session_service,
 )
+
+logger = logging.getLogger("study_reviewer.web_auth")
 
 templates_dir = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
@@ -246,6 +247,15 @@ def submit_account_deletion_request(
     clean_email = email.strip().lower()
     user_repo = SqlAlchemyUserRepository(db)
     user = user_repo.get_by_email(clean_email) if clean_email else None
+
+    logger.info(
+        "Solicitação externa de exclusão de dados submetida",
+        extra={
+            "event": "account_deletion_request_submitted",
+            "user_found": user is not None,
+            "has_confirmation": confirmation is not None,
+        },
+    )
 
     # Simulação do disparo seguro de e-mail Double Opt-In
     return templates.TemplateResponse(

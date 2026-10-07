@@ -1,5 +1,4 @@
-"""Casos de uso para Autenticação, Usuários e Gestão de Sessões (Clean Architecture - Camada 2)."""
-
+import logging
 from uuid import UUID
 
 from src.application.dto.auth_dto import (
@@ -18,6 +17,8 @@ from src.domain.exceptions import (
     ResourceOwnershipError,
     UnauthorizedError,
 )
+
+logger = logging.getLogger("study_reviewer.auth")
 
 
 class AuthenticateWithGoogleUseCase:
@@ -161,6 +162,13 @@ class DeleteAccountUseCase:
             raise EntityNotFoundError("Usuário não encontrado.")
 
         self._user_repo.delete(user_id)
+        logger.info(
+            "Conta de usuário excluída com sucesso",
+            extra={
+                "event": "account_deleted",
+                "user_id": str(user_id),
+            },
+        )
 
 
 class ToggleSubjectPublicUseCase:

@@ -1,4 +1,4 @@
-"""Controladores de API REST para autenticação via Google OAuth2 / OIDC e perfil (Camada 3)."""
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -20,6 +20,8 @@ from src.infrastructure.security.dependencies import (
     get_google_client,
     get_session_service,
 )
+
+logger = logging.getLogger("study_reviewer.auth_api")
 
 api_auth_router = APIRouter(prefix="/api/v1/auth", tags=["API Auth"])
 
@@ -126,6 +128,13 @@ def delete_account_api(
     try:
         use_case.execute(user_id=current_user.id)
         db.commit()
+        logger.info(
+            "Conta de usuário excluída via API REST com sucesso",
+            extra={
+                "event": "api_account_deleted",
+                "user_id": str(current_user.id),
+            },
+        )
     except EntityNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
