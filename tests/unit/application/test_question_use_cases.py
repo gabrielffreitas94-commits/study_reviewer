@@ -30,8 +30,10 @@ from tests.unit.application.fakes import (
     FakeClockService,
     FakeQuestionProgressRepository,
     FakeQuestionRepository,
+    FakeReviewAuditRepository,
     FakeSubjectRepository,
     FakeTopicRepository,
+    FakeUnitOfWork,
 )
 
 RepoFixture = tuple[
@@ -83,6 +85,52 @@ def test_create_question_success(repos: RepoFixture) -> None:
     assert prog is not None
     assert prog.current_level == 0
     assert prog.next_review_date == clock.today()
+
+
+@pytest.mark.unit
+def test_create_question_with_uow_commits_atomically(repos: RepoFixture) -> None:
+    subj_repo, top_repo, q_repo, prog_repo, clock = repos
+    owner_id = uuid4()
+    subj = Subject(id=uuid4(), name="Direito", owner_id=owner_id)
+    subj_repo.save(subj)
+    topic = Topic(id=uuid4(), subject_id=subj.id, name="Constitucional")
+    top_repo.save(topic)
+
+    uow = FakeUnitOfWork()
+    use_case = CreateQuestionUseCase(q_repo, prog_repo, top_repo, subj_repo, clock, uow=uow)
+    dto = CreateQuestionDTO(
+        topic_id=topic.id, prompt="O que é CF?", expected_answer="Constituição Federal"
+    )
+
+    result = use_case.execute(dto, user_id=owner_id)
+
+    assert result.prompt == "O que é CF?"
+    assert uow.committed is True
+    assert uow.rolled_back is False
+
+
+@pytest.mark.unit
+def test_create_question_with_uow_rollback_on_failure(repos: RepoFixture) -> None:
+    subj_repo, top_repo, q_repo, prog_repo, clock = repos
+    owner_id = uuid4()
+    subj = Subject(id=uuid4(), name="Direito", owner_id=owner_id)
+    subj_repo.save(subj)
+    topic = Topic(id=uuid4(), subject_id=subj.id, name="Constitucional")
+    top_repo.save(topic)
+
+    uow = FakeUnitOfWork()
+    prog_repo.fail_on_save = True
+
+    use_case = CreateQuestionUseCase(q_repo, prog_repo, top_repo, subj_repo, clock, uow=uow)
+    dto = CreateQuestionDTO(
+        topic_id=topic.id, prompt="O que é CF?", expected_answer="Constituição Federal"
+    )
+
+    with pytest.raises(RuntimeError, match="Erro ao persistir progresso"):
+        use_case.execute(dto, user_id=owner_id)
+
+    assert uow.committed is False
+    assert uow.rolled_back is True
 
 
 @pytest.mark.unit
@@ -383,6 +431,50 @@ def test_review_question_promotion_success(repos: RepoFixture) -> None:
     assert res.next_review_date == date(2026, 10, 25)
     assert res.is_promoted is True
     assert res.is_regressed is False
+
+
+@pytest.mark.unit
+def test_review_question_uow_commit_and_rollback(repos: RepoFixture) -> None:
+    subj_repo, top_repo, q_repo, prog_repo, clock = repos
+    user_id = uuid4()
+    subj = Subject(id=uuid4(), name="Sociologia", owner_id=user_id)
+    subj_repo.save(subj)
+    topic = Topic(id=uuid4(), subject_id=subj.id, name="Geral")
+    top_repo.save(topic)
+    q = Question(id=uuid4(), topic_id=topic.id, prompt="Q?", expected_answer="A")
+    q_repo.save(q)
+    prog = UserQuestionProgress(
+        user_id=user_id, question_id=q.id, current_level=1, next_review_date=date(2026, 10, 10)
+    )
+    prog_repo.save(prog)
+
+    uow = FakeUnitOfWork()
+    audit_repo = FakeReviewAuditRepository()
+    use_case = ReviewQuestionUseCase(
+        prog_repo, q_repo, top_repo, subj_repo, clock, audit_repo=audit_repo, uow=uow
+    )
+    res = use_case.execute(ReviewQuestionInputDTO(question_id=q.id, score=100), user_id=user_id)
+    assert res.new_level == 2
+    assert uow.committed is True
+    assert uow.rolled_back is False
+    assert len(audit_repo.logs) == 1
+
+    # Testa rollback quando o audit_repo falha
+    uow2 = FakeUnitOfWork()
+    audit_repo2 = FakeReviewAuditRepository()
+    audit_repo2.fail_on_save = True
+
+    prog.next_review_date = date(2026, 10, 10)
+    prog_repo.save(prog)
+
+    use_case2 = ReviewQuestionUseCase(
+        prog_repo, q_repo, top_repo, subj_repo, clock, audit_repo=audit_repo2, uow=uow2
+    )
+    with pytest.raises(RuntimeError, match="Falha de I/O na tabela de auditoria"):
+        use_case2.execute(ReviewQuestionInputDTO(question_id=q.id, score=100), user_id=user_id)
+
+    assert uow2.committed is False
+    assert uow2.rolled_back is True
 
 
 @pytest.mark.unit

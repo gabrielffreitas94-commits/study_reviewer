@@ -604,3 +604,81 @@ def test_export_user_data_csv_empty_question_or_values(
     content = "".join(stream)
     assert '""' in content
     assert "Matéria Histórica" in content
+
+
+@pytest.mark.unit
+def test_export_user_data_csv_n_plus_one_cache_optimization(
+    performance_repos: PerformanceReposTuple,
+) -> None:
+    """Verifica que o cache local em memória elimina o gargalo N+1 no streaming CSV."""
+
+    user_repo, _, _, q_repo, _, audit_repo, _, clock = performance_repos
+    user_id = uuid4()
+    user = User(id=user_id, google_sub="sub-perf", email="perf@teste.com", name="Perf Aluno")
+    user_repo.save(user)
+
+    q1_id = uuid4()
+    q2_id = uuid4()
+    q_repo.save(Question(id=q1_id, topic_id=uuid4(), prompt="Pergunta 1", expected_answer="A1"))
+    q_repo.save(Question(id=q2_id, topic_id=uuid4(), prompt="Pergunta 2", expected_answer="A2"))
+
+    # Cria 10 logs de auditoria: 5 para q1, 3 para q2, 2 sem questão
+    for _ in range(5):
+        audit_repo.save(
+            ReviewAuditLog(
+                user_id=user_id,
+                question_id=q1_id,
+                subject_id=uuid4(),
+                topic_id=uuid4(),
+                historical_subject_name="Matéria A",
+                historical_topic_name="Tema A",
+                review_date=date(2026, 10, 7),
+                score=100,
+                level_before=0,
+                level_after=1,
+            )
+        )
+    for _ in range(3):
+        audit_repo.save(
+            ReviewAuditLog(
+                user_id=user_id,
+                question_id=q2_id,
+                subject_id=uuid4(),
+                topic_id=uuid4(),
+                historical_subject_name="Matéria B",
+                historical_topic_name="Tema B",
+                review_date=date(2026, 10, 7),
+                score=80,
+                level_before=1,
+                level_after=2,
+            )
+        )
+    for _ in range(2):
+        audit_repo.save(
+            ReviewAuditLog(
+                user_id=user_id,
+                question_id=None,
+                subject_id=None,
+                topic_id=None,
+                historical_subject_name="Matéria C",
+                historical_topic_name="Tema C",
+                review_date=date(2026, 10, 7),
+                score=50,
+                level_before=2,
+                level_after=1,
+            )
+        )
+
+    use_case = ExportUserDataUseCase(
+        user_repo=user_repo,
+        audit_repo=audit_repo,
+        question_repo=q_repo,
+        clock=clock,
+    )
+    stream, _, _ = use_case.execute(user_id=user_id, format_type="csv")
+    content = "".join(stream)
+
+    # Deve ter chamado get_by_id exatamente 2 vezes (1 para q1, 1 para q2) em vez de 8
+    assert q_repo.get_by_id_calls == 2
+    assert '"Pergunta 1"' in content
+    assert '"Pergunta 2"' in content

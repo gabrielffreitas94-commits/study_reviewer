@@ -26,6 +26,8 @@ def db_session() -> Generator[Session]:
         yield session
     finally:
         session.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
 
 
 @pytest.mark.integration

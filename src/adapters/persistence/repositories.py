@@ -475,7 +475,7 @@ class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
     def save(self, progress: UserQuestionProgress) -> None:
         model = QuestionProgressMapper.to_model(progress)
         self._session.merge(model)
-        self._session.commit()
+        self._session.flush()
 
     def get_by_user_and_question(
         self, user_id: UUID, question_id: UUID

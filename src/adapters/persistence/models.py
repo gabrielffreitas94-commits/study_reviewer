@@ -262,6 +262,13 @@ class ReviewAuditLogModel(Base):
             postgresql_include=["score", "level_before", "level_after", "logged_at"],
         ),
         Index("ix_review_audit_logs_user_subject", "user_id", "subject_id"),
+        Index(
+            "ix_review_audit_logs_pagination",
+            "user_id",
+            "review_date",
+            "logged_at",
+            "id",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)

@@ -90,7 +90,7 @@ jobs:
                 GoogleClientId="${{ secrets.GOOGLE_CLIENT_ID }}" \
                 GoogleClientSecret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
                 GoogleRedirectUri="${{ secrets.GOOGLE_REDIRECT_URI || '' }}" \
-                LambdaRoleArn="arn:aws:iam::324427252295:role/study-reviewer-lambda-role-$ENV_NAME" \
+                LambdaRoleArn="${{ secrets.LAMBDA_ROLE_ARN || '' }}" \
             --region $AWS_REGION
 
           echo "==> Atualizando código da função Lambda com o digest mais recente do ECR..."

@@ -118,6 +118,7 @@ def test_study_page_renders_due_question_card_and_active_recall(
                 user_id=test_user.id, question_id=q.id, next_review_date=date.today()
             )
         )
+        session.commit()
 
     res = client.get("/questions/study")
     assert res.status_code == 200
@@ -147,6 +148,7 @@ def test_study_page_inbox_zero_state_when_questions_done(
         SqlAlchemyQuestionProgressRepository(session).save(
             UserQuestionProgress(user_id=test_user.id, question_id=q.id, next_review_date=tomorrow)
         )
+        session.commit()
 
     res = client.get("/questions/study")
     assert res.status_code == 200
@@ -182,6 +184,7 @@ def test_review_question_submission_htmx_cycle(
                 user_id=test_user.id, question_id=q2.id, next_review_date=date.today()
             )
         )
+        session.commit()
 
     # 1. Revisa q1 com nota 100 -> deve retornar parcial com q2
     res1 = client.post(f"/questions/{q1.id}/review", data={"score": 100})

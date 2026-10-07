@@ -269,11 +269,13 @@ class FakeQuestionRepository(IQuestionRepository):
 
     def __init__(self) -> None:
         self._questions: dict[UUID, Question] = {}
+        self.get_by_id_calls: int = 0
 
     def save(self, question: Question) -> None:
         self._questions[question.id] = question
 
     def get_by_id(self, question_id: UUID) -> Question | None:
+        self.get_by_id_calls += 1
         return self._questions.get(question_id)
 
     def list_by_topic(self, topic_id: UUID) -> list[Question]:
@@ -300,8 +302,11 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
         self._question_repo = question_repo or FakeQuestionRepository()
         self._topic_repo = topic_repo or FakeTopicRepository()
         self._subject_repo = subject_repo or FakeSubjectRepository()
+        self.fail_on_save: bool = False
 
     def save(self, progress: UserQuestionProgress) -> None:
+        if self.fail_on_save:
+            raise RuntimeError("Erro ao persistir progresso")
         self._progress[(progress.user_id, progress.question_id)] = progress
 
     def get_by_user_and_question(
