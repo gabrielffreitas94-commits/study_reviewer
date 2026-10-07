@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Desempenho & Auditoria — Study Reviewer{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Cabeçalho do Hub e Botões de Exportação LGPD -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                <span aria-hidden="true">📊</span> Hub de Desempenho
+            </h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Acompanhe sua curva de retenção, consolidação SRS e histórico auditável de estudos.
+            </p>
+        </div>
+        <!-- Ações de Exportação LGPD Art. 18 -->
+        <div class="flex items-center gap-2">
+            <a
+                href="/performance/export?format=csv"
+                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 shadow-sm transition-colors focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                title="Exportar histórico completo em CSV (com compatibilidade Excel)"
+            >
+                <span aria-hidden="true">📥</span>
+                <span>Exportar CSV</span>
+            </a>
+            <a
+                href="/performance/export?format=json"
+                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 shadow-sm transition-colors focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                title="Exportar dados autorais e histórico em JSON (Portabilidade LGPD Art. 18)"
+            >
+                <span aria-hidden="true">📄</span>
+                <span>Exportar JSON</span>
+            </a>
+        </div>
+    </div>
+
+    {% if stats.total_reviews_count == 0 %}
+    <!-- Estado Vazio (Estudante Novato) -->
+    <div class="bg-white dark:bg-slate-800/80 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 sm:p-12 text-center">
+        <div class="max-w-md mx-auto space-y-4">
+            <div class="w-16 h-16 mx-auto rounded-full bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-3xl" aria-hidden="true">
+                🚀
+            </div>
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white">Seu Hub de Desempenho está pronto!</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+                Você ainda não registrou revisões de perguntas abertas. Conforme você praticar a repetição espaçada, este painel exibirá seus gráficos de retenção e evolução para o Nível 4+ (Memória Madura).
+            </p>
+            <div class="pt-2">
+                <a
+                    href="/questions/study"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors"
+                >
+                    <span>Começar Minhas Revisões</span>
+                    <span aria-hidden="true">→</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+
+    <!-- 4 Cards de KPIs de Destaque -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- KPI 1: Taxa de Retenção -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 shadow-sm">
+            <div class="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span>Taxa de Retenção</span>
+                <span class="text-base" aria-hidden="true">🎯</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    {{ stats.retention_rate }}%
+                </span>
+            </div>
+            <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Revisões com nota máxima (100%)</p>
+        </div>
+
+        <!-- KPI 2: Retenção Madura (Nível 4+) -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 shadow-sm">
+            <div class="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span>Retenção Madura</span>
+                <span class="text-base" aria-hidden="true">🧠</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-2xl sm:text-3xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">
+                    {{ stats.mature_questions_count }}
+                </span>
+                <span class="text-xs text-slate-500 font-medium">perguntas</span>
+            </div>
+            <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Nível 4 ou mais (60, 90 e 180 dias)</p>
+        </div>
+
+        <!-- KPI 3: Total de Revisões -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 shadow-sm">
+            <div class="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span>Total de Revisões</span>
+                <span class="text-base" aria-hidden="true">🔁</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    {{ stats.total_reviews_count }}
+                </span>
+                <span class="text-xs text-slate-500 font-medium">executadas</span>
+            </div>
+            <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Trilha indelével de auditoria</p>
+        </div>
+
+        <!-- KPI 4: Dias Ativos -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 shadow-sm">
+            <div class="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span>Constância de Estudo</span>
+                <span class="text-base" aria-hidden="true">📅</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
+                    {{ stats.active_days_count }}
+                </span>
+                <span class="text-xs text-slate-500 font-medium">dias</span>
+            </div>
+            <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Dias com revisões registradas</p>
+        </div>
+    </div>
+
+    <!-- Painel Duplo de Gráficos Nativos (Pirâmide SRS + Desempenho por Matéria) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Pirâmide SRS dos Níveis 0 a 6 -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span aria-hidden="true">🏛️</span> Pirâmide de Retenção Espaçada
+                </h2>
+                <span class="text-xs text-slate-400 dark:text-slate-500">Distribuição atual</span>
+            </div>
+
+            <!-- Tabela de Acessibilidade Oculta para Leitores de Tela (WCAG 2.1 AA) -->
+            <table class="sr-only">
+                <caption>Distribuição de perguntas por nível de repetição espaçada</caption>
+                <thead>
+                    <tr><th>Nível</th><th>Intervalo</th><th>Quantidade de Perguntas</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Nível 0</td><td>1 dia</td><td>{{ stats.srs_distribution.get(0, 0) }}</td></tr>
+                    <tr><td>Nível 1</td><td>7 dias</td><td>{{ stats.srs_distribution.get(1, 0) }}</td></tr>
+                    <tr><td>Nível 2</td><td>15 dias</td><td>{{ stats.srs_distribution.get(2, 0) }}</td></tr>
+                    <tr><td>Nível 3</td><td>30 dias</td><td>{{ stats.srs_distribution.get(3, 0) }}</td></tr>
+                    <tr><td>Nível 4</td><td>60 dias (Madura)</td><td>{{ stats.srs_distribution.get(4, 0) }}</td></tr>
+                    <tr><td>Nível 5</td><td>90 dias (Madura)</td><td>{{ stats.srs_distribution.get(5, 0) }}</td></tr>
+                    <tr><td>Nível 6</td><td>180 dias (Mestra)</td><td>{{ stats.srs_distribution.get(6, 0) }}</td></tr>
+                </tbody>
+            </table>
+
+            <!-- Barras Horizontais Nativas CSS -->
+            <div class="mt-4 space-y-2.5" aria-hidden="true">
+                {% set level_labels = {
+                    0: ('Nível 0', '1 dia', 'bg-slate-400'),
+                    1: ('Nível 1', '7 dias', 'bg-blue-400'),
+                    2: ('Nível 2', '15 dias', 'bg-indigo-400'),
+                    3: ('Nível 3', '30 dias', 'bg-purple-400'),
+                    4: ('Nível 4 (Madura)', '60 dias', 'bg-emerald-500'),
+                    5: ('Nível 5 (Madura)', '90 dias', 'bg-teal-500'),
+                    6: ('Nível 6 (Mestra)', '180 dias', 'bg-amber-500')
+                } %}
+
+                {% for lvl in range(6, -1, -1) %}
+                {% set count = stats.srs_distribution.get(lvl, 0) %}
+                {% set label_tuple = level_labels[lvl] %}
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="font-medium text-slate-700 dark:text-slate-300">
+                            {{ label_tuple[0] }} <span class="text-slate-400 font-normal">({{ label_tuple[1] }})</span>
+                        </span>
+                        <span class="font-bold text-slate-900 dark:text-white">{{ count }}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 dark:bg-slate-700/60 rounded-full h-2.5 overflow-hidden">
+                        {% set total_questions = stats.srs_distribution.values() | sum %}
+                        {% set pct = (count / total_questions * 100) if total_questions > 0 else 0 %}
+                        <div class="{{ label_tuple[2] }} h-2.5 rounded-full transition-all duration-300" style="width: {{ pct }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Desempenho por Matéria Histórica -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                    <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span aria-hidden="true">📚</span> Retenção por Matéria
+                    </h2>
+                    <span class="text-xs text-slate-400 dark:text-slate-500">Histórico de acertos</span>
+                </div>
+
+                <div class="mt-4 space-y-3.5 max-h-[320px] overflow-y-auto pr-1">
+                    {% if stats.subject_performances %}
+                        {% for sp in stats.subject_performances %}
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[200px]" title="{{ sp.subject_name }}">
+                                    {{ sp.subject_name }}
+                                </span>
+                                <div class="space-x-2">
+                                    <span class="text-slate-400">{{ sp.perfect_reviews }}/{{ sp.total_reviews }}</span>
+                                    <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ sp.retention_rate }}%</span>
+                                </div>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-700/60 rounded-full h-2 overflow-hidden">
+                                <div class="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full" style="width: {{ sp.retention_rate }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-xs text-slate-400 text-center py-6">Nenhum dado por matéria disponível.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Linha do Tempo de Retenção Madura (Evolução Temporal SVG Nativo) -->
+    {% if stats.mature_evolution_timeline %}
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
+            <div>
+                <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span aria-hidden="true">📈</span> Evolução da Retenção Madura (Nível 4+)
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Crescimento acumulado de perguntas consolidadas na memória de longo prazo ao longo do tempo.
+                </p>
+            </div>
+            <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                Ativo
+            </span>
+        </div>
+
+        <!-- Visualização Simples e Estável SSR -->
+        <div class="mt-4 flex flex-wrap gap-2 items-center">
+            {% for dp in stats.mature_evolution_timeline %}
+            <div class="flex flex-col items-center bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-center min-w-[90px]">
+                <span class="text-[10px] text-slate-400 font-mono">{{ dp.date.strftime('%d/%m') }}</span>
+                <span class="text-lg font-bold text-indigo-600 dark:text-indigo-400">{{ dp.mature_count }}</span>
+                <span class="text-[9px] text-slate-500">maduras</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Seção de Trilha de Auditoria Histórica de Revisões (Com Filtro HTMX) -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span aria-hidden="true">🛡️</span> Trilha de Auditoria Histórica
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Registros imutáveis com nomes de matéria e tema congelados no instante do estudo.
+                </p>
+            </div>
+
+            <!-- Filtro Reativo por Matéria via HTMX -->
+            <div class="flex items-center gap-2">
+                <label for="subject-filter" class="text-xs font-medium text-slate-600 dark:text-slate-300">
+                    Filtrar Matéria:
+                </label>
+                <select
+                    id="subject-filter"
+                    name="subject_id"
+                    hx-get="/performance/audit-logs"
+                    hx-target="#audit-table-container"
+                    hx-swap="innerHTML"
+                    hx-include="this"
+                    class="text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                >
+                    <option value="">Todas as Matérias</option>
+                    {% for subj in subjects %}
+                    <option value="{{ subj.id }}" {% if selected_subject_id == subj.id %}selected{% endif %}>
+                        {{ subj.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Container da Tabela com Paginação Reativa HTMX -->
+        <div id="audit-table-container">
+            {% include "performance/_audit_table_partial.html" %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

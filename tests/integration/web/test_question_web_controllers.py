@@ -462,8 +462,9 @@ def test_navigation_three_tabs_and_active_highlighting(client: TestClient) -> No
     assert res_study.status_code == 200
     assert "Flashcards" in res_study.text
     assert "Revisão" in res_study.text
+    assert "Desempenho" in res_study.text
     assert "Cadastros" in res_study.text
-    assert "grid-cols-3" in res_study.text
+    assert "grid-cols-4" in res_study.text
 
     # 2. Tela /questions/study: "Revisão" ativo
     res_rev = client.get("/questions/study")

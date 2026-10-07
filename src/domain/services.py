@@ -1,10 +1,11 @@
 """Serviço de domínio para a Pool de Flashcards com Gap Indexing (Clean Architecture - Camada 1)."""
 
 import math
+from dataclasses import dataclass
 from datetime import date, timedelta
 from uuid import UUID
 
-from src.domain.entities import Flashcard
+from src.domain.entities import Flashcard, ReviewAuditLog, UserQuestionProgress
 from src.domain.exceptions import DomainValidationError, InvalidScoreError
 from src.domain.protocols import IRandomGenerator
 
@@ -143,3 +144,121 @@ class SpacingPolicyService:
                 interval_days = cls.INTERVALS[current_level]
 
         return new_level, review_date + timedelta(days=interval_days)
+
+
+@dataclass(slots=True, frozen=True)
+class SubjectPerformance:
+    """Métrica agregada de desempenho em uma matéria histórica."""
+
+    subject_name: str
+    total_reviews: int
+    perfect_reviews: int
+    retention_rate: float
+
+
+@dataclass(slots=True, frozen=True)
+class MatureDataPoint:
+    """Ponto de dado na linha do tempo de perguntas consolidadas em Retenção Madura."""
+
+    date: date
+    mature_count: int
+
+
+@dataclass(slots=True, frozen=True)
+class ComputedStudyStatistics:
+    """Estatísticas consolidadas calculadas pelo serviço de domínio."""
+
+    total_reviews_count: int
+    retention_rate: float
+    mature_questions_count: int
+    active_days_count: int
+    srs_distribution: dict[int, int]
+    subject_performances: list[SubjectPerformance]
+    mature_evolution_timeline: list[MatureDataPoint]
+
+
+class StudyStatisticsCalculatorService:
+    """Serviço puro de domínio para consolidação e cálculo de métricas de estudo (Sprint 04)."""
+
+    @classmethod
+    def compute_metrics(
+        cls,
+        logs: list["ReviewAuditLog"],
+        progresses: list["UserQuestionProgress"],
+    ) -> ComputedStudyStatistics:
+        """Calcula todas as métricas consolidadas do estudante em tempo O(N) e memória O(1)."""
+        total_reviews = len(logs)
+        perfect_reviews = sum(1 for log in logs if log.score == 100)
+        retention_rate = (
+            round((perfect_reviews / total_reviews) * 100, 2) if total_reviews > 0 else 0.0
+        )
+
+        mature_count = sum(1 for p in progresses if p.current_level >= 4)
+        active_days = len({log.review_date for log in logs})
+
+        srs_distribution: dict[int, int] = {i: 0 for i in range(7)}
+        for p in progresses:
+            if 0 <= p.current_level <= 6:
+                srs_distribution[p.current_level] += 1
+
+        subject_performances = cls.compute_subject_performances(logs)
+        mature_timeline = cls.compute_mature_timeline(logs)
+
+        return ComputedStudyStatistics(
+            total_reviews_count=total_reviews,
+            retention_rate=retention_rate,
+            mature_questions_count=mature_count,
+            active_days_count=active_days,
+            srs_distribution=srs_distribution,
+            subject_performances=subject_performances,
+            mature_evolution_timeline=mature_timeline,
+        )
+
+    @classmethod
+    def compute_subject_performances(cls, logs: list["ReviewAuditLog"]) -> list[SubjectPerformance]:
+        """Agrupa e calcula a taxa de retenção por matéria histórica."""
+        subjects_data: dict[str, list[int]] = {}
+        for log in logs:
+            name = log.historical_subject_name
+            if name not in subjects_data:
+                subjects_data[name] = [0, 0]  # [total, perfect]
+            subjects_data[name][0] += 1
+            if log.score == 100:
+                subjects_data[name][1] += 1
+
+        performances: list[SubjectPerformance] = []
+        for name, (total, perfect) in sorted(subjects_data.items()):
+            rate = round((perfect / total) * 100, 2) if total > 0 else 0.0
+            performances.append(
+                SubjectPerformance(
+                    subject_name=name,
+                    total_reviews=total,
+                    perfect_reviews=perfect,
+                    retention_rate=rate,
+                )
+            )
+        return performances
+
+    @classmethod
+    def compute_mature_timeline(cls, logs: list["ReviewAuditLog"]) -> list[MatureDataPoint]:
+        """Calcula a evolução cronológica líquida de perguntas em Retenção Madura (Nível 4+)."""
+        if not logs:
+            return []
+
+        # Ordena logs cronologicamente
+        sorted_logs = sorted(logs, key=lambda log_item: (log_item.review_date, log_item.id))
+        timeline_by_date: dict[date, int] = {}
+        mature_questions: set[UUID] = set()
+
+        for log in sorted_logs:
+            if log.question_id is not None:
+                if log.level_after >= 4:
+                    mature_questions.add(log.question_id)
+                elif log.question_id in mature_questions:
+                    mature_questions.remove(log.question_id)
+            timeline_by_date[log.review_date] = len(mature_questions)
+
+        return [
+            MatureDataPoint(date=d, mature_count=count)
+            for d, count in sorted(timeline_by_date.items())
+        ]

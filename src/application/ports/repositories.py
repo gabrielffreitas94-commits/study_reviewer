@@ -9,6 +9,7 @@ from src.domain.entities import (
     Flashcard,
     FlashcardPoolSession,
     Question,
+    ReviewAuditLog,
     Subject,
     Topic,
     User,
@@ -225,6 +226,52 @@ class IQuestionProgressRepository(Protocol):
         self, user_id: UUID, question_ids: list[UUID], initial_date: date
     ) -> None:
         """Inicializa em lote o progresso de perguntas para um estudante (JIT seguro)."""
+        ...
+
+    def list_by_user(self, user_id: UUID) -> list[UserQuestionProgress]:
+        """Lista todos os registros de progresso de um estudante."""
+        ...
+
+
+class IReviewAuditRepository(Protocol):
+    """Porta de persistência para a Trilha de Auditoria Histórica de Revisões (Sprint 04)."""
+
+    def save(self, log: ReviewAuditLog) -> None:
+        """Persiste um registro indelével de auditoria."""
+        ...
+
+    def list_by_user(
+        self, user_id: UUID, limit: int = 50, offset: int = 0, subject_id: UUID | None = None
+    ) -> list[ReviewAuditLog]:
+        """Retorna logs paginados do estudante com filtro opcional por matéria."""
+        ...
+
+    def count_by_user(self, user_id: UUID, subject_id: UUID | None = None) -> int:
+        """Retorna o total de revisões realizadas pelo estudante."""
+        ...
+
+    def get_all_by_user(self, user_id: UUID) -> list[ReviewAuditLog]:
+        """Retorna todos os logs do estudante."""
+        ...
+
+    def stream_by_user(self, user_id: UUID, chunk_size: int = 1000) -> Any:
+        """Retorna gerador de logs com consumo de memória O(1) para exportação massiva."""
+        ...
+
+    def get_active_dates_count(self, user_id: UUID) -> int:
+        """Retorna a contagem de datas distintas em que o estudante realizou revisões."""
+        ...
+
+
+class IUnitOfWork(Protocol):
+    """Porta para controle transacional ACID atômico."""
+
+    def commit(self) -> None:
+        """Persiste atomicamente as operações da transação."""
+        ...
+
+    def rollback(self) -> None:
+        """Reverte todas as operações não commitadas."""
         ...
 
 

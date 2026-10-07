@@ -1,5 +1,6 @@
 """Implementações concretas dos repositórios utilizando SQLAlchemy 2.0 (Camada 3 - Adaptadores)."""
 
+from collections.abc import Iterator
 from datetime import date
 from typing import Any
 from uuid import UUID, uuid4
@@ -11,6 +12,7 @@ from src.adapters.persistence.mappers import (
     FlashcardMapper,
     QuestionMapper,
     QuestionProgressMapper,
+    ReviewAuditLogMapper,
     SessionMapper,
     SubjectMapper,
     TopicMapper,
@@ -21,6 +23,7 @@ from src.adapters.persistence.models import (
     FlashcardTopicModel,
     PoolSessionModel,
     QuestionModel,
+    ReviewAuditLogModel,
     StudyEventModel,
     SubjectModel,
     TopicModel,
@@ -32,16 +35,19 @@ from src.application.ports.repositories import (
     IFlashcardRepository,
     IQuestionProgressRepository,
     IQuestionRepository,
+    IReviewAuditRepository,
     ISessionRepository,
     IStudyEventRepository,
     ISubjectRepository,
     ITopicRepository,
+    IUnitOfWork,
     IUserRepository,
 )
 from src.domain.entities import (
     Flashcard,
     FlashcardPoolSession,
     Question,
+    ReviewAuditLog,
     Subject,
     Topic,
     User,
@@ -589,3 +595,100 @@ class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
 
         self._session.execute(insert_stmt)
         self._session.commit()
+
+    def list_by_user(self, user_id: UUID) -> list[UserQuestionProgress]:
+        stmt = (
+            select(UserQuestionProgressModel)
+            .where(UserQuestionProgressModel.user_id == user_id)
+            .order_by(UserQuestionProgressModel.id)
+        )
+        models = self._session.scalars(stmt).all()
+        return [QuestionProgressMapper.to_domain(m) for m in models]
+
+
+class SqlAlchemyReviewAuditRepository(IReviewAuditRepository):
+    """Repositório SQLAlchemy para a Trilha de Auditoria Histórica (Sprint 04)."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def save(self, log: ReviewAuditLog) -> None:
+        model = ReviewAuditLogMapper.to_model(log)
+        self._session.add(model)
+        self._session.flush()
+
+    def list_by_user(
+        self, user_id: UUID, limit: int = 50, offset: int = 0, subject_id: UUID | None = None
+    ) -> list[ReviewAuditLog]:
+        stmt = select(ReviewAuditLogModel).where(ReviewAuditLogModel.user_id == user_id)
+        if subject_id is not None:
+            stmt = stmt.where(ReviewAuditLogModel.subject_id == subject_id)
+
+        stmt = (
+            stmt.order_by(
+                ReviewAuditLogModel.review_date.desc(),
+                ReviewAuditLogModel.logged_at.desc(),
+                ReviewAuditLogModel.id.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+
+        models = self._session.scalars(stmt).all()
+        return [ReviewAuditLogMapper.to_domain(m) for m in models]
+
+    def count_by_user(self, user_id: UUID, subject_id: UUID | None = None) -> int:
+        stmt = select(func.count(ReviewAuditLogModel.id)).where(
+            ReviewAuditLogModel.user_id == user_id
+        )
+        if subject_id is not None:
+            stmt = stmt.where(ReviewAuditLogModel.subject_id == subject_id)
+        count = self._session.scalar(stmt)
+        return int(count) if count is not None else 0
+
+    def get_all_by_user(self, user_id: UUID) -> list[ReviewAuditLog]:
+        stmt = (
+            select(ReviewAuditLogModel)
+            .where(ReviewAuditLogModel.user_id == user_id)
+            .order_by(
+                ReviewAuditLogModel.review_date.asc(),
+                ReviewAuditLogModel.logged_at.asc(),
+                ReviewAuditLogModel.id.asc(),
+            )
+        )
+        models = self._session.scalars(stmt).all()
+        return [ReviewAuditLogMapper.to_domain(m) for m in models]
+
+    def stream_by_user(self, user_id: UUID, chunk_size: int = 1000) -> Iterator[ReviewAuditLog]:
+        stmt = (
+            select(ReviewAuditLogModel)
+            .where(ReviewAuditLogModel.user_id == user_id)
+            .order_by(
+                ReviewAuditLogModel.review_date.asc(),
+                ReviewAuditLogModel.logged_at.asc(),
+                ReviewAuditLogModel.id.asc(),
+            )
+            .execution_options(yield_per=chunk_size)
+        )
+        for model in self._session.scalars(stmt):
+            yield ReviewAuditLogMapper.to_domain(model)
+
+    def get_active_dates_count(self, user_id: UUID) -> int:
+        stmt = select(func.count(func.distinct(ReviewAuditLogModel.review_date))).where(
+            ReviewAuditLogModel.user_id == user_id
+        )
+        count = self._session.scalar(stmt)
+        return int(count) if count is not None else 0
+
+
+class SqlAlchemyUnitOfWork(IUnitOfWork):
+    """Implementação concreta de IUnitOfWork usando Session do SQLAlchemy."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def commit(self) -> None:
+        self._session.commit()
+
+    def rollback(self) -> None:
+        self._session.rollback()
