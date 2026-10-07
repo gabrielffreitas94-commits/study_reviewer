@@ -13,10 +13,12 @@ from src.application.ports.repositories import (
     IClockService,
     IQuestionProgressRepository,
     IQuestionRepository,
+    IReviewAuditRepository,
     ISubjectRepository,
     ITopicRepository,
+    IUnitOfWork,
 )
-from src.domain.entities import Question, UserQuestionProgress
+from src.domain.entities import Question, ReviewAuditLog, UserQuestionProgress
 from src.domain.exceptions import (
     EntityNotFoundError,
     QuestionNotDueError,
@@ -294,12 +296,16 @@ class ReviewQuestionUseCase:
         topic_repo: ITopicRepository,
         subject_repo: ISubjectRepository,
         clock: IClockService,
+        audit_repo: IReviewAuditRepository | None = None,
+        uow: IUnitOfWork | None = None,
     ) -> None:
         self._progress_repo = progress_repo
         self._question_repo = question_repo
         self._topic_repo = topic_repo
         self._subject_repo = subject_repo
         self._clock = clock
+        self._audit_repo = audit_repo
+        self._uow = uow
 
     def execute(self, dto: ReviewQuestionInputDTO, user_id: UUID) -> ReviewQuestionResultDTO:
         question = self._question_repo.get_by_id(dto.question_id)
@@ -338,12 +344,38 @@ class ReviewQuestionUseCase:
             review_date=today,
         )
 
+        now = self._clock.now()
         progress.apply_review(
             new_level=new_level,
             next_date=next_date,
-            reviewed_at=self._clock.now(),
+            reviewed_at=now,
         )
-        self._progress_repo.save(progress)
+
+        try:
+            self._progress_repo.save(progress)
+            if self._audit_repo is not None:
+                audit_log = ReviewAuditLog(
+                    user_id=user_id,
+                    question_id=dto.question_id,
+                    subject_id=subject.id,
+                    topic_id=topic.id,
+                    historical_subject_name=subject.name,
+                    historical_topic_name=topic.name,
+                    review_date=today,
+                    score=dto.score,
+                    level_before=previous_level,
+                    level_after=new_level,
+                    evaluation_mode="MANUAL",
+                    logged_at=now,
+                )
+                self._audit_repo.save(audit_log)
+
+            if self._uow is not None:
+                self._uow.commit()
+        except Exception:
+            if self._uow is not None:
+                self._uow.rollback()
+            raise
 
         is_promoted = new_level > previous_level
         is_regressed = new_level < previous_level

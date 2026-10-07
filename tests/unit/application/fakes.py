@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
@@ -8,16 +9,21 @@ from src.application.ports.repositories import (
     IFlashcardRepository,
     IQuestionProgressRepository,
     IQuestionRepository,
+    IReviewAuditRepository,
     ISessionRepository,
     ISubjectRepository,
     ITopicRepository,
+    IUnitOfWork,
+    IUserRepository,
 )
 from src.domain.entities import (
     Flashcard,
     FlashcardPoolSession,
     Question,
+    ReviewAuditLog,
     Subject,
     Topic,
+    User,
     UserQuestionProgress,
 )
 from src.domain.protocols import IRandomGenerator
@@ -36,6 +42,31 @@ class FakeRandomGenerator(IRandomGenerator):
     def shuffle(self, items: list[Any]) -> None:
         self.shuffled = True
         items.reverse()
+
+
+class FakeUserRepository(IUserRepository):
+    """Implementação em memória de IUserRepository."""
+
+    def __init__(self) -> None:
+        self._users: dict[UUID, User] = {}
+
+    def save(self, user: User) -> None:
+        self._users[user.id] = user
+
+    def get_by_id(self, user_id: UUID) -> User | None:
+        return self._users.get(user_id)
+
+    def get_by_google_sub(self, google_sub: str) -> User | None:
+        for u in self._users.values():
+            if u.google_sub == google_sub:
+                return u
+        return None
+
+    def get_by_email(self, email: str) -> User | None:
+        for u in self._users.values():
+            if u.email.lower() == email.lower():
+                return u
+        return None
 
 
 class FakeSubjectRepository(ISubjectRepository):
@@ -212,9 +243,12 @@ class FakeClockService(IClockService):
     """Implementação em memória de IClockService para testes temporais."""
 
     def __init__(
-        self, current_date: date | None = None, current_datetime: datetime | None = None
+        self,
+        current_date: date | None = None,
+        current_datetime: datetime | None = None,
+        initial_date: date | None = None,
     ) -> None:
-        self._date = current_date or date.today()
+        self._date = initial_date or current_date or date.today()
         self._datetime = current_datetime or datetime.now(UTC)
 
     def set_date(self, new_date: date) -> None:
@@ -356,3 +390,63 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
                     next_review_date=initial_date,
                     last_reviewed_at=None,
                 )
+
+    def list_by_user(self, user_id: UUID) -> list[UserQuestionProgress]:
+        return [p for (u_id, _), p in self._progress.items() if u_id == user_id]
+
+
+class FakeReviewAuditRepository(IReviewAuditRepository):
+    """Implementação em memória de IReviewAuditRepository para testes unitários."""
+
+    def __init__(self) -> None:
+        self.logs: list[ReviewAuditLog] = []
+
+    def save(self, log: ReviewAuditLog) -> None:
+        self.logs.append(log)
+
+    def list_by_user(
+        self, user_id: UUID, limit: int = 50, offset: int = 0, subject_id: UUID | None = None
+    ) -> list[ReviewAuditLog]:
+        filtered = [
+            log
+            for log in self.logs
+            if log.user_id == user_id and (subject_id is None or log.subject_id == subject_id)
+        ]
+        sorted_logs = sorted(
+            filtered,
+            key=lambda log: (log.review_date, log.logged_at or datetime.min, log.id),
+            reverse=True,
+        )
+        return sorted_logs[offset : offset + limit]
+
+    def count_by_user(self, user_id: UUID, subject_id: UUID | None = None) -> int:
+        return sum(
+            1
+            for log in self.logs
+            if log.user_id == user_id and (subject_id is None or log.subject_id == subject_id)
+        )
+
+    def get_all_by_user(self, user_id: UUID) -> list[ReviewAuditLog]:
+        return [log for log in self.logs if log.user_id == user_id]
+
+    def stream_by_user(self, user_id: UUID, chunk_size: int = 1000) -> Generator[ReviewAuditLog]:
+        user_logs = [log for log in self.logs if log.user_id == user_id]
+        for i in range(0, len(user_logs), chunk_size):
+            yield from user_logs[i : i + chunk_size]
+
+    def get_active_dates_count(self, user_id: UUID) -> int:
+        return len({log.review_date for log in self.logs if log.user_id == user_id})
+
+
+class FakeUnitOfWork(IUnitOfWork):
+    """Implementação em memória de IUnitOfWork para testes unitários."""
+
+    def __init__(self) -> None:
+        self.committed = False
+        self.rolled_back = False
+
+    def commit(self) -> None:
+        self.committed = True
+
+    def rollback(self) -> None:
+        self.rolled_back = True

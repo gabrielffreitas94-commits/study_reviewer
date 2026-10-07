@@ -381,3 +381,39 @@ def test_delete_flashcard_by_non_owner_raises_ownership_error() -> None:
         ResourceOwnershipError, match="Você não tem permissão para excluir cards desta matéria"
     ):
         use_case.execute(card.id, user_id=intruder_id)
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_create_flashcard_by_non_owner_raises_ownership_error() -> None:
+    """Impede que usuários adicionem flashcards a matérias de terceiros.
+
+    Vulnerabilidade prevenida: IDOR na inserção de conteúdo não autorizado.
+    Garantia de segurança: Lança ResourceOwnershipError ao tentar criar card em matéria alheia.
+    """
+    subject_repo = FakeSubjectRepository()
+    topic_repo = FakeTopicRepository()
+    card_repo = FakeFlashcardRepository(topic_repo)
+    session_repo = FakeSessionRepository()
+    rng = FakeRandomGenerator()
+
+    owner_id = uuid4()
+    intruder_id = uuid4()
+
+    subject = Subject(name="Direito", owner_id=owner_id, is_public=True)
+    subject_repo.save(subject)
+    topic = Topic(subject_id=subject.id, name="Artigos")
+    topic_repo.save(topic)
+
+    use_case = CreateFlashcardUseCase(
+        card_repo=card_repo,
+        topic_repo=topic_repo,
+        session_repo=session_repo,
+        rng=rng,
+        subject_repo=subject_repo,
+    )
+    with pytest.raises(ResourceOwnershipError, match="Você não tem permissão para adicionar cards"):
+        use_case.execute(
+            CreateFlashcardDTO(topic_id=topic.id, front="F", back="V"),
+            user_id=intruder_id,
+        )
