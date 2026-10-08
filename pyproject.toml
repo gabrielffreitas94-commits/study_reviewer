@@ -42,7 +42,12 @@ select = ["E", "F", "W", "I", "B", "UP", "S"]
 ignore = []
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends"]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.params.Depends",
+    "fastapi.File",
+    "fastapi.params.File",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "S105", "S106"]  # Permite assert e tokens de teste nos testes

@@ -325,7 +325,7 @@ class ReviewAuditLog:
             raise DomainValidationError("O nome histórico da matéria não pode ser vazio.")
         if not self.historical_topic_name or not self.historical_topic_name.strip():
             raise DomainValidationError("O nome histórico do tema não pode ser vazio.")
-        if self.evaluation_mode not in ("MANUAL", "AI_TEXT", "AI_AUDIO"):
+        if self.evaluation_mode not in ("MANUAL", "AI_TEXT", "AI_AUDIO", "MULTIAGENT_DISPUTE"):
             raise DomainValidationError(f"Modo de avaliação inválido: {self.evaluation_mode}")
 
     @property
@@ -486,6 +486,7 @@ class AnswerEvaluationResult:
     tokens_used: int = 0
     cached_context: bool = False
     evaluation_mode: str = "AI_TEXT"
+    transcribed_text: str | None = None
 
     def __post_init__(self) -> None:
         if not (0 <= self.score <= 100):
@@ -500,5 +501,32 @@ class AnswerEvaluationResult:
             raise DomainValidationError("Tokens consumidos não podem ser negativos.")
         if not self.feedback or not self.feedback.strip():
             raise DomainValidationError("Feedback de avaliação não pode ser vazio.")
-        if self.evaluation_mode not in ("AI_TEXT", "AI_AUDIO"):
+        if self.evaluation_mode not in ("AI_TEXT", "AI_AUDIO", "MULTIAGENT_DISPUTE"):
             raise DomainValidationError(f"Modo de avaliação inválido: {self.evaluation_mode}")
+
+
+@dataclass(slots=True, frozen=True)
+class DisputeEvaluationResult:
+    """Resultado deliberado pelo conselho multiagente na contestação de avaliação."""
+
+    status: str  # "UPHELD" ou "REJECTED"
+    revised_score: int
+    advocate_rationale: str
+    critic_rationale: str
+    arbitrator_verdict: str
+    tokens_used: int = 0
+    refund_dispute_tokens: bool = False
+
+    def __post_init__(self) -> None:
+        if self.status not in ("UPHELD", "REJECTED"):
+            raise DomainValidationError(f"Status de contestação inválido: {self.status}")
+        if not (0 <= self.revised_score <= 100):
+            raise DomainValidationError("O revised_score deve estar entre 0 e 100.")
+        if not self.advocate_rationale or not self.advocate_rationale.strip():
+            raise DomainValidationError("O parecer do advogado não pode ser vazio.")
+        if not self.critic_rationale or not self.critic_rationale.strip():
+            raise DomainValidationError("O parecer do crítico não pode ser vazio.")
+        if not self.arbitrator_verdict or not self.arbitrator_verdict.strip():
+            raise DomainValidationError("O veredito do árbitro não pode ser vazio.")
+        if self.tokens_used < 0:
+            raise DomainValidationError("Tokens consumidos não podem ser negativos.")
