@@ -73,7 +73,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Erro ao carregar métricas'), findsOneWidget);
-    expect(find.text('Falha de rede'), findsOneWidget);
+    expect(find.text('Falha de rede'), findsNWidgets(2));
     expect(find.text('Tentar Novamente'), findsOneWidget);
   });
 }

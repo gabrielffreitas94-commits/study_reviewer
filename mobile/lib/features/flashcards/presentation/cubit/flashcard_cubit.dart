@@ -76,9 +76,6 @@ class FlashcardCubit extends Cubit<FlashcardState> {
         isPrefetching: false,
         isOffline: _isOffline,
       ));
-
-      // Se o lote inicial for pequeno, verifica se já dispara prefetch
-      _checkAndTriggerPrefetch();
     } catch (e) {
       emit(FlashcardError(
         message: 'Falha ao carregar flashcards: ${e.toString()}',

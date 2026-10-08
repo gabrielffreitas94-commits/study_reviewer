@@ -30,6 +30,9 @@ void main() {
           subjectId: any(named: 'subjectId'),
           topicId: any(named: 'topicId'),
         )).thenAnswer((_) async {});
+    when(() => mockCubit.nextCard()).thenAnswer((_) async {});
+    when(() => mockCubit.retry()).thenReturn(null);
+    when(() => mockCubit.toggleFlip()).thenReturn(null);
   });
 
   Widget createWidgetUnderTest() {
@@ -74,7 +77,7 @@ void main() {
       verify(() => mockCubit.loadSession(
             subjectId: any(named: 'subjectId'),
             topicId: any(named: 'topicId'),
-          )).called(1);
+          )).called(2);
     });
 
     testWidgets('State 4: Error shows error message and retry button',
