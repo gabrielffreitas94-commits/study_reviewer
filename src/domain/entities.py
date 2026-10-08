@@ -7,7 +7,9 @@ from uuid import UUID, uuid4
 
 from src.domain.exceptions import (
     DomainValidationError,
+    EmptyKnowledgeContentError,
     InvalidEmailError,
+    InvalidEmbeddingError,
     InvalidExpectedAnswerError,
     InvalidGoogleSubError,
     InvalidPromptError,
@@ -332,3 +334,64 @@ class ReviewAuditLog:
     @property
     def is_regressed(self) -> bool:
         return self.level_after < self.level_before
+
+
+@dataclass(slots=True)
+class KnowledgeSource:
+    """Entidade que representa um material/fonte de conhecimento associado a um Tema."""
+
+    topic_id: UUID
+    title: str
+    content_type: str = "TEXT"  # TEXT, SUMMARY, BOOK_CHAPTER
+    total_chunks: int = 0
+    char_count: int = 0
+    id: UUID = field(default_factory=uuid4)
+    created_at: date = field(default_factory=date.today)
+
+    def __post_init__(self) -> None:
+        self.title = self.title.strip() if self.title is not None else ""
+        if len(self.title) < 2 or len(self.title) > 200:
+            raise DomainValidationError("Título do material deve ter entre 2 e 200 caracteres.")
+        if self.total_chunks < 0:
+            raise DomainValidationError("total_chunks não pode ser negativo.")
+        if self.char_count < 0:
+            raise DomainValidationError("char_count não pode ser negativo.")
+
+
+@dataclass(slots=True)
+class KnowledgeChunk:
+    """Entidade que representa um fragmento semântico de conhecimento vetorizado."""
+
+    source_id: UUID
+    topic_id: UUID
+    chunk_index: int
+    content: str
+    embedding: tuple[float, ...] = field(default_factory=tuple)
+    token_estimate: int = 0
+    id: UUID = field(default_factory=uuid4)
+    created_at: date = field(default_factory=date.today)
+
+    def __post_init__(self) -> None:
+        self.content = self.content.strip() if self.content is not None else ""
+        if not self.content:
+            raise EmptyKnowledgeContentError("Conteúdo do chunk não pode ser vazio.")
+        if self.chunk_index < 0:
+            raise DomainValidationError("Índice do chunk não pode ser negativo.")
+        if not self.embedding:
+            raise InvalidEmbeddingError("Vetor de embedding não pode ser vazio.")
+
+
+@dataclass(slots=True, frozen=True)
+class ValidationResult:
+    """Entidade de valor representando o resultado da validação de uma questão contra a base RAG."""
+
+    is_grounded: bool
+    confidence_score: float
+    evidence_chunk_ids: tuple[UUID, ...]
+    evidence_quotes: tuple[str, ...]
+    reasoning: str
+    suggested_improvements: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.confidence_score <= 1.0):
+            raise DomainValidationError("confidence_score deve estar entre 0.0 e 1.0.")
