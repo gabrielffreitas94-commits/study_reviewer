@@ -14,7 +14,7 @@ Este documento estabelece as regras inegociáveis para o desenvolvimento de toda
      2. `gh pr create --base staging --head feature/sprint-XX-<nome> --title "Sprint XX — <Título>" --body-file docs/sprints/sprint-XX/02-pull-request-sprint-XX.md`
    - O encerramento de qualquer sprint só ocorre quando o comando `gh pr create` conclui com sucesso e o link ativo da PR (`https://github.com/.../pull/X`) é fornecido ao usuário.
    - O merge de `staging` para `main` é de responsabilidade exclusiva do usuário após validação em ambiente de homologação.
-   - A PR para `staging` deve conter o template oficial completamente preenchido e assinado por todos os 13 especialistas.
+   - A PR para `staging` deve conter o template oficial completamente preenchido e assinado por todos os 17 especialistas.
 
 2. **TDD Estrito (Test-Driven Development — Red, Green, Refactor):**
    - **🔴 RED:** Nenhum código de produção deve ser escrito antes de existir um teste unitário/de integração correspondente que falhe.
@@ -47,8 +47,8 @@ Este documento estabelece as regras inegociáveis para o desenvolvimento de toda
      - **Frontend:** Build e minificação de assets estáticos (Tailwind CSS) e Integridade de Templates (Jinja2 / UI) em ambientes Node/Python isolados.
      - **Delivery:** Build e paridade de contêiner Docker multi-stage com usuário não-root.
 
-7. **Auditoria Unânime pelos 13 Especialistas:**
-   - Antes da abertura da PR, todas as 13 personas técnicas devem auditar o código e emitir seus pareceres formais:
+7. **Auditoria Unânime pelos 17 Especialistas:**
+   - Antes da abertura da PR, todas as 17 personas técnicas devem auditar o código e emitir seus pareceres formais:
      1. Especialista de Produto
      2. Especialista QA
      3. Especialista Arquiteto
@@ -62,22 +62,27 @@ Este documento estabelece as regras inegociáveis para o desenvolvimento de toda
      11. Especialista de Performance de Programação Python
      12. Especialista de Performance de Frontend
      13. Especialista de Performance de Banco de Dados
+     14. Especialista Mobile
+     15. Especialista Flutter
+     16. Especialista em Arquitetura de IA
+     17. Especialista de Pagamento e Cobrança
    - Status válidos para cada parecer: `[APROVADO]` ou `[N/A JUSTIFICADO]`. Nenhum especialista pode ser omitido.
 
 8. **Protocolo de Auditoria Concorrente por Clusters (`invoke_subagent`):**
-   - Na fase de auditoria final da PR, a avaliação dos 13 especialistas é realizada de forma **estritamente paralela** via multi-agente, agrupados em 4 clusters de competência afins:
+   - Na fase de auditoria final da PR, a avaliação dos 17 especialistas é realizada de forma **estritamente paralela** via multi-agente, agrupados em 5 clusters de competência afins:
      - **Cluster 1 (Core & Arquitetura):** Especialistas #1 (Produto), #2 (QA) e #3 (Arquiteto).
-     - **Cluster 2 (Segurança & Compliance):** Especialistas #4 (Segurança), #5 (Telemetria) e #10 (LGPD).
+     - **Cluster 2 (Segurança & Compliance):** Especialistas #4 (Segurança), #5 (Telemetria), #10 (LGPD) e #17 (Pagamento e Cobrança).
      - **Cluster 3 (Experiência & Interface):** Especialistas #6 (UX), #7 (UI), #9 (Acessibilidade) e #12 (Performance Frontend).
-     - **Cluster 4 (Engenharia, Dados & Ops):** Especialistas #8 (DevOps), #11 (Performance Python) e #13 (Performance de Banco de Dados).
-   - O assistente orquestrador despacha os 4 clusters concorrentemente em uma única chamada de `invoke_subagent`, consolidando os pareceres na tabela oficial da PR.
+     - **Cluster 4 (Engenharia Mobile & Flutter):** Especialistas #14 (Mobile) e #15 (Flutter).
+     - **Cluster 5 (Backend, Dados, Ops & IA):** Especialistas #8 (DevOps), #11 (Performance Python), #13 (Performance de Banco de Dados) e #16 (Arquitetura de IA).
+   - O assistente orquestrador despacha os 5 clusters concorrentemente em uma única chamada de `invoke_subagent`, consolidando os pareceres na tabela oficial da PR.
 
 9. **Protocolo Automatizado de Fechamento de Sprint (Gatekeeper Inegociável da PR):**
    - Nenhuma sprint pode ser declarada "concluída", "finalizada" ou com o comando `/goal` atingido sem seguir a risca o fluxo sequencial estrito de encerramento:
      1. **Testes & Cobertura:** `pytest --cov=src --cov-fail-under=100` (100.00% de cobertura estrita em `src/`).
      2. **Qualidade Estática de Código:** `ruff check`, `ruff format --check` e `mypy` sem nenhum erro.
-     3. **Auditoria Concorrente dos 13 Especialistas:** Despachar os 4 clusters via `invoke_subagent` e obter parecer `[APROVADO]` unânime.
-     4. **Documentação Oficial da PR:** Consolidar métricas e a tabela dos 13 pareceres em `docs/sprints/sprint-XX/02-pull-request-sprint-XX.md`.
+     3. **Auditoria Concorrente dos 17 Especialistas:** Despachar os 5 clusters via `invoke_subagent` e obter parecer `[APROVADO]` unânime.
+     4. **Documentação Oficial da PR:** Consolidar métricas e a tabela dos 17 pareceres em `docs/sprints/sprint-XX/02-pull-request-sprint-XX.md`.
      5. **Commit de Fechamento:**
         ```bash
         git add .

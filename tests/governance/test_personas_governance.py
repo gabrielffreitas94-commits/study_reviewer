@@ -1,4 +1,4 @@
-"""Testes de governança para verificação automatizada dos 13 especialistas e CI/CD modular."""
+"""Testes de governança para verificação automatizada dos 17 especialistas e CI/CD modular."""
 
 from pathlib import Path
 
@@ -16,6 +16,10 @@ EXPECTED_PERSONAS = [
     ("11-python-performance-specialist.md", "Especialista de Performance de Programação Python"),
     ("12-frontend-performance-specialist.md", "Especialista de Performance de Frontend"),
     ("13-database-performance-specialist.md", "Especialista de Performance de Banco de Dados"),
+    ("14-mobile-specialist.md", "Especialista Mobile"),
+    ("15-flutter-specialist.md", "Especialista Flutter"),
+    ("16-ai-architecture-specialist.md", "Especialista em Arquitetura de IA"),
+    ("17-payment-billing-specialist.md", "Especialista de Pagamento e Cobrança"),
 ]
 
 EXPECTED_SKILLS = [
@@ -36,6 +40,18 @@ EXPECTED_SKILLS = [
     "python-performance-auditor",
     "frontend-performance-auditor",
     "database-performance-auditor",
+    "mobile-usability-auditor",
+    "mobile-security-auditor",
+    "mobile-performance-auditor",
+    "flutter-performance-auditor",
+    "flutter-code-quality-auditor",
+    "ai-performance-auditor",
+    "ai-resilience-auditor",
+    "ai-security-auditor",
+    "ai-hallucination-mitigator",
+    "payment-transactions-auditor",
+    "payment-gateways-webhook-auditor",
+    "billing-lifecycle-auditor",
     "parallel-audit-orchestrator",
 ]
 
@@ -50,8 +66,8 @@ EXPECTED_WORKFLOWS = [
 ]
 
 
-def test_all_13_personas_exist_with_complete_structure() -> None:
-    """Valida a existência e completude documental de todas as 13 personas de auditoria."""
+def test_all_17_personas_exist_with_complete_structure() -> None:
+    """Valida a existência e completude documental de todas as 17 personas de auditoria."""
     personas_dir = Path("docs/personas")
     assert personas_dir.exists(), "Diretório docs/personas não encontrado!"
 
@@ -71,7 +87,7 @@ def test_all_13_personas_exist_with_complete_structure() -> None:
 
 
 def test_all_specialist_skills_exist_with_frontmatter() -> None:
-    """Valida que todas as skills dos 13 especialistas existem com YAML frontmatter válido."""
+    """Valida que todas as skills dos 17 especialistas existem com YAML frontmatter válido."""
     skills_dir = Path(".gemini/skills")
     assert skills_dir.exists(), "Diretório .gemini/skills não encontrado!"
 
@@ -91,15 +107,15 @@ def test_all_specialist_skills_exist_with_frontmatter() -> None:
         )
 
 
-def test_pr_template_contains_all_13_specialists() -> None:
-    """Garante que o template de PR contenha a bancada completa dos 13 especialistas."""
+def test_pr_template_contains_all_17_specialists() -> None:
+    """Garante que o template de PR contenha a bancada completa dos 17 especialistas."""
     template_path = Path(".github/PULL_REQUEST_TEMPLATE.md")
     assert template_path.exists(), "Template de PR não encontrado!"
 
     content = template_path.read_text(encoding="utf-8")
-    assert "Bancada dos 13 Especialistas" in content
+    assert "Bancada dos 17 Especialistas" in content
 
-    for i in range(1, 14):
+    for i in range(1, 18):
         assert f"| **{i}** |" in content, (
             f"Especialista #{i} ausente na tabela de auditoria do template de PR!"
         )
@@ -127,16 +143,17 @@ def test_parallel_audit_protocol_document_exists() -> None:
     assert "Cluster 1: Core & Arquitetura" in content
     assert "Cluster 2: Segurança & Compliance" in content
     assert "Cluster 3: Experiência & Interface" in content
-    assert "Cluster 4: Engenharia, Dados & Ops" in content
+    assert "Cluster 4: Engenharia Mobile & Flutter" in content
+    assert "Cluster 5: Backend, Dados, Ops & IA" in content
 
 
-def test_prd_documents_all_13_specialists() -> None:
-    """Garante que o PRD.md documente formalmente a bancada dos 13 especialistas."""
+def test_prd_documents_all_17_specialists() -> None:
+    """Garante que o PRD.md documente formalmente a bancada dos 17 especialistas."""
     prd_path = Path("PRD.md")
     assert prd_path.exists(), "PRD.md não encontrado!"
 
     content = prd_path.read_text(encoding="utf-8")
-    assert "Bancada dos 13 Especialistas" in content
+    assert "Bancada dos 17 Especialistas" in content
     for _, specialist_name in EXPECTED_PERSONAS:
         assert specialist_name.lower() in content.lower(), (
             f"Especialista '{specialist_name}' não mencionado no PRD.md!"
