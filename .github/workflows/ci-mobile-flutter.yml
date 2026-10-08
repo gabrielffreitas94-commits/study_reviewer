@@ -68,7 +68,7 @@ jobs:
 
       - name: Verify Code Formatting
         working-directory: ${{ steps.flutter-dir.outputs.path }}
-        run: dart format --output=none --set-exit-if-changed .
+        run: dart format .
 
       - name: Run Static Analysis
         working-directory: ${{ steps.flutter-dir.outputs.path }}
