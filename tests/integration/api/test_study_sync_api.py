@@ -581,7 +581,9 @@ def test_sync_answers_api_direct_call_fallback_event_repo(
 def test_sync_answers_api_with_correlation_id_telemetry(
     client: TestClient, db_session: Session, test_user: User, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Verifica se o cabeçalho X-Correlation-ID é capturado e registrado na telemetria estruturada."""
+    """Verifica se o cabeçalho X-Correlation-ID é capturado
+    e registrado na telemetria estruturada.
+    """
     import logging
 
     study_session, cards = _seed_study_session(db_session, test_user)
@@ -611,4 +613,3 @@ def test_sync_answers_api_with_correlation_id_telemetry(
         or correlation_id in record.message
         for record in caplog.records
     )
-
