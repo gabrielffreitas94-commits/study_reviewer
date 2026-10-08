@@ -39,7 +39,7 @@ void main() {
       await tester.pumpWidget(
         const MediaQuery(
           data: MediaQueryData(disableAnimations: true),
-          child: const MaterialApp(
+          child: MaterialApp(
             home: Scaffold(
               body: FlipCard3D(
                 front: Text('Frente Reduzida'),

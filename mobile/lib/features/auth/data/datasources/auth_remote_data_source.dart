@@ -100,7 +100,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         e.type == DioExceptionType.receiveTimeout ||
         e.error is SocketException) {
       return const NetworkFailure(
-        message: 'Conexão instável ou servidor indisponível. Verifique sua rede.',
+        'Conexão instável ou servidor indisponível. Verifique sua rede.',
       );
     }
 

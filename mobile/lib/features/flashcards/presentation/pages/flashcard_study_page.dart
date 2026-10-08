@@ -67,6 +67,7 @@ class _FlashcardStudyPageState extends State<FlashcardStudyPage> {
               FlashcardEmpty() => _buildEmptyState(context, state),
               FlashcardError() => _buildErrorState(context, state),
               FlashcardLoaded() => _buildLoadedState(context, state),
+              _ => _buildLoadingState(),
             };
           },
         ),

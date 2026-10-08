@@ -101,7 +101,7 @@ class LoginPage extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: isDark ? AppTheme.slate900 : Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: BorderSide(
+                          border: Border.all(
                             color: isDark ? AppTheme.slate800 : AppTheme.slate200,
                           ),
                           boxShadow: [

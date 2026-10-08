@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:study_reviewer_mobile/core/theme/app_theme.dart';
 import 'package:study_reviewer_mobile/features/auth/domain/entities/user_entity.dart';
 import 'package:study_reviewer_mobile/features/auth/presentation/cubit/auth_cubit.dart';
-import 'package:study_reviewer_mobile/features/auth/presentation/cubit/auth_state.dart';
 import 'package:study_reviewer_mobile/features/flashcards/presentation/cubit/flashcard_cubit.dart';
 import 'package:study_reviewer_mobile/features/flashcards/presentation/pages/flashcard_study_page.dart';
 import 'package:study_reviewer_mobile/features/performance/presentation/cubit/performance_cubit.dart';
@@ -198,7 +197,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
               padding: const EdgeInsets.symmetric(vertical: 32),
               child: Column(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.check_circle_outline_rounded,
                     size: 64,
                     color: AppTheme.emerald500,
@@ -244,153 +243,6 @@ class _HomeShellPageState extends State<HomeShellPage> {
   }
 
 
-  Widget _buildPerformanceTab(bool isDark) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSummaryCard(
-            title: 'Métricas de Aprendizado',
-            subtitle: 'Retenção estimada e consistência de estudo',
-            icon: Icons.trending_up_rounded,
-            color: AppTheme.amber500,
-            isDark: isDark,
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildMetricTile(
-                  label: 'Taxa de Retenção',
-                  value: '89.4%',
-                  color: AppTheme.emerald500,
-                  isDark: isDark,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildMetricTile(
-                  label: 'Sequência (Dias)',
-                  value: '14 🔥',
-                  color: AppTheme.amber500,
-                  isDark: isDark,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingsTab(BuildContext context, bool isDark) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Card com dados do usuário
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.slate900 : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: BorderSide(
-                color: isDark ? AppTheme.slate800 : AppTheme.slate200,
-              ),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: AppTheme.indigo600,
-                  backgroundImage: widget.user.avatarUrl != null
-                      ? NetworkImage(widget.user.avatarUrl!)
-                      : null,
-                  child: widget.user.avatarUrl == null
-                      ? Text(
-                          widget.user.name.isNotEmpty
-                              ? widget.user.name[0].toUpperCase()
-                              : 'U',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.user.name,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppTheme.slate100 : AppTheme.slate900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.user.email,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? AppTheme.slate400 : AppTheme.slate600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Botão Acessível de Logout
-          Semantics(
-            label: 'Encerrar sessão da conta',
-            button: true,
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  context.read<AuthCubit>().logout();
-                },
-                icon: const Icon(Icons.logout_rounded, color: AppTheme.rose600),
-                label: const Text(
-                  'Encerrar Sessão',
-                  style: TextStyle(
-                    color: AppTheme.rose600,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: AppTheme.minTouchTargetSize,
-                  side: const BorderSide(color: AppTheme.rose600),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Study Reviewer Mobile v1.0.0 (Build 1)',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? AppTheme.slate500 : AppTheme.slate400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSummaryCard({
     required String title,
     required String subtitle,
@@ -403,7 +255,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
       decoration: BoxDecoration(
         color: isDark ? AppTheme.slate900 : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: BorderSide(
+        border: Border.all(
           color: isDark ? AppTheme.slate800 : AppTheme.slate200,
         ),
       ),
@@ -475,7 +327,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
         decoration: BoxDecoration(
           color: isDark ? AppTheme.slate900 : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: BorderSide(
+          border: Border.all(
             color: isDark ? AppTheme.slate800 : AppTheme.slate200,
           ),
         ),
@@ -507,46 +359,6 @@ class _HomeShellPageState extends State<HomeShellPage> {
             const Icon(Icons.chevron_right_rounded, color: AppTheme.slate400),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildMetricTile({
-    required String label,
-    required String value,
-    required Color color,
-    required bool isDark,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.slate900 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: BorderSide(
-          color: isDark ? AppTheme.slate800 : AppTheme.slate200,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark ? AppTheme.slate400 : AppTheme.slate600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
       ),
     );
   }
