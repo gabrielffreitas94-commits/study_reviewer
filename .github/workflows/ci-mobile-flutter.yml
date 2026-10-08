@@ -81,3 +81,16 @@ jobs:
       - name: Build Android App Bundle (Release)
         working-directory: ${{ steps.flutter-dir.outputs.path }}
         run: flutter build appbundle --release --android-skip-build-dependency-validation
+
+      - name: Build Android APK (Release for Staging)
+        working-directory: ${{ steps.flutter-dir.outputs.path }}
+        run: flutter build apk --release --android-skip-build-dependency-validation --dart-define=API_BASE_URL=https://6xopxyw6z6qmqpbmcvaszuy27m0jsgzh.lambda-url.sa-east-1.on.aws/api/v1
+
+      - name: Upload Android Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: study-reviewer-mobile-staging
+          path: |
+            mobile/build/app/outputs/flutter-apk/app-release.apk
+            mobile/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 7
