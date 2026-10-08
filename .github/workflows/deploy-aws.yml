@@ -78,6 +78,12 @@ jobs:
           ENV_NAME: ${{ github.event.inputs.environment || 'staging' }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
         run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ROLE_ARN="${{ secrets.LAMBDA_ROLE_ARN }}"
+          if [ -z "$ROLE_ARN" ]; then
+            ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/study-reviewer-lambda-role-${ENV_NAME}"
+          fi
+
           aws cloudformation deploy \
             --template-file infra/template.yaml \
             --stack-name study-reviewer-$ENV_NAME \
@@ -90,7 +96,7 @@ jobs:
                 GoogleClientId="${{ secrets.GOOGLE_CLIENT_ID }}" \
                 GoogleClientSecret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
                 GoogleRedirectUri="${{ secrets.GOOGLE_REDIRECT_URI || '' }}" \
-                LambdaRoleArn="${{ secrets.LAMBDA_ROLE_ARN || '' }}" \
+                LambdaRoleArn="$ROLE_ARN" \
             --region $AWS_REGION
 
           echo "==> Atualizando código da função Lambda com o digest mais recente do ECR..."

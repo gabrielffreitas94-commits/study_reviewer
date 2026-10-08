@@ -11,8 +11,16 @@ class ApiConstants {
   /// URL padrão para Web, Desktop e emulador iOS (localhost).
   static const String localhostBaseUrl = 'http://localhost:8000/api/v1';
 
-  /// Determina dinamicamente a URL base correta conforme a plataforma de execução.
+  /// URL de Staging pública na AWS (Serverless Always Free)
+  static const String stagingBaseUrl =
+      'https://6xopxyw6z6qmqpbmcvaszuy27m0jsgzh.lambda-url.sa-east-1.on.aws/api/v1';
+
+  /// Determina dinamicamente a URL base correta conforme a plataforma de execução ou flag --dart-define.
   static String get defaultBaseUrl {
+    const envUrl = String.fromEnvironment('API_BASE_URL');
+    if (envUrl.isNotEmpty) {
+      return envUrl;
+    }
     if (kIsWeb) {
       return localhostBaseUrl;
     }
