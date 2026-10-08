@@ -33,7 +33,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? redirectUri,
   }) async {
     try {
-      final response = await _dio.post(
+      final response = await _dio.post<Map<String, dynamic>>(
         ApiConstants.authGoogle,
         data: {
           if (idToken != null) 'id_token': idToken,
@@ -62,7 +62,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserModel> getCurrentUser() async {
     try {
-      final response = await _dio.get(ApiConstants.authMe);
+      final response = await _dio.get<Map<String, dynamic>>(ApiConstants.authMe);
 
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data as Map<String, dynamic>;
@@ -84,7 +84,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> logout() async {
     try {
-      await _dio.post(ApiConstants.authLogout);
+      await _dio.post<dynamic>(ApiConstants.authLogout);
     } on DioException catch (e) {
       // Mesmo com falha remota no logout, a camada de repositório deve expurgar credenciais locais
       throw _handleDioException(e);

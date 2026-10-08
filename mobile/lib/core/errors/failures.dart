@@ -22,13 +22,11 @@ class ServerFailure extends Failure {
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure([String message = 'Falha ao recuperar dados salvos localmente.'])
-      : super(message);
+  const CacheFailure([super.message = 'Falha ao recuperar dados salvos localmente.']);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure([String message = 'Sem conexão com a internet.'])
-      : super(message);
+  const NetworkFailure([super.message = 'Sem conexão com a internet.']);
 }
 
 class AuthFailure extends Failure {

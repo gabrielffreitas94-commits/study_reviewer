@@ -37,7 +37,7 @@ class AppTheme {
 
   /// Tema Claro (Light Mode)
   static ThemeData get lightTheme {
-    final colorScheme = ColorScheme.light(
+    final colorScheme = const ColorScheme.light(
       primary: indigo600,
       onPrimary: Colors.white,
       primaryContainer: indigo50,
@@ -67,7 +67,7 @@ class AppTheme {
         centerTitle: true,
         surfaceTintColor: Colors.transparent,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -160,10 +160,10 @@ class AppTheme {
 
   /// Tema Escuro (Dark Mode)
   static ThemeData get darkTheme {
-    final colorScheme = ColorScheme.dark(
+    final colorScheme = const ColorScheme.dark(
       primary: indigo500,
       onPrimary: Colors.white,
-      primaryContainer: const Color(0xFF1E1B4B), // Indigo 950
+      primaryContainer: Color(0xFF1E1B4B), // Indigo 950
       onPrimaryContainer: indigo200,
       secondary: slate300,
       onSecondary: slate900,
@@ -190,7 +190,7 @@ class AppTheme {
         centerTitle: true,
         surfaceTintColor: Colors.transparent,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: slate900,
         elevation: 0,
         shape: RoundedRectangleBorder(

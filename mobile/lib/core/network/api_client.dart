@@ -18,7 +18,7 @@ class DefensiveLoggingInterceptor extends Interceptor {
   }
 
   @override
-  void onResponse(Response response, ResponseInterceptorHandler handler) {
+  void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
     developer.log(
       '<-- ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri.path}',
       name: 'ApiClient',
