@@ -12,7 +12,7 @@ Este Pull Request conclui a implementação, homologação e auditoria formal da
 
 A entrega cumpre rigorosamente os padrões de **Clean Architecture** e **TDD (Test-Driven Development)**:
 - **100.00% de cobertura estrita de código** no backend (`src/`), com 4.137 statements e 0 linhas descobertas.
-- **581 testes automatizados** passando sem qualquer falha.
+- **585 testes automatizados** passando sem qualquer falha.
 - Zero alertas no linter `ruff` e zero pendências no `mypy` em modo estrito (129 arquivos validados).
 - Governança de segurança AST verificada e aprovada com conformidade a CWEs e OWASP Top 10.
 - Auditoria multidisciplinar concluída com aprovação unânime dos **13 Especialistas Técnicos**.
@@ -74,7 +74,7 @@ A entrega cumpre rigorosamente os padrões de **Clean Architecture** e **TDD (Te
 ```text
 =============================== tests coverage ================================
 TOTAL: 4.137 statements | 0 missed | 100.00% strict coverage
-Result: 581 passed in 22.63s (Backend)
+Result: 585 passed in 20.65s (Backend)
 Governance AST: test_security_governance.py aprovado (100% compliance)
 Security Markers: 88 security-marked tests passed
 Linter (ruff): All checks passed!

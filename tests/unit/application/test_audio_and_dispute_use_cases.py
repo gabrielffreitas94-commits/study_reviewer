@@ -841,3 +841,217 @@ def test_dispute_service_error_refunds_hold() -> None:
 
     assert ledger.held_balance == 0
     assert ledger.available_balance == 3000
+
+
+def test_evaluate_audio_ledger_none_initializes_default() -> None:
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        audio_svc,
+        _,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id, topic_id=t_id, prompt="Pergunta", expected_answer="Gabarito"
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    s_repo.get_by_id.return_value = Subject(id=s_id, name="Matéria", owner_id=user_id)
+    p_repo.get_by_user_and_question.return_value = None
+    l_repo.get_by_user_id.return_value = None  # Testa linhas 416-418
+    k_repo.list_by_topic.return_value = []
+
+    audio_svc.evaluate_audio_answer = AsyncMock(
+        return_value=AnswerEvaluationResult(
+            score=90,
+            feedback="Bom.",
+            coverage_score=90,
+            accuracy_score=90,
+            depth_score=90,
+            tokens_used=200,
+            evaluation_mode="AI_AUDIO",
+            transcribed_text="Texto",
+        )
+    )
+
+    use_case = EvaluateAudioAnswerUseCase(
+        q_repo, t_repo, s_repo, p_repo, k_repo, l_repo, audio_svc, clock, audit_repo, uow
+    )
+
+    res = asyncio.run(
+        use_case.execute(
+            EvaluateAudioAnswerInputDTO(
+                question_id=q_id, audio_bytes=b"bytes", mime_type="audio/webm"
+            ),
+            user_id=user_id,
+        )
+    )
+    assert res.score == 90
+    assert l_repo.save.called
+
+
+def test_evaluate_audio_service_raises_domain_exception() -> None:
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        audio_svc,
+        _,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id, topic_id=t_id, prompt="Pergunta", expected_answer="Gabarito"
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    s_repo.get_by_id.return_value = Subject(id=s_id, name="Matéria", owner_id=user_id)
+    p_repo.get_by_user_and_question.return_value = None
+    ledger = TokenLedger(user_id=user_id, balance=2000)
+    l_repo.get_by_user_id.return_value = ledger
+
+    # Testa linha 464 (re-raise de DomainException)
+    audio_svc.evaluate_audio_answer = AsyncMock(
+        side_effect=DomainValidationError("Falha de validação no adaptador")
+    )
+
+    use_case = EvaluateAudioAnswerUseCase(
+        q_repo, t_repo, s_repo, p_repo, k_repo, l_repo, audio_svc, clock, audit_repo, uow
+    )
+
+    with pytest.raises(DomainValidationError, match="Falha de validação no adaptador"):
+        asyncio.run(
+            use_case.execute(
+                EvaluateAudioAnswerInputDTO(
+                    question_id=q_id, audio_bytes=b"bytes", mime_type="audio/webm"
+                ),
+                user_id=user_id,
+            )
+        )
+    assert ledger.held_balance == 0
+
+
+def test_dispute_ledger_none_initializes_default() -> None:
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        _,
+        dispute_svc,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id, topic_id=t_id, prompt="Pergunta", expected_answer="Gabarito"
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    s_repo.get_by_id.return_value = Subject(id=s_id, name="Matéria", owner_id=user_id)
+    p_repo.get_by_user_and_question.return_value = None
+    l_repo.get_by_user_id.return_value = None  # Testa linhas 614-615
+
+    dispute_svc.dispute_evaluation = AsyncMock(
+        return_value=DisputeEvaluationResult(
+            status="REJECTED",
+            revised_score=20,
+            advocate_rationale="Adv.",
+            critic_rationale="Crit.",
+            arbitrator_verdict="Veredito.",
+            tokens_used=300,
+            refund_dispute_tokens=False,
+        )
+    )
+
+    use_case = DisputeEvaluationUseCase(
+        q_repo, t_repo, s_repo, p_repo, k_repo, l_repo, dispute_svc, clock, audit_repo, uow
+    )
+
+    res = asyncio.run(
+        use_case.execute(
+            DisputeEvaluationInputDTO(
+                question_id=q_id,
+                student_answer="Resposta",
+                dispute_argument="Argumento de contestação válido.",
+            ),
+            user_id=user_id,
+        )
+    )
+    assert res.status == "REJECTED"
+    assert l_repo.save.called
+
+
+def test_dispute_service_raises_domain_exception() -> None:
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        _,
+        dispute_svc,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id, topic_id=t_id, prompt="Pergunta", expected_answer="Gabarito"
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    s_repo.get_by_id.return_value = Subject(id=s_id, name="Matéria", owner_id=user_id)
+    p_repo.get_by_user_and_question.return_value = None
+    ledger = TokenLedger(user_id=user_id, balance=3000)
+    l_repo.get_by_user_id.return_value = ledger
+
+    # Testa linha 663 (re-raise de DomainException)
+    dispute_svc.dispute_evaluation = AsyncMock(
+        side_effect=DomainValidationError("Falha de domínio na câmara")
+    )
+
+    use_case = DisputeEvaluationUseCase(
+        q_repo, t_repo, s_repo, p_repo, k_repo, l_repo, dispute_svc, clock, audit_repo, uow
+    )
+
+    with pytest.raises(DomainValidationError, match="Falha de domínio na câmara"):
+        asyncio.run(
+            use_case.execute(
+                DisputeEvaluationInputDTO(
+                    question_id=q_id,
+                    student_answer="Resposta",
+                    dispute_argument="Argumento de contestação válido.",
+                ),
+                user_id=user_id,
+            )
+        )
+    assert ledger.held_balance == 0
