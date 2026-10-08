@@ -37,7 +37,7 @@ class AppTheme {
 
   /// Tema Claro (Light Mode)
   static ThemeData get lightTheme {
-    final colorScheme = const ColorScheme.light(
+    const colorScheme = ColorScheme.light(
       primary: indigo600,
       onPrimary: Colors.white,
       primaryContainer: indigo50,
@@ -160,7 +160,7 @@ class AppTheme {
 
   /// Tema Escuro (Dark Mode)
   static ThemeData get darkTheme {
-    final colorScheme = const ColorScheme.dark(
+    const colorScheme = ColorScheme.dark(
       primary: indigo500,
       onPrimary: Colors.white,
       primaryContainer: Color(0xFF1E1B4B), // Indigo 950
