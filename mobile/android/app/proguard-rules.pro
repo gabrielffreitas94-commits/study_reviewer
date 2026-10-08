@@ -32,4 +32,9 @@
     java.lang.Object readResolve();
 }
 
+# Google Play Core & Deferred Components (R8 warning suppression)
+-dontwarn com.google.android.play.core.**
+-dontwarn io.flutter.embedding.engine.deferredcomponents.**
+-dontwarn io.flutter.embedding.android.FlutterPlayStoreSplitApplication
+
 -dontwarn java.lang.management.**
