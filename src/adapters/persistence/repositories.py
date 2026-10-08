@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from src.adapters.persistence.mappers import (
     FlashcardMapper,
+    KnowledgeChunkMapper,
+    KnowledgeSourceMapper,
     QuestionMapper,
     QuestionProgressMapper,
     ReviewAuditLogMapper,
@@ -21,6 +23,8 @@ from src.adapters.persistence.mappers import (
 from src.adapters.persistence.models import (
     FlashcardModel,
     FlashcardTopicModel,
+    KnowledgeChunkModel,
+    KnowledgeSourceModel,
     PoolSessionModel,
     QuestionModel,
     ReviewAuditLogModel,
@@ -33,6 +37,8 @@ from src.adapters.persistence.models import (
 from src.application.dto.question_dto import DueQuestionItemDTO
 from src.application.ports.repositories import (
     IFlashcardRepository,
+    IKnowledgeChunkRepository,
+    IKnowledgeSourceRepository,
     IQuestionProgressRepository,
     IQuestionRepository,
     IReviewAuditRepository,
@@ -46,6 +52,8 @@ from src.application.ports.repositories import (
 from src.domain.entities import (
     Flashcard,
     FlashcardPoolSession,
+    KnowledgeChunk,
+    KnowledgeSource,
     Question,
     ReviewAuditLog,
     Subject,
@@ -53,7 +61,7 @@ from src.domain.entities import (
     User,
     UserQuestionProgress,
 )
-from src.domain.services import SpacingPolicyService
+from src.domain.services import KnowledgeGroundingService, SpacingPolicyService
 
 
 class SqlAlchemyUserRepository(IUserRepository):
@@ -703,3 +711,86 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
 
     def rollback(self) -> None:
         self._session.rollback()
+
+
+class SqlAlchemyKnowledgeSourceRepository(IKnowledgeSourceRepository):
+    """Repositório SQLAlchemy para gerenciamento de Fontes de Conhecimento."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def save(self, source: KnowledgeSource) -> KnowledgeSource:
+        existing = self._session.get(KnowledgeSourceModel, source.id)
+        if existing:
+            existing.title = source.title
+            existing.content_type = source.content_type
+            existing.total_chunks = source.total_chunks
+            existing.char_count = source.char_count
+            self._session.flush()
+            return KnowledgeSourceMapper.to_domain(existing)
+
+        model = KnowledgeSourceMapper.to_model(source)
+        self._session.add(model)
+        self._session.flush()
+        return KnowledgeSourceMapper.to_domain(model)
+
+    def get_by_id(self, source_id: UUID) -> KnowledgeSource | None:
+        model = self._session.get(KnowledgeSourceModel, source_id)
+        return KnowledgeSourceMapper.to_domain(model) if model else None
+
+    def list_by_topic(self, topic_id: UUID) -> list[KnowledgeSource]:
+        stmt = (
+            select(KnowledgeSourceModel)
+            .where(KnowledgeSourceModel.topic_id == topic_id)
+            .order_by(KnowledgeSourceModel.created_at.desc(), KnowledgeSourceModel.id.desc())
+        )
+        return [KnowledgeSourceMapper.to_domain(m) for m in self._session.scalars(stmt)]
+
+    def delete(self, source_id: UUID) -> bool:
+        model = self._session.get(KnowledgeSourceModel, source_id)
+        if not model:
+            return False
+        self._session.delete(model)
+        self._session.flush()
+        return True
+
+
+class SqlAlchemyKnowledgeChunkRepository(IKnowledgeChunkRepository):
+    """Repositório SQLAlchemy para Chunks Vetoriais de Conhecimento."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def save_batch(self, chunks: list[KnowledgeChunk]) -> None:
+        for chunk in chunks:
+            model = KnowledgeChunkMapper.to_model(chunk)
+            self._session.add(model)
+        self._session.flush()
+
+    def list_by_topic(self, topic_id: UUID) -> list[KnowledgeChunk]:
+        stmt = (
+            select(KnowledgeChunkModel)
+            .where(KnowledgeChunkModel.topic_id == topic_id)
+            .order_by(KnowledgeChunkModel.chunk_index.asc())
+        )
+        return [KnowledgeChunkMapper.to_domain(m) for m in self._session.scalars(stmt)]
+
+    def delete_by_source(self, source_id: UUID) -> int:
+        stmt = select(KnowledgeChunkModel).where(KnowledgeChunkModel.source_id == source_id)
+        models = list(self._session.scalars(stmt).all())
+        count = len(models)
+        for m in models:
+            self._session.delete(m)
+        self._session.flush()
+        return count
+
+    def search_similar(
+        self,
+        topic_id: UUID,
+        query_embedding: list[float] | tuple[float, ...],
+        top_k: int = 5,
+    ) -> list[tuple[KnowledgeChunk, float]]:
+        chunks = self.list_by_topic(topic_id)
+        return KnowledgeGroundingService.rank_chunks_by_similarity(
+            query_embedding, chunks, top_k=top_k
+        )

@@ -78,3 +78,15 @@ class InvalidPromptError(DomainValidationError):
 
 class InvalidExpectedAnswerError(DomainValidationError):
     """Gabarito de pergunta vazio ou ultrapassando 10.000 caracteres."""
+
+
+class KnowledgeSourceNotFoundError(EntityNotFoundError):
+    """Fonte de conhecimento não encontrada para o identificador fornecido."""
+
+
+class EmptyKnowledgeContentError(DomainValidationError):
+    """Conteúdo textual de conhecimento ou chunk vazio ou insuficiente."""
+
+
+class InvalidEmbeddingError(DomainValidationError):
+    """Vetor de embedding com formato inválido, nulo ou dimensões incorretas."""

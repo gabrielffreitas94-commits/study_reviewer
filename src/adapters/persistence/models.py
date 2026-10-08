@@ -299,3 +299,56 @@ class ReviewAuditLogModel(Base):
     question: Mapped["QuestionModel | None"] = relationship("QuestionModel")
     subject: Mapped["SubjectModel | None"] = relationship("SubjectModel")
     topic: Mapped["TopicModel | None"] = relationship("TopicModel")
+
+
+class KnowledgeSourceModel(Base):
+    """Tabela de Fontes/Materiais de Conhecimento vinculados a um Tema."""
+
+    __tablename__ = "knowledge_sources"
+    __table_args__ = (Index("ix_knowledge_sources_topic_created", "topic_id", "created_at"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    topic_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(50), nullable=False, default="TEXT")
+    total_chunks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    char_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
+
+    topic: Mapped["TopicModel"] = relationship("TopicModel")
+    chunks: Mapped[list["KnowledgeChunkModel"]] = relationship(
+        "KnowledgeChunkModel",
+        back_populates="source",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class KnowledgeChunkModel(Base):
+    """Tabela de Fragmentos Semânticos Vetorizados de Conhecimento."""
+
+    __tablename__ = "knowledge_chunks"
+    __table_args__ = (
+        Index("ix_knowledge_chunks_topic", "topic_id"),
+        Index("ix_knowledge_chunks_source", "source_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    source_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("knowledge_sources.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    topic_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(JSON, nullable=False)
+    token_estimate: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
+
+    source: Mapped["KnowledgeSourceModel"] = relationship(
+        "KnowledgeSourceModel", back_populates="chunks"
+    )
+    topic: Mapped["TopicModel"] = relationship("TopicModel")

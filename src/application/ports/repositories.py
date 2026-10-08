@@ -8,6 +8,8 @@ from src.application.dto.question_dto import DueQuestionItemDTO
 from src.domain.entities import (
     Flashcard,
     FlashcardPoolSession,
+    KnowledgeChunk,
+    KnowledgeSource,
     Question,
     ReviewAuditLog,
     Subject,
@@ -289,4 +291,49 @@ class IClockService(Protocol):
 
     def now(self) -> datetime:
         """Retorna o timestamp corrente com fuso horário."""
+        ...
+
+
+class IKnowledgeSourceRepository(Protocol):
+    """Porta de persistência para Fontes de Conhecimento (Materiais Didáticos)."""
+
+    def save(self, source: KnowledgeSource) -> KnowledgeSource:
+        """Persiste ou atualiza uma fonte de conhecimento."""
+        ...
+
+    def get_by_id(self, source_id: UUID) -> KnowledgeSource | None:
+        """Busca uma fonte de conhecimento pelo seu identificador primário."""
+        ...
+
+    def list_by_topic(self, topic_id: UUID) -> list[KnowledgeSource]:
+        """Lista todas as fontes de conhecimento vinculadas a um tema."""
+        ...
+
+    def delete(self, source_id: UUID) -> bool:
+        """Remove uma fonte de conhecimento."""
+        ...
+
+
+class IKnowledgeChunkRepository(Protocol):
+    """Porta de persistência para Fragmentos Vetoriais de Conhecimento (Chunks)."""
+
+    def save_batch(self, chunks: list[KnowledgeChunk]) -> None:
+        """Persiste uma lista de chunks de conhecimento em lote."""
+        ...
+
+    def list_by_topic(self, topic_id: UUID) -> list[KnowledgeChunk]:
+        """Lista todos os chunks de conhecimento de um tema."""
+        ...
+
+    def delete_by_source(self, source_id: UUID) -> int:
+        """Remove todos os chunks associados a uma fonte específica."""
+        ...
+
+    def search_similar(
+        self,
+        topic_id: UUID,
+        query_embedding: list[float] | tuple[float, ...],
+        top_k: int = 5,
+    ) -> list[tuple[KnowledgeChunk, float]]:
+        """Busca os top-k chunks mais relevantes de um tema por similaridade de cosseno."""
         ...

@@ -3,6 +3,8 @@ from uuid import UUID
 
 from src.adapters.persistence.models import (
     FlashcardModel,
+    KnowledgeChunkModel,
+    KnowledgeSourceModel,
     PoolSessionModel,
     QuestionModel,
     ReviewAuditLogModel,
@@ -14,6 +16,8 @@ from src.adapters.persistence.models import (
 from src.domain.entities import (
     Flashcard,
     FlashcardPoolSession,
+    KnowledgeChunk,
+    KnowledgeSource,
     Question,
     ReviewAuditLog,
     Subject,
@@ -243,4 +247,62 @@ class ReviewAuditLogMapper:
             level_after=entity.level_after,
             evaluation_mode=entity.evaluation_mode,
             logged_at=entity.logged_at or datetime.now(UTC),
+        )
+
+
+class KnowledgeSourceMapper:
+    """Conversor para Fonte de Conhecimento (Sprint 07)."""
+
+    @staticmethod
+    def to_domain(model: KnowledgeSourceModel) -> KnowledgeSource:
+        return KnowledgeSource(
+            id=model.id,
+            topic_id=model.topic_id,
+            title=model.title,
+            content_type=model.content_type,
+            total_chunks=model.total_chunks,
+            char_count=model.char_count,
+            created_at=model.created_at,
+        )
+
+    @staticmethod
+    def to_model(entity: KnowledgeSource) -> KnowledgeSourceModel:
+        return KnowledgeSourceModel(
+            id=entity.id,
+            topic_id=entity.topic_id,
+            title=entity.title,
+            content_type=entity.content_type,
+            total_chunks=entity.total_chunks,
+            char_count=entity.char_count,
+            created_at=entity.created_at,
+        )
+
+
+class KnowledgeChunkMapper:
+    """Conversor para Fragmento de Conhecimento Vetorizado (Sprint 07)."""
+
+    @staticmethod
+    def to_domain(model: KnowledgeChunkModel) -> KnowledgeChunk:
+        return KnowledgeChunk(
+            id=model.id,
+            source_id=model.source_id,
+            topic_id=model.topic_id,
+            chunk_index=model.chunk_index,
+            content=model.content,
+            embedding=tuple(model.embedding),
+            token_estimate=model.token_estimate,
+            created_at=model.created_at,
+        )
+
+    @staticmethod
+    def to_model(entity: KnowledgeChunk) -> KnowledgeChunkModel:
+        return KnowledgeChunkModel(
+            id=entity.id,
+            source_id=entity.source_id,
+            topic_id=entity.topic_id,
+            chunk_index=entity.chunk_index,
+            content=entity.content,
+            embedding=list(entity.embedding),
+            token_estimate=entity.token_estimate,
+            created_at=entity.created_at,
         )

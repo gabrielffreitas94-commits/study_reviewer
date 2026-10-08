@@ -1,12 +1,18 @@
 """Serviço de domínio para a Pool de Flashcards com Gap Indexing (Clean Architecture - Camada 1)."""
 
 import math
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from uuid import UUID
 
-from src.domain.entities import Flashcard, ReviewAuditLog, UserQuestionProgress
-from src.domain.exceptions import DomainValidationError, InvalidScoreError
+from src.domain.entities import Flashcard, KnowledgeChunk, ReviewAuditLog, UserQuestionProgress
+from src.domain.exceptions import (
+    DomainValidationError,
+    EmptyKnowledgeContentError,
+    InvalidScoreError,
+)
 from src.domain.protocols import IRandomGenerator
 
 
@@ -262,3 +268,98 @@ class StudyStatisticsCalculatorService:
             MatureDataPoint(date=d, mature_count=count)
             for d, count in sorted(timeline_by_date.items())
         ]
+
+
+class SemanticChunkerService:
+    """Serviço puro de domínio para segmentação e chunking de textos acadêmicos."""
+
+    @classmethod
+    def chunk_text(
+        cls,
+        text: str,
+        chunk_size_chars: int = 1500,
+        overlap_chars: int = 150,
+    ) -> list[str]:
+        """Fragmenta texto em blocos coerentes respeitando fronteiras de frases e overlap."""
+        if not text or not text.strip():
+            raise EmptyKnowledgeContentError("Texto para chunking não pode ser vazio.")
+
+        # Normaliza quebras de linha e múltiplos espaços
+        normalized = re.sub(r"[ \t]+", " ", text.strip())
+        normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+
+        if len(normalized) <= chunk_size_chars:
+            return [normalized]
+
+        # Divide por fronteiras de frases (. ! ? \n)
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?\n])\s+", normalized) if s.strip()]
+
+        chunks: list[str] = []
+        current_chunk_sentences: list[str] = []
+        current_len = 0
+
+        for sentence in sentences:
+            sentence_len = len(sentence)
+            if current_chunk_sentences and (current_len + sentence_len + 1 > chunk_size_chars):
+                # Consolida o chunk atual
+                chunk_str = " ".join(current_chunk_sentences).strip()
+                chunks.append(chunk_str)
+
+                # Calcula frases para overlap no próximo chunk
+                overlap_sentences: list[str] = []
+                overlap_len = 0
+                for s in reversed(current_chunk_sentences):
+                    if overlap_len + len(s) + 1 <= overlap_chars:
+                        overlap_sentences.insert(0, s)
+                        overlap_len += len(s) + 1
+                    else:
+                        break
+
+                current_chunk_sentences = list(overlap_sentences)
+                current_len = sum(len(s) + 1 for s in current_chunk_sentences)
+
+            current_chunk_sentences.append(sentence)
+            current_len += sentence_len + 1
+
+        if current_chunk_sentences:
+            final_str = " ".join(current_chunk_sentences).strip()
+            if final_str and (not chunks or chunks[-1] != final_str):
+                chunks.append(final_str)
+
+        return chunks if chunks else [normalized]
+
+
+class KnowledgeGroundingService:
+    """Serviço puro de domínio para cálculo de relevância e similaridade vetorial."""
+
+    @staticmethod
+    def cosine_similarity(
+        vec_a: Sequence[float],
+        vec_b: Sequence[float],
+    ) -> float:
+        """Calcula similaridade de cosseno pura entre dois vetores densos."""
+        if len(vec_a) != len(vec_b) or not vec_a:
+            return 0.0
+
+        dot = sum(a * b for a, b in zip(vec_a, vec_b, strict=False))
+        norm_a = math.sqrt(sum(a * a for a in vec_a))
+        norm_b = math.sqrt(sum(b * b for b in vec_b))
+
+        if norm_a == 0.0 or norm_b == 0.0:
+            return 0.0
+
+        return max(-1.0, min(1.0, dot / (norm_a * norm_b)))
+
+    @classmethod
+    def rank_chunks_by_similarity(
+        cls,
+        query_embedding: Sequence[float],
+        chunks: Sequence[KnowledgeChunk],
+        top_k: int = 5,
+    ) -> list[tuple[KnowledgeChunk, float]]:
+        """Ranqueia chunks em ordem decrescente de similaridade de cosseno."""
+        scored = [
+            (chunk, cls.cosine_similarity(query_embedding, chunk.embedding)) for chunk in chunks
+        ]
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return scored[:top_k]
