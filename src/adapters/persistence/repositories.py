@@ -17,6 +17,8 @@ from src.adapters.persistence.mappers import (
     ReviewAuditLogMapper,
     SessionMapper,
     SubjectMapper,
+    TokenLedgerMapper,
+    TokenTransactionMapper,
     TopicMapper,
     UserMapper,
 )
@@ -30,6 +32,8 @@ from src.adapters.persistence.models import (
     ReviewAuditLogModel,
     StudyEventModel,
     SubjectModel,
+    TokenLedgerModel,
+    TokenTransactionModel,
     TopicModel,
     UserModel,
     UserQuestionProgressModel,
@@ -45,6 +49,7 @@ from src.application.ports.repositories import (
     ISessionRepository,
     IStudyEventRepository,
     ISubjectRepository,
+    ITokenLedgerRepository,
     ITopicRepository,
     IUnitOfWork,
     IUserRepository,
@@ -57,6 +62,8 @@ from src.domain.entities import (
     Question,
     ReviewAuditLog,
     Subject,
+    TokenLedger,
+    TokenTransaction,
     Topic,
     User,
     UserQuestionProgress,
@@ -794,3 +801,43 @@ class SqlAlchemyKnowledgeChunkRepository(IKnowledgeChunkRepository):
         return KnowledgeGroundingService.rank_chunks_by_similarity(
             query_embedding, chunks, top_k=top_k
         )
+
+
+class SqlAlchemyTokenLedgerRepository(ITokenLedgerRepository):
+    """Repositório SQLAlchemy para Saldo e Extrato de Tokens (Sprint 08)."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_by_user_id(self, user_id: UUID) -> TokenLedger | None:
+        model = self._session.get(TokenLedgerModel, user_id)
+        return TokenLedgerMapper.to_domain(model) if model else None
+
+    def save(self, ledger: TokenLedger) -> TokenLedger:
+        existing = self._session.get(TokenLedgerModel, ledger.user_id)
+        if existing:
+            existing.balance = ledger.balance
+            existing.held_balance = ledger.held_balance
+            existing.updated_at = ledger.updated_at
+            self._session.flush()
+            return TokenLedgerMapper.to_domain(existing)
+
+        model = TokenLedgerMapper.to_model(ledger)
+        self._session.add(model)
+        self._session.flush()
+        return TokenLedgerMapper.to_domain(model)
+
+    def record_transaction(self, transaction: TokenTransaction) -> TokenTransaction:
+        model = TokenTransactionMapper.to_model(transaction)
+        self._session.add(model)
+        self._session.flush()
+        return TokenTransactionMapper.to_domain(model)
+
+    def list_transactions(self, user_id: UUID, limit: int = 50) -> list[TokenTransaction]:
+        stmt = (
+            select(TokenTransactionModel)
+            .where(TokenTransactionModel.user_id == user_id)
+            .order_by(TokenTransactionModel.created_at.desc(), TokenTransactionModel.id.desc())
+            .limit(limit)
+        )
+        return [TokenTransactionMapper.to_domain(m) for m in self._session.scalars(stmt)]

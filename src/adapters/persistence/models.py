@@ -352,3 +352,40 @@ class KnowledgeChunkModel(Base):
         "KnowledgeSourceModel", back_populates="chunks"
     )
     topic: Mapped["TopicModel"] = relationship("TopicModel")
+
+
+class TokenLedgerModel(Base):
+    """Tabela de Saldos e Retenções de Tokens por Usuário (Sprint 08)."""
+
+    __tablename__ = "token_ledgers"
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    balance: Mapped[int] = mapped_column(Integer, nullable=False, default=1000)
+    held_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+    user: Mapped["UserModel"] = relationship("UserModel")
+
+
+class TokenTransactionModel(Base):
+    """Tabela Imutável de Transações do Ledger de Tokens (Sprint 08)."""
+
+    __tablename__ = "token_transactions"
+    __table_args__ = (Index("ix_token_transactions_user_created", "user_id", "created_at"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    transaction_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    reference_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+    user: Mapped["UserModel"] = relationship("UserModel")

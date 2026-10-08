@@ -9,6 +9,8 @@ from src.adapters.persistence.models import (
     QuestionModel,
     ReviewAuditLogModel,
     SubjectModel,
+    TokenLedgerModel,
+    TokenTransactionModel,
     TopicModel,
     UserModel,
     UserQuestionProgressModel,
@@ -21,6 +23,8 @@ from src.domain.entities import (
     Question,
     ReviewAuditLog,
     Subject,
+    TokenLedger,
+    TokenTransaction,
     Topic,
     User,
     UserQuestionProgress,
@@ -304,5 +308,53 @@ class KnowledgeChunkMapper:
             content=entity.content,
             embedding=list(entity.embedding),
             token_estimate=entity.token_estimate,
+            created_at=entity.created_at,
+        )
+
+
+class TokenLedgerMapper:
+    """Conversor para Saldo/Ledger de Tokens (Sprint 08)."""
+
+    @staticmethod
+    def to_domain(model: TokenLedgerModel) -> TokenLedger:
+        return TokenLedger(
+            user_id=model.user_id,
+            balance=model.balance,
+            held_balance=model.held_balance,
+            updated_at=model.updated_at,
+        )
+
+    @staticmethod
+    def to_model(entity: TokenLedger) -> TokenLedgerModel:
+        return TokenLedgerModel(
+            user_id=entity.user_id,
+            balance=entity.balance,
+            held_balance=entity.held_balance,
+            updated_at=entity.updated_at,
+        )
+
+
+class TokenTransactionMapper:
+    """Conversor para Transação de Tokens (Sprint 08)."""
+
+    @staticmethod
+    def to_domain(model: TokenTransactionModel) -> TokenTransaction:
+        return TokenTransaction(
+            id=model.id,
+            user_id=model.user_id,
+            transaction_type=model.transaction_type,
+            amount=model.amount,
+            reference_id=model.reference_id,
+            created_at=model.created_at,
+        )
+
+    @staticmethod
+    def to_model(entity: TokenTransaction) -> TokenTransactionModel:
+        return TokenTransactionModel(
+            id=entity.id,
+            user_id=entity.user_id,
+            transaction_type=entity.transaction_type,
+            amount=entity.amount,
+            reference_id=entity.reference_id,
             created_at=entity.created_at,
         )
