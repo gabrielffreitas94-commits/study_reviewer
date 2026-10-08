@@ -3,11 +3,15 @@
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.adapters.ai.gemini_adapters import GeminiAnswerEvaluationAdapter
+from src.adapters.ai.gemini_adapters import (
+    GeminiAnswerEvaluationAdapter,
+    GeminiAudioEvaluationAdapter,
+    GeminiMultiAgentDisputeAdapter,
+)
 from src.adapters.persistence.repositories import (
     SqlAlchemyKnowledgeChunkRepository,
     SqlAlchemyQuestionProgressRepository,
@@ -19,10 +23,14 @@ from src.adapters.persistence.repositories import (
 )
 from src.application.dto.evaluation_dto import (
     DepositTokensInputDTO,
+    DisputeEvaluationInputDTO,
     EvaluateAnswerInputDTO,
+    EvaluateAudioAnswerInputDTO,
 )
 from src.application.use_cases.evaluation_use_cases import (
     DepositTokensUseCase,
+    DisputeEvaluationUseCase,
+    EvaluateAudioAnswerUseCase,
     EvaluateStudentAnswerUseCase,
     GetUserTokenBalanceUseCase,
     ListTokenTransactionsUseCase,
@@ -48,6 +56,13 @@ class EvaluateAnswerRequest(BaseModel):
     """Payload para submissão de resposta aberta para avaliação por IA."""
 
     student_answer: str = Field(..., min_length=1, max_length=10000)
+
+
+class DisputeEvaluationRequest(BaseModel):
+    """Payload para contestação de nota perante o Conselho Multiagente."""
+
+    student_answer: str = Field(..., min_length=1, max_length=10000)
+    dispute_argument: str = Field(..., min_length=5, max_length=5000)
 
 
 class DepositTokensRequest(BaseModel):
@@ -111,6 +126,166 @@ async def evaluate_text_answer(
             detail=str(e),
         ) from e
     except (DomainValidationError, QuestionNotDueError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except ResourceOwnershipError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        ) from e
+    except (QuestionNotFoundError, EntityNotFoundError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except EvaluationServiceError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+        ) from e
+
+
+@api_evaluation_router.post(
+    "/questions/{question_id}/evaluate-audio",
+    status_code=status.HTTP_200_OK,
+    summary="Avaliar resposta em áudio com IA multimodal (efêmero) e atualizar repetição espaçada",
+)
+async def evaluate_audio_answer(
+    question_id: UUID,
+    audio_file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Transcreve e avalia a resposta em áudio com privacidade efêmera (LGPD Art. 16)."""
+    clock = SystemClockService()
+    use_case = EvaluateAudioAnswerUseCase(
+        question_repo=SqlAlchemyQuestionRepository(db),
+        topic_repo=SqlAlchemyTopicRepository(db),
+        subject_repo=SqlAlchemySubjectRepository(db),
+        progress_repo=SqlAlchemyQuestionProgressRepository(db),
+        chunk_repo=SqlAlchemyKnowledgeChunkRepository(db),
+        ledger_repo=SqlAlchemyTokenLedgerRepository(db),
+        audio_service=GeminiAudioEvaluationAdapter(),
+        clock=clock,
+        audit_repo=SqlAlchemyReviewAuditRepository(db),
+        uow=db,
+    )
+
+    audio_bytes = await audio_file.read()
+    mime_type = audio_file.content_type or "audio/webm"
+
+    try:
+        result = await use_case.execute(
+            dto=EvaluateAudioAnswerInputDTO(
+                question_id=question_id,
+                audio_bytes=audio_bytes,
+                mime_type=mime_type,
+            ),
+            user_id=current_user.id,
+        )
+        return {
+            "question_id": str(result.question_id),
+            "score": result.score,
+            "feedback": result.feedback,
+            "coverage_score": result.coverage_score,
+            "accuracy_score": result.accuracy_score,
+            "depth_score": result.depth_score,
+            "evidence_quotes": result.evidence_quotes,
+            "level_before": result.level_before,
+            "level_after": result.level_after,
+            "next_review_date": result.next_review_date.isoformat(),
+            "tokens_deducted": result.tokens_deducted,
+            "remaining_token_balance": result.remaining_token_balance,
+            "evaluation_mode": result.evaluation_mode,
+            "transcribed_text": result.transcribed_text,
+        }
+    except InsufficientTokensError as e:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=str(e),
+        ) from e
+    except (DomainValidationError, QuestionNotDueError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except ResourceOwnershipError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        ) from e
+    except (QuestionNotFoundError, EntityNotFoundError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except EvaluationServiceError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+        ) from e
+    finally:
+        del audio_bytes
+
+
+@api_evaluation_router.post(
+    "/questions/{question_id}/dispute",
+    status_code=status.HTTP_200_OK,
+    summary="Submeter contestação ao Conselho Multiagente (Advocate, Critic, Arbitrator)",
+)
+async def dispute_evaluation_endpoint(
+    question_id: UUID,
+    payload: DisputeEvaluationRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Submete a contestação de nota perante o conselho multiagente."""
+    clock = SystemClockService()
+    use_case = DisputeEvaluationUseCase(
+        question_repo=SqlAlchemyQuestionRepository(db),
+        topic_repo=SqlAlchemyTopicRepository(db),
+        subject_repo=SqlAlchemySubjectRepository(db),
+        progress_repo=SqlAlchemyQuestionProgressRepository(db),
+        chunk_repo=SqlAlchemyKnowledgeChunkRepository(db),
+        ledger_repo=SqlAlchemyTokenLedgerRepository(db),
+        dispute_service=GeminiMultiAgentDisputeAdapter(),
+        clock=clock,
+        audit_repo=SqlAlchemyReviewAuditRepository(db),
+        uow=db,
+    )
+
+    try:
+        result = await use_case.execute(
+            dto=DisputeEvaluationInputDTO(
+                question_id=question_id,
+                student_answer=payload.student_answer,
+                dispute_argument=payload.dispute_argument,
+            ),
+            user_id=current_user.id,
+        )
+        return {
+            "question_id": str(result.question_id),
+            "status": result.status,
+            "previous_score": result.previous_score,
+            "revised_score": result.revised_score,
+            "advocate_rationale": result.advocate_rationale,
+            "critic_rationale": result.critic_rationale,
+            "arbitrator_verdict": result.arbitrator_verdict,
+            "level_before": result.level_before,
+            "level_after": result.level_after,
+            "next_review_date": result.next_review_date.isoformat(),
+            "tokens_deducted": result.tokens_deducted,
+            "remaining_token_balance": result.remaining_token_balance,
+            "refund_dispute_tokens": result.refund_dispute_tokens,
+        }
+    except InsufficientTokensError as e:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=str(e),
+        ) from e
+    except DomainValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),

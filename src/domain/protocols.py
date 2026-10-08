@@ -52,3 +52,35 @@ class IAnswerEvaluationService(Protocol):
     ) -> Any:
         """Avalia a resposta contra o enunciado, gabarito e evidências bibliográficas."""
         ...
+
+
+class IAudioAnswerEvaluationService(Protocol):
+    """Protocolo abstrato para transcrição e avaliação multimodal efêmera de áudio."""
+
+    async def evaluate_audio_answer(
+        self,
+        prompt: str,
+        expected_answer: str,
+        audio_bytes: bytes,
+        mime_type: str,
+        context_chunks: list[str],
+    ) -> Any:
+        """Transcreve efemeramente e avalia a resposta em áudio com IA multimodal."""
+        ...
+
+
+class IMultiAgentDisputeService(Protocol):
+    """Protocolo abstrato para conselho multiagente de contestação de avaliações."""
+
+    async def dispute_evaluation(
+        self,
+        prompt: str,
+        expected_answer: str,
+        student_answer: str,
+        initial_score: int,
+        initial_feedback: str,
+        dispute_argument: str,
+        context_chunks: list[str],
+    ) -> Any:
+        """Executa julgamento multiagente (Advocate, Critic, Arbitrator) da contestação."""
+        ...

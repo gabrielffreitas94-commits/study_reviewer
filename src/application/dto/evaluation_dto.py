@@ -30,6 +30,44 @@ class EvaluateAnswerResponseDTO:
     tokens_deducted: int
     remaining_token_balance: int
     evaluation_mode: str = "AI_TEXT"
+    transcribed_text: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluateAudioAnswerInputDTO:
+    """Dados de entrada para avaliação de resposta em áudio com IA multimodal."""
+
+    question_id: UUID
+    audio_bytes: bytes
+    mime_type: str = "audio/webm"
+
+
+@dataclass(frozen=True, slots=True)
+class DisputeEvaluationInputDTO:
+    """Dados de entrada para contestação de avaliação perante o conselho multiagente."""
+
+    question_id: UUID
+    student_answer: str
+    dispute_argument: str
+
+
+@dataclass(frozen=True, slots=True)
+class DisputeEvaluationResponseDTO:
+    """Resultado deliberado pelo conselho multiagente na contestação de avaliação."""
+
+    question_id: UUID
+    status: str
+    previous_score: int
+    revised_score: int
+    advocate_rationale: str
+    critic_rationale: str
+    arbitrator_verdict: str
+    level_before: int
+    level_after: int
+    next_review_date: date
+    tokens_deducted: int
+    remaining_token_balance: int
+    refund_dispute_tokens: bool = False
 
 
 @dataclass(frozen=True, slots=True)
