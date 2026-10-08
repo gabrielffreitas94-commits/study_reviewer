@@ -83,9 +83,7 @@ class GeminiQuestionValidatorAdapter(IKnowledgeValidationService):
                 confidence_score=0.92,
                 evidence_chunk_ids=tuple(c.id for c in matching_chunks[:3]),
                 evidence_quotes=tuple(evidence_quotes[:3]),
-                reasoning=(
-                    "O enunciado e o gabarito possuem respaldo direto nas fontes do tema."
-                ),
+                reasoning=("O enunciado e o gabarito possuem respaldo direto nas fontes do tema."),
                 suggested_improvements=(),
             )
 
