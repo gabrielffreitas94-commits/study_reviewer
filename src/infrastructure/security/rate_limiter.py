@@ -18,15 +18,21 @@ class RateLimiter:
         """Verifica se o identificador pode executar a requisição dentro da janela temporal."""
         now = time.monotonic()
         cutoff = now - self.window_seconds
-        timestamps = _REQUEST_TIMESTAMPS[identifier]
+        timestamps = _REQUEST_TIMESTAMPS.get(identifier, [])
 
         # Purga timestamps expirados
-        _REQUEST_TIMESTAMPS[identifier] = [ts for ts in timestamps if ts > cutoff]
+        valid_ts = [ts for ts in timestamps if ts > cutoff]
+        if not valid_ts:
+            _REQUEST_TIMESTAMPS.pop(identifier, None)
+            valid_ts = []
+        else:
+            _REQUEST_TIMESTAMPS[identifier] = valid_ts
 
-        if len(_REQUEST_TIMESTAMPS[identifier]) >= self.max_requests:
+        if len(valid_ts) >= self.max_requests:
             return False
 
-        _REQUEST_TIMESTAMPS[identifier].append(now)
+        valid_ts.append(now)
+        _REQUEST_TIMESTAMPS[identifier] = valid_ts
         return True
 
 

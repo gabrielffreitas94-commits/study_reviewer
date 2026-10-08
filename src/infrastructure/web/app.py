@@ -30,6 +30,18 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Habilita CORS para origens móveis e clientes web
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ALLOWED_ORIGINS,
+        allow_origin_regex=settings.CORS_ALLOW_ORIGIN_REGEX,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     # Adiciona middleware de segurança HTTP
     app.add_middleware(SecurityHeadersMiddleware)
 
@@ -49,7 +61,7 @@ def create_app() -> FastAPI:
     from src.adapters.api.auth_controllers import api_auth_router
     from src.adapters.api.performance_controllers import api_performance_router
     from src.adapters.api.question_controllers import api_question_router
-    from src.adapters.web.auth_controllers import auth_router
+    from src.adapters.web.auth_controllers import auth_router, privacy_router
     from src.adapters.web.performance_controllers import web_performance_router
     from src.adapters.web.question_controllers import web_question_router
     from src.domain.exceptions import (
@@ -119,6 +131,7 @@ def create_app() -> FastAPI:
         return HTMLResponse(status_code=500, content=html_content)
 
     app.include_router(auth_router)
+    app.include_router(privacy_router)
     app.include_router(api_auth_router)
     app.include_router(web_router)
     app.include_router(api_router)

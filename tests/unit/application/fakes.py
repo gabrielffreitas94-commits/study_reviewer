@@ -68,6 +68,9 @@ class FakeUserRepository(IUserRepository):
                 return u
         return None
 
+    def delete(self, user_id: UUID) -> None:
+        self._users.pop(user_id, None)
+
 
 class FakeSubjectRepository(ISubjectRepository):
     """Implementação em memória de ISubjectRepository."""
@@ -166,6 +169,7 @@ class FakeFlashcardRepository(IFlashcardRepository):
         topic_id: UUID | None,
         limit: int | None = None,
         min_position: int | None = None,
+        offset: int | None = None,
     ) -> list[Flashcard]:
         cards = list(self._cards.values())
 
@@ -179,6 +183,9 @@ class FakeFlashcardRepository(IFlashcardRepository):
         sorted_cards = sorted(cards, key=lambda c: c.position)
         if min_position is not None:
             sorted_cards = [c for c in sorted_cards if c.position > min_position]
+
+        if offset is not None:
+            sorted_cards = sorted_cards[offset:]
 
         if limit is not None:
             sorted_cards = sorted_cards[:limit]
@@ -269,11 +276,13 @@ class FakeQuestionRepository(IQuestionRepository):
 
     def __init__(self) -> None:
         self._questions: dict[UUID, Question] = {}
+        self.get_by_id_calls: int = 0
 
     def save(self, question: Question) -> None:
         self._questions[question.id] = question
 
     def get_by_id(self, question_id: UUID) -> Question | None:
+        self.get_by_id_calls += 1
         return self._questions.get(question_id)
 
     def list_by_topic(self, topic_id: UUID) -> list[Question]:
@@ -300,8 +309,11 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
         self._question_repo = question_repo or FakeQuestionRepository()
         self._topic_repo = topic_repo or FakeTopicRepository()
         self._subject_repo = subject_repo or FakeSubjectRepository()
+        self.fail_on_save: bool = False
 
     def save(self, progress: UserQuestionProgress) -> None:
+        if self.fail_on_save:
+            raise RuntimeError("Erro ao persistir progresso")
         self._progress[(progress.user_id, progress.question_id)] = progress
 
     def get_by_user_and_question(

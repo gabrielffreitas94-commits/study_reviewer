@@ -307,6 +307,7 @@ def test_api_questions_rate_limiting_defense(
                 user_id=test_user.id, question_id=q.id, next_review_date=date.today()
             )
         )
+        session.commit()
 
     # Executa 60 requisições
     for _ in range(60):
@@ -398,6 +399,7 @@ def test_api_questions_edge_cases_and_error_branches(
                 user_id=test_user.id, question_id=q.id, next_review_date=date.today()
             )
         )
+        session.commit()
 
     res_bad_score = client.post(f"/api/v1/questions/{q.id}/review", json={"score": 150})
     assert res_bad_score.status_code == 400

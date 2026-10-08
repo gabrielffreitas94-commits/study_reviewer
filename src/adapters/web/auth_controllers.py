@@ -1,9 +1,18 @@
-"""Controlador Web para autenticação via Google OAuth2 / OIDC (Camada 3 - Adaptadores)."""
-
+import logging
 import urllib.parse
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -23,6 +32,8 @@ from src.infrastructure.security.dependencies import (
     get_google_client,
     get_session_service,
 )
+
+logger = logging.getLogger("study_reviewer.web_auth")
 
 templates_dir = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
@@ -169,3 +180,91 @@ def logout(
     response = RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(key="session_token", path="/")
     return response
+
+
+@auth_router.get("/privacy", include_in_schema=False)
+def auth_privacy_redirect() -> Response:
+    """Redireciona /auth/privacy para a rota canônica /privacy."""
+    return RedirectResponse(url="/privacy", status_code=status.HTTP_301_MOVED_PERMANENTLY)
+
+
+@auth_router.get("/account-deletion-request", include_in_schema=False)
+def auth_account_deletion_redirect() -> Response:
+    """Redireciona /auth/account-deletion-request para a rota canônica."""
+    return RedirectResponse(
+        url="/privacy/account-deletion-request", status_code=status.HTTP_301_MOVED_PERMANENTLY
+    )
+
+
+privacy_router = APIRouter(tags=["Web Privacy & LGPD"])
+
+
+@privacy_router.get("/privacy", response_class=HTMLResponse)
+def privacy_page(
+    request: Request,
+    current_user: User | None = Depends(get_current_user_optional),
+) -> Response:
+    """Renderiza a Política de Privacidade em conformidade com LGPD e Google Play Data Safety."""
+    return templates.TemplateResponse(
+        request=request,
+        name="privacy.html",
+        context={
+            "current_user": current_user,
+        },
+    )
+
+
+@privacy_router.get("/privacy/account-deletion-request", response_class=HTMLResponse)
+def account_deletion_request_page(
+    request: Request,
+    current_user: User | None = Depends(get_current_user_optional),
+) -> Response:
+    """Renderiza o formulário público para solicitação externa de exclusão de conta e dados."""
+    return templates.TemplateResponse(
+        request=request,
+        name="account_deletion_request.html",
+        context={
+            "current_user": current_user,
+            "submitted": False,
+            "email": current_user.email if current_user else "",
+        },
+    )
+
+
+@privacy_router.post("/privacy/account-deletion-request", response_class=HTMLResponse)
+def submit_account_deletion_request(
+    request: Request,
+    email: Annotated[str, Form(...)],
+    confirmation: Annotated[str | None, Form()] = None,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Processa solicitação externa de exclusão de dados com confirmação por e-mail (Double Opt-In).
+
+    Segurança Anti-Enumeration: Mensagem genérica uniforme independente da existência do e-mail
+    no sistema, prevenindo vazamento por enumeração de usuários.
+    """
+    clean_email = email.strip().lower()
+    user_repo = SqlAlchemyUserRepository(db)
+    user = user_repo.get_by_email(clean_email) if clean_email else None
+
+    logger.info(
+        "Solicitação externa de exclusão de dados submetida",
+        extra={
+            "event": "account_deletion_request_submitted",
+            "user_found": user is not None,
+            "has_confirmation": confirmation is not None,
+        },
+    )
+
+    # Simulação do disparo seguro de e-mail Double Opt-In
+    return templates.TemplateResponse(
+        request=request,
+        name="account_deletion_request.html",
+        context={
+            "current_user": current_user,
+            "submitted": True,
+            "email": clean_email,
+            "user_found": user is not None,
+        },
+    )

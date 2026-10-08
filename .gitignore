@@ -13,8 +13,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -54,3 +54,19 @@ Thumbs.db
 node_modules/
 
 .neon
+
+# Android & Flutter Mobile Secrets & Artifacts
+*.jks
+*.keystore
+**/key.properties
+**/local.properties
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+mobile/build/
+build/
+*.aab
+*.apk

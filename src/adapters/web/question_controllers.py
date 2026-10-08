@@ -325,6 +325,7 @@ def create_question_from_manage_view(
     prog_repo = SqlAlchemyQuestionProgressRepository(db)
     top_repo = SqlAlchemyTopicRepository(db)
     subj_repo = SqlAlchemySubjectRepository(db)
+    uow = SqlAlchemyUnitOfWork(db)
 
     topic = top_repo.get_by_id(topic_id)
     if not topic:
@@ -339,6 +340,7 @@ def create_question_from_manage_view(
         topic_repo=top_repo,
         subject_repo=subj_repo,
         clock=system_clock,
+        uow=uow,
     )
 
     try:
@@ -418,6 +420,7 @@ def create_topic_question(
     prog_repo = SqlAlchemyQuestionProgressRepository(db)
     top_repo = SqlAlchemyTopicRepository(db)
     subj_repo = SqlAlchemySubjectRepository(db)
+    uow = SqlAlchemyUnitOfWork(db)
 
     use_case = CreateQuestionUseCase(
         question_repo=q_repo,
@@ -425,6 +428,7 @@ def create_topic_question(
         topic_repo=top_repo,
         subject_repo=subj_repo,
         clock=system_clock,
+        uow=uow,
     )
 
     try:

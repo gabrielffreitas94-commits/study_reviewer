@@ -40,12 +40,14 @@ class CreateQuestionUseCase:
         topic_repo: ITopicRepository,
         subject_repo: ISubjectRepository,
         clock: IClockService,
+        uow: IUnitOfWork | None = None,
     ) -> None:
         self._question_repo = question_repo
         self._progress_repo = progress_repo
         self._topic_repo = topic_repo
         self._subject_repo = subject_repo
         self._clock = clock
+        self._uow = uow
 
     def execute(self, dto: CreateQuestionDTO, user_id: UUID) -> QuestionDTO:
         topic = self._topic_repo.get_by_id(dto.topic_id)
@@ -62,16 +64,24 @@ class CreateQuestionUseCase:
             expected_answer=dto.expected_answer,
             created_at=self._clock.today(),
         )
-        self._question_repo.save(question)
 
-        # Progresso inicial criado para o autor no Nível 0 com vencimento hoje
         initial_progress = UserQuestionProgress(
             user_id=user_id,
             question_id=question.id,
             current_level=0,
             next_review_date=self._clock.today(),
         )
-        self._progress_repo.save(initial_progress)
+
+        try:
+            self._question_repo.save(question)
+            self._progress_repo.save(initial_progress)
+
+            if self._uow is not None:
+                self._uow.commit()
+        except Exception:
+            if self._uow is not None:
+                self._uow.rollback()
+            raise
 
         return QuestionDTO(
             id=question.id,

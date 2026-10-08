@@ -1,4 +1,4 @@
-"""Controladores de API REST para autenticação via Google OAuth2 / OIDC e perfil (Camada 3)."""
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -7,9 +7,12 @@ from sqlalchemy.orm import Session
 from src.adapters.persistence.repositories import SqlAlchemyUserRepository
 from src.application.dto.auth_dto import GoogleAuthInputDTO, UserDTO
 from src.application.ports.auth import IGoogleAuthClient, ISessionTokenService
-from src.application.use_cases.auth_use_cases import AuthenticateWithGoogleUseCase
+from src.application.use_cases.auth_use_cases import (
+    AuthenticateWithGoogleUseCase,
+    DeleteAccountUseCase,
+)
 from src.domain.entities import User
-from src.domain.exceptions import DomainException, UnauthorizedError
+from src.domain.exceptions import DomainException, EntityNotFoundError, UnauthorizedError
 from src.infrastructure.config import settings
 from src.infrastructure.database import get_db
 from src.infrastructure.security.dependencies import (
@@ -17,6 +20,8 @@ from src.infrastructure.security.dependencies import (
     get_google_client,
     get_session_service,
 )
+
+logger = logging.getLogger("study_reviewer.auth_api")
 
 api_auth_router = APIRouter(prefix="/api/v1/auth", tags=["API Auth"])
 
@@ -33,6 +38,10 @@ class AuthTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"  # noqa: S105
     user: UserDTO
+
+
+class MessageResponse(BaseModel):
+    message: str
 
 
 @api_auth_router.post("/google", response_model=AuthTokenResponse, status_code=status.HTTP_200_OK)
@@ -103,3 +112,41 @@ def get_me_api(
         avatar_url=current_user.avatar_url,
         created_at=current_user.created_at,
     )
+
+
+@api_auth_router.delete("/account", response_model=MessageResponse, status_code=status.HTTP_200_OK)
+def delete_account_api(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    """Exclui a conta e dados pessoais do usuário autenticado (LGPD Art. 18 / Google Play).
+
+    Segurança: Identidade extraída exclusivamente de current_user.id (anti-IDOR).
+    """
+    user_repo = SqlAlchemyUserRepository(db)
+    use_case = DeleteAccountUseCase(user_repo=user_repo)
+    try:
+        use_case.execute(user_id=current_user.id)
+        db.commit()
+        logger.info(
+            "Conta de usuário excluída via API REST com sucesso",
+            extra={
+                "event": "api_account_deleted",
+                "user_id": str(current_user.id),
+            },
+        )
+    except EntityNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    return MessageResponse(message="Conta e dados pessoais excluídos com sucesso.")
+
+
+@api_auth_router.post("/logout", response_model=MessageResponse, status_code=status.HTTP_200_OK)
+def logout_api(
+    current_user: User = Depends(get_current_user),
+) -> MessageResponse:
+    """Efetua logout formal do usuário autenticado."""
+    return MessageResponse(message="Logout efetuado com sucesso.")

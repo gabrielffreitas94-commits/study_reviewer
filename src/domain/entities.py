@@ -66,13 +66,17 @@ class Subject:
         if len(self.name) < 2 or len(self.name) > 100:
             raise DomainValidationError("Nome da matéria deve ter entre 2 e 100 caracteres.")
 
-    def can_be_edited_by(self, user_id: UUID) -> bool:
+    def can_be_edited_by(self, user_id: UUID | None) -> bool:
         """Determina se o usuário possui permissão de edição/exclusão (apenas o proprietário)."""
+        if user_id is None:
+            return False
         return self.owner_id == user_id
 
-    def can_be_studied_by(self, user_id: UUID) -> bool:
+    def can_be_studied_by(self, user_id: UUID | None) -> bool:
         """Determina se o usuário possui permissão de estudo (proprietário ou matéria pública)."""
-        return self.owner_id == user_id or self.is_public
+        if user_id is not None and self.owner_id == user_id:
+            return True
+        return self.is_public
 
 
 @dataclass
@@ -156,6 +160,17 @@ class Flashcard:
     def topic_id(self) -> UUID:
         """Propriedade de compatibilidade retornando o primeiro tema associado."""
         return self.topic_ids[0]
+
+    def update_content(self, front: str, back: str) -> None:
+        """Atualiza frente e verso do flashcard aplicando validações de domínio."""
+        clean_front = front.strip() if front is not None else ""
+        clean_back = back.strip() if back is not None else ""
+        if len(clean_front) < 1 or len(clean_front) > 5000:
+            raise DomainValidationError("Frente do flashcard deve ter entre 1 e 5.000 caracteres.")
+        if len(clean_back) < 1 or len(clean_back) > 10000:
+            raise DomainValidationError("Verso do flashcard deve ter entre 1 e 10.000 caracteres.")
+        self.front = clean_front
+        self.back = clean_back
 
 
 @dataclass(slots=True)

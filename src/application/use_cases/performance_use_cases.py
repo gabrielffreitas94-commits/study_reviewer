@@ -222,12 +222,17 @@ class ExportUserDataUseCase:
             "Nivel_Anterior,Novo_Nivel,Modo_Avaliacao,Timestamp\r\n"
         )
 
+        question_cache: dict[UUID, str] = {}
+
         for log in self._audit_repo.stream_by_user(user_id):
             question_prompt = ""
             if log.question_id:
-                q = self._question_repo.get_by_id(log.question_id)
-                if q:
-                    question_prompt = q.prompt
+                if log.question_id in question_cache:
+                    question_prompt = question_cache[log.question_id]
+                else:
+                    q = self._question_repo.get_by_id(log.question_id)
+                    question_prompt = q.prompt if q else ""
+                    question_cache[log.question_id] = question_prompt
 
             line = (
                 f"{log.id},"

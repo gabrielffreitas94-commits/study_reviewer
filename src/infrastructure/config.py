@@ -35,5 +35,15 @@ class Settings(BaseSettings):
     DYNAMODB_ENDPOINT_URL: str | None = None
     DYNAMODB_TTL_DAYS: int = 90
 
+    # CORS Configuration
+    CORS_ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+        "http://localhost:8081",
+        "http://10.0.2.2:8000",
+    ]
+    CORS_ALLOW_ORIGIN_REGEX: str = r"^https?://(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?$"
+
 
 settings = Settings()

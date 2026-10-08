@@ -19,6 +19,7 @@ from src.application.ports.repositories import (
 )
 from src.application.use_cases.auth_use_cases import (
     AuthenticateWithGoogleUseCase,
+    DeleteAccountUseCase,
     GetCurrentUserUseCase,
     LogoutUseCase,
     ToggleSubjectPublicUseCase,
@@ -60,6 +61,9 @@ class InMemoryUserRepository(IUserRepository):
             if u.email == email.lower().strip():
                 return u
         return None
+
+    def delete(self, user_id: UUID) -> None:
+        self.users.pop(user_id, None)
 
 
 class FakeGoogleAuthClient(IGoogleAuthClient):
@@ -508,3 +512,64 @@ def test_authenticate_google_existing_user_linked_by_email_updates_sub() -> None
     assert updated_user.google_sub == "google-official-sub-999"
     assert updated_user.name == "Aluno Atualizado"
     assert updated_user.avatar_url == "https://novo.png"
+
+
+@pytest.mark.unit
+def test_delete_account_use_case_success() -> None:
+    """Valida a exclusão bem-sucedida de usuário existente via DeleteAccountUseCase."""
+    user_repo = InMemoryUserRepository()
+    user = User(
+        google_sub="sub-delete-001",
+        email="delete_me@teste.com",
+        name="Usuário A Ser Excluído",
+    )
+    user_repo.save(user)
+    assert user_repo.get_by_id(user.id) is not None
+
+    use_case = DeleteAccountUseCase(user_repo=user_repo)
+    use_case.execute(user.id)
+
+    assert user_repo.get_by_id(user.id) is None
+
+
+@pytest.mark.unit
+def test_delete_account_use_case_not_found_raises_exception() -> None:
+    """Valida que tentar excluir um usuário inexistente levanta EntityNotFoundError."""
+    user_repo = InMemoryUserRepository()
+    use_case = DeleteAccountUseCase(user_repo=user_repo)
+    non_existent_id = uuid4()
+
+    with pytest.raises(EntityNotFoundError, match="Usuário não encontrado."):
+        use_case.execute(non_existent_id)
+
+
+@pytest.mark.security
+def test_delete_account_security_entity_validation_and_tampering() -> None:
+    """Vulnerabilidade prevenida: Impede exclusão indevida ou adulteração de contas inexistentes.
+
+    Garantia de segurança: Assegura que o caso de uso valide estritamente a existência
+    prévia da entidade antes de acionar a porta de exclusão e isole o impacto de chave
+    primária sob LGPD Art. 18.
+    """
+    user_repo = InMemoryUserRepository()
+    target_user = User(
+        google_sub="sub-target-victim",
+        email="vitima@seguranca.com",
+        name="Conta Alvo",
+    )
+    user_repo.save(target_user)
+
+    token_service = FakeSessionTokenService()
+    use_case = DeleteAccountUseCase(user_repo=user_repo, session_token_service=token_service)
+
+    # Tentativa de deletar id aleatório que não existe
+    tampered_id = uuid4()
+    with pytest.raises(EntityNotFoundError):
+        use_case.execute(tampered_id)
+
+    # Garante que a conta alvo permaneceu intacta
+    assert user_repo.get_by_id(target_user.id) is not None
+
+    # Exclusão legítima
+    use_case.execute(target_user.id)
+    assert user_repo.get_by_id(target_user.id) is None

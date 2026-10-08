@@ -575,3 +575,41 @@ def test_sync_answers_api_direct_call_fallback_event_repo(
     )
     assert res.status == "ok"
     assert res.synced_count == 1
+
+
+@pytest.mark.integration
+def test_sync_answers_api_with_correlation_id_telemetry(
+    client: TestClient, db_session: Session, test_user: User, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Verifica se o cabeçalho X-Correlation-ID é capturado
+    e registrado na telemetria estruturada.
+    """
+    import logging
+
+    study_session, cards = _seed_study_session(db_session, test_user)
+    correlation_id = f"sync-corr-{uuid4()}"
+    payload = {
+        "session_id": str(study_session.id),
+        "events": [
+            {
+                "id": str(uuid4()),
+                "card_id": str(cards[0].id),
+                "reviewed_at": datetime.now(UTC).isoformat(),
+                "status": "viewed",
+                "device_id": "test-device-uuid-123",
+            }
+        ],
+        "batch_index": 1,
+    }
+    with caplog.at_level(logging.INFO):
+        resp = client.post(
+            "/api/v1/study/sync-answers",
+            json=payload,
+            headers={"X-Correlation-ID": correlation_id},
+        )
+    assert resp.status_code == 200
+    assert any(
+        getattr(record, "correlation_id", None) == correlation_id
+        or correlation_id in record.message
+        for record in caplog.records
+    )
