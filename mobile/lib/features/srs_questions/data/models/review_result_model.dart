@@ -22,21 +22,29 @@ class ReviewResultModel extends ReviewResultEntity {
         DateTime.now().toIso8601String();
     final parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
 
-    final prevLevel = (json['previous_level'] ?? json['level_before'] as num?)
-            ?.toInt() ??
-        0;
-    final newLevel = (json['new_level'] ?? json['level_after'] as num?)
-            ?.toInt() ??
-        0;
+    final dynamic rawPrev = json['previous_level'] ?? json['level_before'];
+    final int prevLevel = (rawPrev is num) ? rawPrev.toInt() : 0;
 
-    final isPromoted = (json['is_promoted'] as bool?) ?? (newLevel > prevLevel);
-    final isDemoted = (json['is_regressed'] as bool?) ??
-        (json['is_demoted'] as bool?) ??
-        (newLevel < prevLevel);
-    final isMaintained = (json['is_maintained'] as bool?) ??
-        (!isPromoted && !isDemoted);
+    final dynamic rawNew = json['new_level'] ?? json['level_after'];
+    final int newLevel = (rawNew is num) ? rawNew.toInt() : 0;
 
-    final scoreVal = (json['score'] as num?)?.toInt() ?? submittedScore;
+    final bool isPromoted = (json['is_promoted'] is bool)
+        ? (json['is_promoted'] as bool)
+        : (newLevel > prevLevel);
+    final bool isDemoted = (json['is_regressed'] is bool)
+        ? (json['is_regressed'] as bool)
+        : ((json['is_demoted'] is bool)
+            ? (json['is_demoted'] as bool)
+            : (newLevel < prevLevel));
+    final bool isMaintained = (json['is_maintained'] is bool)
+        ? (json['is_maintained'] as bool)
+        : (!isPromoted && !isDemoted);
+
+    final dynamic rawScore = json['score'];
+    final int scoreVal = (rawScore is num) ? rawScore.toInt() : submittedScore;
+
+    final dynamic rawInterval = json['interval_days'];
+    final int intervalVal = (rawInterval is num) ? rawInterval.toInt() : 1;
 
     return ReviewResultModel(
       questionId: (json['question_id'] ?? json['id'] ?? '').toString(),
@@ -47,7 +55,7 @@ class ReviewResultModel extends ReviewResultEntity {
       isPromoted: isPromoted,
       isDemoted: isDemoted,
       isMaintained: isMaintained,
-      intervalDays: (json['interval_days'] as num?)?.toInt() ?? 1,
+      intervalDays: intervalVal,
     );
   }
 

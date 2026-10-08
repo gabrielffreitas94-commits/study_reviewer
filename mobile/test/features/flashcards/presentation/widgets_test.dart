@@ -37,8 +37,8 @@ void main() {
     testWidgets('respects prefers-reduced-motion (disableAnimations)',
         (tester) async {
       await tester.pumpWidget(
-        MediaQuery(
-          data: const MediaQueryData(disableAnimations: true),
+        const MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
           child: const MaterialApp(
             home: Scaffold(
               body: FlipCard3D(

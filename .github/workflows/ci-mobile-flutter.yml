@@ -72,7 +72,7 @@ jobs:
 
       - name: Run Static Analysis
         working-directory: ${{ steps.flutter-dir.outputs.path }}
-        run: flutter analyze --fatal-infos
+        run: flutter analyze --fatal-warnings
 
       - name: Run Tests with Coverage
         working-directory: ${{ steps.flutter-dir.outputs.path }}

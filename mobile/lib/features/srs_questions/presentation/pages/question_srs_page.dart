@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/review_result_entity.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/question_srs_cubit.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/question_srs_state.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/score_thumb_selector.dart';
@@ -27,8 +28,6 @@ class _QuestionSrsPageState extends State<QuestionSrsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Perguntas Abertas SRS'),
@@ -410,7 +409,7 @@ class _QuestionSrsPageState extends State<QuestionSrsPage> {
 
   Widget _buildReviewFeedbackBanner(
     BuildContext context,
-    dynamic result,
+    ReviewResultEntity result,
   ) {
     return Container(
       padding: const EdgeInsets.all(16.0),
