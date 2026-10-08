@@ -234,11 +234,11 @@ Para que qualquer Sprint seja considerada concluída e receba autorização de m
 4. [ ] **Governança de Testes de Segurança:** Testes com impacto de segurança decorados com `@pytest.mark.security`, docstring estruturada contendo `"Vulnerabilidade prevenida:"` e `"Garantia de segurança:"`, e meta-teste AST 100% aprovado.
 5. [ ] **Qualidade Estática de Código:** Linters e checagem de tipos (Ruff format/check e Mypy strict) passando com zero alertas e sem supressões artificiais.
 6. [ ] **Aderência à Clean Architecture:** Núcleo de domínio Python puro (sem dependência de frameworks/ORM), use cases agnósticos e inversão de dependência via Protocols.
-7. [ ] **Auditoria Unânime da Bancada:** Pareceres formais assinados pelos **13 Especialistas** no template oficial de PR (`[APROVADO]` ou `[N/A JUSTIFICADO]`).
+7. [ ] **Auditoria Unânime da Bancada:** Pareceres formais assinados pelos **17 Especialistas** no template oficial de PR (`[APROVADO]` ou `[N/A JUSTIFICADO]`).
 8. [ ] **Paridade Docker Comprovada:** Aplicação, Redis e banco executando perfeitamente via `docker compose up`.
-9. [ ] **Pull Request Aberta no GitHub para Staging:** A sprint só é finalizada com a execução de `gh pr create` no GitHub apontando para `staging`, com documentação, 100% de cobertura, os 13 pareceres aprovados e a URL oficial entregue ao usuário.
+9. [ ] **Pull Request Aberta no GitHub para Staging:** A sprint só é finalizada com a execução de `gh pr create` no GitHub apontando para `staging`, com documentação, 100% de cobertura, os 17 pareceres aprovados e a URL oficial entregue ao usuário.
 
-### 7.1 Bancada dos 13 Especialistas de Auditoria e Qualidade
+### 7.1 Bancada dos 17 Especialistas de Auditoria e Qualidade
 Cada Pull Request para `staging` é auditada e aprovada formalmente pela bancada completa de especialistas:
 1. **Especialista de Produto (PO):** Aderência aos requisitos e valor de entrega do PRD sem escopo fantasma.
 2. **Especialista QA:** Testabilidade, integridade de cenários BDD e barreira de 100% de cobertura.
@@ -253,6 +253,10 @@ Cada Pull Request para `staging` é auditada e aprovada formalmente pela bancada
 11. **Especialista de Performance de Programação Python:** Eficiência Big-O, uso de `slots=True`, projeção escalar de IDs, pipelines não-bloqueantes (`redis.asyncio`/`asyncpg`) e serialização ultra-rápida (`orjson`).
 12. **Especialista de Performance de Frontend:** Core Web Vitals (LCP, INP $\le 50$ms via Web Worker, CLS zero com CSS Containment), Tailwind CSS estático minificado e prefetch preditivo com Low-Water Mark.
 13. **Especialista de Performance de Banco de Dados:** Eliminação de N+1 via `selectinload()`, particionamento temporal `PARTITION BY RANGE (reviewed_at)`, índices cobridores B-tree e ingestão atômica em batch.
+14. **Especialista Mobile:** Usabilidade ergonômica (touch targets $\ge 48$dp, thumb zone, safe areas), segurança em dispositivos móveis (KeyStore/Keychain, biometria, ofuscação R8, detecção de root/tampering, zero storage plaintext) e performance de plataforma (cold start $\le 1.5$s, ciclo de vida de bateria e resiliência offline).
+15. **Especialista Flutter:** Excelência em Dart/Flutter, otimização da árvore de widgets (eliminação de rebuilds com `const` e reatividade granular), profiling de 60/120 FPS sem jank, offload para `Isolates`, descarte rigoroso de recursos em `dispose()` e Clean Architecture na camada client.
+16. **Especialista em Arquitetura de IA:** Performance de inferência (TTFT $\le 800$ms, streaming SSE, prompt caching, token metering), resiliência operacional (circuit breakers, fallbacks graciosos e retentativas com jitter), segurança contra Prompt Injection/data leakage e mitigação de alucinação (grounding RAG, esquemas estruturados estritos e temperatura calibrada).
+17. **Especialista de Pagamento e Cobrança:** Integridade financeira transacional com idempotência estrita (`Idempotency-Key`), prevenção de double-spending, validação criptográfica de webhooks (HMAC SHA-256), processamento assíncrono resiliente, ciclo de vida de assinaturas (dunning management), pro-rata e conformidade PCI-DSS.
 
 ---
 

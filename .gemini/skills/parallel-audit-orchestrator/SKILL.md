@@ -1,13 +1,13 @@
 ---
 name: parallel-audit-orchestrator
-description: Orchestrates the parallel execution of the 13 audit specialists grouped into 4 concurrent clusters using invoke_subagent for fast, thorough PR sign-off.
+description: Orchestrates the parallel execution of the 17 audit specialists grouped into 5 concurrent clusters using invoke_subagent for fast, thorough PR sign-off.
 ---
 
 # Parallel Audit Orchestrator (Skill de Orquestração Concorrente da Bancada)
 
 Esta skill é operada pelo agente orquestrador ao término de cada Sprint, imediatamente antes da abertura ou atualização da Pull Request para a branch `staging`.
 
-Seu objetivo é **paralelizar a auditoria dos 13 especialistas técnicos**, despachando **4 clusters concorrentes via `invoke_subagent`**, eliminando a latência da execução sequencial e consolidando a tabela oficial de pareceres da PR de forma unificada.
+Seu objetivo é **paralelizar a auditoria dos 17 especialistas técnicos**, despachando **5 clusters concorrentes via `invoke_subagent`**, eliminando a latência da execução sequencial e consolidando a tabela oficial de pareceres da PR de forma unificada.
 
 ---
 
@@ -15,14 +15,14 @@ Seu objetivo é **paralelizar a auditoria dos 13 especialistas técnicos**, desp
 * **Gatilho de Execução:** Finalização da implementação do código e garantia de 100% de cobertura nos testes.
 * **Artefatos Inspecionados:**
   * Git diff contra a branch `staging`: `git diff staging...HEAD`.
-  * Resultados da suíte de testes e linters: `pytest`, `ruff`, `mypy`.
-  * Arquivos de configuração, templates e infraestrutura alterados.
+  * Resultados da suíte de testes e linters: `pytest`, `ruff`, `mypy`, `flutter analyze` (quando aplicável).
+  * Arquivos de configuração, templates, modelos, fluxos de IA, pagamentos e infraestrutura alterados.
 
 ---
 
 ## 2. Protocolo de Invocação Concorrente
 
-O agente orquestrador deve chamar `invoke_subagent` com um único payload contendo exatamente os 4 clusters:
+O agente orquestrador deve chamar `invoke_subagent` com um único payload contendo exatamente os 5 clusters:
 
 ```json
 {
@@ -35,7 +35,7 @@ O agente orquestrador deve chamar `invoke_subagent` com um único payload conten
     {
       "TypeName": "self",
       "Role": "Cluster 2: Segurança & Compliance Auditor",
-      "Prompt": "Você é o auditor técnico responsável pelos Especialistas #4 (Segurança), #5 (Telemetria) e #10 (LGPD). Inspecione o diff contra staging e a base de código. Avalie: (1) vulnerabilidades OWASP, sanitização na borda e decorators/docstrings de segurança AST; (2) logging estruturado e observabilidade; (3) minimização de dados e privacidade LGPD. Retorne exatamente as 3 linhas formatadas em markdown para a tabela da PR com status [APROVADO] ou [BLOQUEANTE] com justificativa técnica."
+      "Prompt": "Você é o auditor técnico responsável pelos Especialistas #4 (Segurança), #5 (Telemetria), #10 (LGPD) e #17 (Pagamento e Cobrança). Inspecione o diff contra staging e a base de código. Avalie: (1) vulnerabilidades OWASP, sanitização na borda e decorators/docstrings de segurança AST; (2) logging estruturado e observabilidade; (3) minimização de dados e privacidade LGPD; (4) integridade de pagamento, idempotência estrita (Idempotency-Key), webhooks com HMAC e PCI-DSS SAQ A. Retorne exatamente as 4 linhas formatadas em markdown para a tabela da PR com status [APROVADO], [BLOQUEANTE] ou [N/A JUSTIFICADO] com justificativa técnica."
     },
     {
       "TypeName": "self",
@@ -44,8 +44,13 @@ O agente orquestrador deve chamar `invoke_subagent` com um único payload conten
     },
     {
       "TypeName": "self",
-      "Role": "Cluster 4: Engenharia, Dados & Ops Auditor",
-      "Prompt": "Você é o auditor técnico responsável pelos Especialistas #8 (DevOps), #11 (Performance Python) e #13 (Performance de Banco). Inspecione o Dockerfile, Compose, consultas SQLAlchemy e código backend. Avalie: (1) Docker multi-stage, usuário não-root e dev/prod parity; (2) complexidade algorítmica Big-O, uso de geradores e ausência de loops redundantes; (3) prevenção inegociável de queries N+1, índices B-tree/covering e persistência bulk. Retorne exatamente as 3 linhas formatadas em markdown para a tabela da PR com status [APROVADO] ou [BLOQUEANTE] com justificativa técnica."
+      "Role": "Cluster 4: Engenharia Mobile & Flutter Auditor",
+      "Prompt": "Você é o auditor técnico responsável pelos Especialistas #14 (Mobile) e #15 (Flutter). Inspecione o diretório mobile/, manifestos, arquivos Dart e árvore de widgets. Avalie: (1) touch targets ergonômicos (>= 48dp), safe areas e armazenamento seguro em KeyStore/Keychain; (2) otimização da árvore de widgets com const, isolamento reativo, descarte em dispose(), offload para Isolates e zero warnings no flutter analyze. Retorne exatamente as 2 linhas formatadas em markdown para a tabela da PR com status [APROVADO], [BLOQUEANTE] ou [N/A JUSTIFICADO] com justificativa técnica."
+    },
+    {
+      "TypeName": "self",
+      "Role": "Cluster 5: Backend, Dados, Ops & IA Auditor",
+      "Prompt": "Você é o auditor técnico responsável pelos Especialistas #8 (DevOps), #11 (Performance Python), #13 (Performance de Banco) e #16 (Arquitetura de IA). Inspecione Dockerfile, Compose, SQLAlchemy, algoritmos e subsistema de IA. Avalie: (1) Docker multi-stage, usuário não-root e dev/prod parity; (2) complexidade algorítmica Big-O e uso de geradores; (3) prevenção de queries N+1, índices cobridores e persistência bulk; (4) latência de inferência de IA (TTFT), streaming SSE, circuit breaker, blindagem contra prompt injection e mitigação de alucinações. Retorne exatamente as 4 linhas formatadas em markdown para a tabela da PR com status [APROVADO], [BLOQUEANTE] ou [N/A JUSTIFICADO] com justificativa técnica."
     }
   ]
 }
@@ -55,9 +60,9 @@ O agente orquestrador deve chamar `invoke_subagent` com um único payload conten
 
 ## 3. Consolidação, Encerramento e Abertura Obrigatória da PR
 
-Ao receber as respostas dos 4 subagentes, o agente orquestrador:
-1. Valida se todos os 13 especialistas emitiram seus pareceres formais (nenhum especialista pode ser omitido).
-2. Ordena os pareceres do #1 ao #13.
+Ao receber as respostas dos 5 subagentes, o agente orquestrador:
+1. Valida se todos os 17 especialistas emitiram seus pareceres formais (nenhum especialista pode ser omitido).
+2. Ordena os pareceres do #1 ao #17.
 3. Preenche a tabela oficial no documento da Sprint em `docs/sprints/sprint-XX/02-pull-request-sprint-XX.md`.
 4. Commita as alterações da sprint e envia a branch ao remote:
    ```bash
@@ -68,4 +73,3 @@ Ao receber as respostas dos 4 subagentes, o agente orquestrador:
    gh pr create --base staging --head feature/sprint-XX-<nome> --title "Sprint XX — <Título>" --body-file docs/sprints/sprint-XX/02-pull-request-sprint-XX.md
    ```
 6. **Entrega a URL do PR ao usuário:** O encerramento da sprint só está completo após a confirmação da URL da PR aberta.
-

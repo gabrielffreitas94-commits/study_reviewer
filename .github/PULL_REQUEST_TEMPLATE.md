@@ -17,7 +17,7 @@
 - [ ] **TDD Aplicado:** Testes unitários e de integração foram escritos antes da implementação (Red-Green-Refactor).
 - [ ] **Casos de Uso e Edge Cases:** Matriz completa gerada e validada autonomamente antes da codificação.
 - [ ] **Cobertura Backend:** 100% de cobertura confirmada via `pytest --cov=src --cov-fail-under=100`.
-- [ ] **Cobertura Frontend:** Testes de UI/Templates executados e validados em processo isolado.
+- [ ] **Cobertura Frontend / Mobile:** Testes de UI, templates e componentes executados e validados em processos isolados.
 
 ```bash
 # Cole aqui o resumo da execução do pytest com coverage
@@ -43,7 +43,7 @@
 
 ---
 
-## 🏛️ Bancada dos 13 Especialistas — Auditoria Obrigatória
+## 🏛️ Bancada dos 17 Especialistas — Auditoria Obrigatória
 > **Importante:** Todo especialista deve emitir seu parecer. Status permitidos: `[APROVADO]` ou `[N/A JUSTIFICADO]`.
 
 | # | Especialista | Status | Parecer Técnico / Justificativa |
@@ -61,6 +61,10 @@
 | **11** | **Especialista de Performance Python** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
 | **12** | **Especialista de Performance Frontend** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
 | **13** | **Especialista de Performance de Banco** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **14** | **Especialista Mobile** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **15** | **Especialista Flutter** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **16** | **Especialista em Arquitetura de IA** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
+| **17** | **Especialista de Pagamento e Cobrança** | `[APROVADO]` / `[N/A JUSTIFICADO]` | <!-- Justificativa --> |
 
 ---
 
