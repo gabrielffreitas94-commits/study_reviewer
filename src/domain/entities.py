@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from src.domain.exceptions import (
     DomainValidationError,
     EmptyKnowledgeContentError,
+    InsufficientTokensError,
     InvalidEmailError,
     InvalidEmbeddingError,
     InvalidExpectedAnswerError,
@@ -395,3 +396,109 @@ class ValidationResult:
     def __post_init__(self) -> None:
         if not (0.0 <= self.confidence_score <= 1.0):
             raise DomainValidationError("confidence_score deve estar entre 0.0 e 1.0.")
+
+
+@dataclass(slots=True)
+class TokenLedger:
+    """Entidade que controla o saldo e a retenção em duas fases de tokens do usuário."""
+
+    user_id: UUID
+    balance: int = 1000
+    held_balance: int = 0
+    id: UUID = field(default_factory=uuid4)
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        if self.balance < 0:
+            raise DomainValidationError("O saldo de tokens não pode ser negativo.")
+        if self.held_balance < 0:
+            raise DomainValidationError("O saldo retido de tokens não pode ser negativo.")
+        if self.held_balance > self.balance:
+            raise DomainValidationError("O saldo retido não pode exceder o saldo total.")
+
+    @property
+    def available_balance(self) -> int:
+        return self.balance - self.held_balance
+
+    def hold(self, amount: int) -> None:
+        if amount <= 0:
+            raise DomainValidationError("A quantidade para retenção deve ser positiva.")
+        if self.available_balance < amount:
+            raise InsufficientTokensError(
+                f"Saldo insuficiente de tokens. Disponível: {self.available_balance}, "
+                f"Solicitado: {amount}"
+            )
+        self.held_balance += amount
+        self.updated_at = datetime.now(UTC)
+
+    def settle(self, hold_amount: int, actual_tokens: int) -> None:
+        if hold_amount <= 0 or actual_tokens < 0:
+            raise DomainValidationError("Valores de liquidação inválidos.")
+        if hold_amount > self.held_balance:
+            raise DomainValidationError("A retenção a liberar excede o saldo atualmente retido.")
+        self.held_balance -= hold_amount
+        self.balance = max(0, self.balance - actual_tokens)
+        self.updated_at = datetime.now(UTC)
+
+    def refund_hold(self, amount: int) -> None:
+        if amount <= 0:
+            raise DomainValidationError("A quantidade para estorno deve ser positiva.")
+        if amount > self.held_balance:
+            raise DomainValidationError("A quantidade de estorno excede o saldo retido.")
+        self.held_balance -= amount
+        self.updated_at = datetime.now(UTC)
+
+    def deposit(self, amount: int) -> None:
+        if amount <= 0:
+            raise DomainValidationError("A quantidade de depósito deve ser positiva.")
+        self.balance += amount
+        self.updated_at = datetime.now(UTC)
+
+
+@dataclass(slots=True, frozen=True)
+class TokenTransaction:
+    """Entidade indelével registrando uma movimentação financeira no ledger de tokens."""
+
+    user_id: UUID
+    transaction_type: str  # DEPOSIT, HOLD, SETTLEMENT, REFUND
+    amount: int
+    reference_id: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    id: UUID = field(default_factory=uuid4)
+
+    def __post_init__(self) -> None:
+        if self.amount < 0:
+            raise DomainValidationError("O montante da transação não pode ser negativo.")
+        if self.transaction_type not in ("DEPOSIT", "HOLD", "SETTLEMENT", "REFUND"):
+            raise DomainValidationError(f"Tipo de transação inválido: {self.transaction_type}")
+
+
+@dataclass(slots=True, frozen=True)
+class AnswerEvaluationResult:
+    """Resultado estruturado e auditável da avaliação semântica de uma resposta aberta."""
+
+    score: int
+    feedback: str
+    coverage_score: int = 100
+    accuracy_score: int = 100
+    depth_score: int = 100
+    evidence_quotes: tuple[str, ...] = ()
+    tokens_used: int = 0
+    cached_context: bool = False
+    evaluation_mode: str = "AI_TEXT"
+
+    def __post_init__(self) -> None:
+        if not (0 <= self.score <= 100):
+            raise DomainValidationError("O score de avaliação deve estar entre 0 e 100.")
+        if not (0 <= self.coverage_score <= 100):
+            raise DomainValidationError("O coverage_score deve estar entre 0 e 100.")
+        if not (0 <= self.accuracy_score <= 100):
+            raise DomainValidationError("O accuracy_score deve estar entre 0 e 100.")
+        if not (0 <= self.depth_score <= 100):
+            raise DomainValidationError("O depth_score deve estar entre 0 e 100.")
+        if self.tokens_used < 0:
+            raise DomainValidationError("Tokens consumidos não podem ser negativos.")
+        if not self.feedback or not self.feedback.strip():
+            raise DomainValidationError("Feedback de avaliação não pode ser vazio.")
+        if self.evaluation_mode not in ("AI_TEXT", "AI_AUDIO"):
+            raise DomainValidationError(f"Modo de avaliação inválido: {self.evaluation_mode}")

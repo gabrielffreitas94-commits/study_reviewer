@@ -59,6 +59,7 @@ def create_app() -> FastAPI:
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
     from src.adapters.api.auth_controllers import api_auth_router
+    from src.adapters.api.evaluation_controllers import api_evaluation_router
     from src.adapters.api.knowledge_controllers import api_knowledge_router
     from src.adapters.api.performance_controllers import api_performance_router
     from src.adapters.api.question_controllers import api_question_router
@@ -139,6 +140,7 @@ def create_app() -> FastAPI:
     app.include_router(web_question_router)
     app.include_router(api_question_router)
     app.include_router(api_knowledge_router)
+    app.include_router(api_evaluation_router)
     app.include_router(web_performance_router)
     app.include_router(api_performance_router)
 

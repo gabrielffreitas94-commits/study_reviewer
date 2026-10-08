@@ -13,6 +13,8 @@ from src.domain.entities import (
     Question,
     ReviewAuditLog,
     Subject,
+    TokenLedger,
+    TokenTransaction,
     Topic,
     User,
     UserQuestionProgress,
@@ -336,4 +338,24 @@ class IKnowledgeChunkRepository(Protocol):
         top_k: int = 5,
     ) -> list[tuple[KnowledgeChunk, float]]:
         """Busca os top-k chunks mais relevantes de um tema por similaridade de cosseno."""
+        ...
+
+
+class ITokenLedgerRepository(Protocol):
+    """Porta de persistência para o saldo e transações de tokens do usuário."""
+
+    def get_by_user_id(self, user_id: UUID) -> TokenLedger | None:
+        """Recupera o saldo/ledger de tokens do usuário."""
+        ...
+
+    def save(self, ledger: TokenLedger) -> TokenLedger:
+        """Persiste ou atualiza o saldo/ledger de tokens."""
+        ...
+
+    def record_transaction(self, transaction: TokenTransaction) -> TokenTransaction:
+        """Registra uma movimentação no extrato/ledger de tokens."""
+        ...
+
+    def list_transactions(self, user_id: UUID, limit: int = 50) -> list[TokenTransaction]:
+        """Lista as transações mais recentes do usuário ordenadas por data descendente."""
         ...

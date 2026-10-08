@@ -90,3 +90,11 @@ class EmptyKnowledgeContentError(DomainValidationError):
 
 class InvalidEmbeddingError(DomainValidationError):
     """Vetor de embedding com formato inválido, nulo ou dimensões incorretas."""
+
+
+class InsufficientTokensError(DomainException):
+    """Tentativa de executar inferência de IA sem saldo suficiente de tokens (HTTP 402)."""
+
+
+class EvaluationServiceError(DomainException):
+    """Falha ou indisponibilidade temporária no serviço de avaliação de respostas por IA."""

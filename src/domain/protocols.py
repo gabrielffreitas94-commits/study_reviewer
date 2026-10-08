@@ -38,3 +38,17 @@ class IKnowledgeValidationService(Protocol):
     ) -> Any:
         """Avalia se o prompt e o gabarito possuem respaldo nos chunks fornecidos."""
         ...
+
+
+class IAnswerEvaluationService(Protocol):
+    """Protocolo abstrato para avaliação semântica de respostas de estudantes com IA."""
+
+    async def evaluate_answer(
+        self,
+        prompt: str,
+        expected_answer: str,
+        student_answer: str,
+        context_chunks: list[str],
+    ) -> Any:
+        """Avalia a resposta contra o enunciado, gabarito e evidências bibliográficas."""
+        ...
