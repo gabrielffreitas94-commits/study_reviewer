@@ -344,7 +344,7 @@ class IKnowledgeChunkRepository(Protocol):
 class ITokenLedgerRepository(Protocol):
     """Porta de persistência para o saldo e transações de tokens do usuário."""
 
-    def get_by_user_id(self, user_id: UUID) -> TokenLedger | None:
+    def get_by_user_id(self, user_id: UUID, for_update: bool = False) -> TokenLedger | None:
         """Recupera o saldo/ledger de tokens do usuário."""
         ...
 

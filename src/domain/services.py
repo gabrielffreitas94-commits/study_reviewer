@@ -356,10 +356,13 @@ class KnowledgeGroundingService:
         query_embedding: Sequence[float],
         chunks: Sequence[KnowledgeChunk],
         top_k: int = 5,
+        threshold: float = -1.0,
     ) -> list[tuple[KnowledgeChunk, float]]:
-        """Ranqueia chunks em ordem decrescente de similaridade de cosseno."""
+        """Ranqueia chunks em ordem decrescente de similaridade com filtro de threshold."""
         scored = [
-            (chunk, cls.cosine_similarity(query_embedding, chunk.embedding)) for chunk in chunks
+            (chunk, sim)
+            for chunk in chunks
+            if (sim := cls.cosine_similarity(query_embedding, chunk.embedding)) >= threshold
         ]
         scored.sort(key=lambda item: item[1], reverse=True)
         return scored[:top_k]

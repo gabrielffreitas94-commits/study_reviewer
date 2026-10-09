@@ -76,3 +76,12 @@ def test_token_ledger_repository_crud_lifecycle(db_session: Session) -> None:
     types = [t.transaction_type for t in transactions]
     assert "DEPOSIT" in types
     assert "HOLD" in types
+
+    # 6. Busca com with_for_update opcional
+    locked = ledger_repo.get_by_user_id(user.id, for_update=True)
+    assert locked is not None
+    assert locked.user_id == user.id
+
+    unlocked = ledger_repo.get_by_user_id(user.id, for_update=False)
+    assert unlocked is not None
+    assert unlocked.user_id == user.id

@@ -19,7 +19,7 @@ from src.domain.exceptions import (
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
 
-@dataclass
+@dataclass(slots=True)
 class User:
     """Entidade que representa um Usuário/Estudante autenticado."""
 
@@ -52,7 +52,7 @@ class User:
         return bool(EMAIL_REGEX.match(email))
 
 
-@dataclass
+@dataclass(slots=True)
 class Subject:
     """Entidade que representa uma Matéria macro de estudo com suporte
     a multi-tenancy e compartilhamento read-only.
@@ -82,7 +82,7 @@ class Subject:
         return self.is_public
 
 
-@dataclass
+@dataclass(slots=True)
 class Topic:
     """Entidade que representa um Tema/Tópico pertencente a uma Matéria."""
 
@@ -97,7 +97,7 @@ class Topic:
             raise DomainValidationError("Nome do tema deve ter entre 2 e 100 caracteres.")
 
 
-@dataclass
+@dataclass(slots=True)
 class Flashcard:
     """Entidade que representa um Flashcard com suporte a múltiplos temas (ADR-004)."""
 

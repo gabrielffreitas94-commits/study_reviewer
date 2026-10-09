@@ -115,3 +115,54 @@ def test_semantic_chunker_with_overlap_sentences() -> None:
 def test_knowledge_grounding_cosine_similarity_different_lengths() -> None:
     assert KnowledgeGroundingService.cosine_similarity([1.0], [1.0, 2.0]) == 0.0
     assert KnowledgeGroundingService.cosine_similarity([], []) == 0.0
+
+
+@pytest.mark.unit
+def test_knowledge_grounding_rank_chunks_with_threshold() -> None:
+    source_id = uuid4()
+    topic_id = uuid4()
+
+    c1 = KnowledgeChunk(
+        source_id=source_id,
+        topic_id=topic_id,
+        chunk_index=0,
+        content="Altamente relevante",
+        embedding=(1.0, 0.0, 0.0),
+    )
+    c2 = KnowledgeChunk(
+        source_id=source_id,
+        topic_id=topic_id,
+        chunk_index=1,
+        content="Similaridade moderada (~0.707)",
+        embedding=(0.5, 0.5, 0.0),
+    )
+    c3 = KnowledgeChunk(
+        source_id=source_id,
+        topic_id=topic_id,
+        chunk_index=2,
+        content="Irrelevante (0.0)",
+        embedding=(0.0, 1.0, 0.0),
+    )
+
+    query_vec = [1.0, 0.0, 0.0]
+
+    # Threshold 0.70 deve incluir c1 (1.0) e c2 (0.707), excluindo c3 (0.0)
+    ranked = KnowledgeGroundingService.rank_chunks_by_similarity(
+        query_vec, [c1, c2, c3], threshold=0.70, top_k=5
+    )
+    assert len(ranked) == 2
+    assert ranked[0][0].id == c1.id
+    assert ranked[1][0].id == c2.id
+
+    # Threshold alto (0.80) deve incluir apenas c1
+    ranked_high = KnowledgeGroundingService.rank_chunks_by_similarity(
+        query_vec, [c1, c2, c3], threshold=0.80, top_k=5
+    )
+    assert len(ranked_high) == 1
+    assert ranked_high[0][0].id == c1.id
+
+    # Threshold inatingível (0.9999 no c2/c3 e query diferente) retorna vazio
+    ranked_none = KnowledgeGroundingService.rank_chunks_by_similarity(
+        [0.0, 0.0, 1.0], [c1, c2, c3], threshold=0.70, top_k=5
+    )
+    assert len(ranked_none) == 0

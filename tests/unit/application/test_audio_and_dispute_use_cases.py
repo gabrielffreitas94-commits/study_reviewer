@@ -1055,3 +1055,179 @@ def test_dispute_service_raises_domain_exception() -> None:
             )
         )
     assert ledger.held_balance == 0
+
+
+def test_evaluate_audio_answer_with_embedding_service_ranking() -> None:
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        audio_svc,
+        _,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id,
+        topic_id=t_id,
+        prompt="Pergunta sobre áudio",
+        expected_answer="Gabarito áudio",
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    s_repo.get_by_id.return_value = Subject(id=s_id, name="Matéria", owner_id=user_id)
+    p_repo.get_by_user_and_question.return_value = None
+    ledger = TokenLedger(user_id=user_id, balance=2000)
+    l_repo.get_by_user_id.return_value = ledger
+
+    c1 = KnowledgeChunk(
+        source_id=uuid4(),
+        topic_id=t_id,
+        chunk_index=0,
+        content="Chunk de áudio relevante",
+        embedding=(1.0, 0.0, 0.0),
+    )
+    k_repo.list_by_topic.return_value = [c1]
+
+    embedding_svc = MagicMock()
+    embedding_svc.generate_embedding = AsyncMock(return_value=[1.0, 0.0, 0.0])
+
+    audio_svc.evaluate_audio_answer = AsyncMock(
+        return_value=AnswerEvaluationResult(
+            score=85,
+            feedback="Muito bom",
+            coverage_score=85,
+            accuracy_score=85,
+            depth_score=85,
+            evidence_quotes=(),
+            tokens_used=180,
+            cached_context=True,
+            evaluation_mode="AI_AUDIO",
+            transcribed_text="Transcrição",
+        )
+    )
+
+    use_case = EvaluateAudioAnswerUseCase(
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        audio_svc,
+        clock,
+        audit_repo,
+        uow,
+        embedding_service=embedding_svc,
+    )
+
+    result = asyncio.run(
+        use_case.execute(
+            EvaluateAudioAnswerInputDTO(
+                question_id=q_id,
+                audio_bytes=b"dummy audio content",
+                mime_type="audio/webm",
+            ),
+            user_id=user_id,
+        )
+    )
+
+    assert result.score == 85
+    embedding_svc.generate_embedding.assert_called_once_with("Pergunta sobre áudio")
+    context_passed = audio_svc.evaluate_audio_answer.call_args.kwargs["context_chunks"]
+    assert context_passed == ["Chunk de áudio relevante"]
+
+
+def test_dispute_evaluation_with_embedding_service_ranking() -> None:
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        _,
+        dispute_svc,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id,
+        topic_id=t_id,
+        prompt="Pergunta contestada",
+        expected_answer="Gabarito canônico",
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    s_repo.get_by_id.return_value = Subject(id=s_id, name="Matéria", owner_id=user_id)
+    p_repo.get_by_user_and_question.return_value = None
+    ledger = TokenLedger(user_id=user_id, balance=3000)
+    l_repo.get_by_user_id.return_value = ledger
+
+    c1 = KnowledgeChunk(
+        source_id=uuid4(),
+        topic_id=t_id,
+        chunk_index=0,
+        content="Chunk fundamentando a contestação",
+        embedding=(1.0, 0.0, 0.0),
+    )
+    k_repo.list_by_topic.return_value = [c1]
+
+    embedding_svc = MagicMock()
+    embedding_svc.generate_embedding = AsyncMock(return_value=[1.0, 0.0, 0.0])
+
+    dispute_svc.dispute_evaluation = AsyncMock(
+        return_value=DisputeEvaluationResult(
+            status="UPHELD",
+            revised_score=90,
+            advocate_rationale="Fundamentado",
+            critic_rationale="Apoiado",
+            arbitrator_verdict="Deferido",
+            tokens_used=400,
+            refund_dispute_tokens=True,
+        )
+    )
+
+    use_case = DisputeEvaluationUseCase(
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        dispute_svc,
+        clock,
+        audit_repo,
+        uow,
+        embedding_service=embedding_svc,
+    )
+
+    result = asyncio.run(
+        use_case.execute(
+            DisputeEvaluationInputDTO(
+                question_id=q_id,
+                student_answer="Minha resposta original",
+                dispute_argument="Argumento fundamentado na doutrina.",
+            ),
+            user_id=user_id,
+        )
+    )
+
+    assert result.status == "UPHELD"
+    assert result.revised_score == 90
+    embedding_svc.generate_embedding.assert_called_once()
+    context_passed = dispute_svc.dispute_evaluation.call_args.kwargs["context_chunks"]
+    assert context_passed == ["Chunk fundamentando a contestação"]

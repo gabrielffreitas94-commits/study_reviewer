@@ -146,3 +146,30 @@ def test_multiagent_dispute_adapter_injection_defense() -> None:
         or "prompt injection" in result.critic_rationale.lower()
         or "diretrizes" in result.arbitrator_verdict.lower()
     )
+
+
+def test_multiagent_dispute_adapter_api_key_initialization() -> None:
+    # Teste de inicialização com chaves opcionais e fallback determinístico
+    adapter_none = GeminiMultiAgentDisputeAdapter(api_key=None)
+    assert adapter_none._api_key is None
+
+    adapter_empty = GeminiMultiAgentDisputeAdapter(api_key="   ")
+    assert adapter_empty._api_key is None
+
+    adapter_with_key = GeminiMultiAgentDisputeAdapter(api_key="gemini-live-key-123")
+    assert adapter_with_key._api_key == "gemini-live-key-123"
+
+    # Ambos continuam operando determinística e seguramente offline
+    result = asyncio.run(
+        adapter_with_key.dispute_evaluation(
+            prompt="Questão sobre controle de constitucionalidade.",
+            expected_answer="Controle difuso e concentrado.",
+            student_answer="Controle difuso e concentrado.",
+            initial_score=60,
+            initial_feedback="Bom.",
+            dispute_argument="Controle difuso e concentrado são modalidades canônicas.",
+            context_chunks=["Controle difuso e concentrado de constitucionalidade."],
+        )
+    )
+    assert result.status == "UPHELD"
+    assert result.revised_score > 60
