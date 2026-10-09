@@ -347,4 +347,3 @@ def test_gemini_answer_evaluation_live_api_clamping_and_fallback_tokens() -> Non
     assert result.accuracy_score == 100
     assert result.depth_score == 0
     assert result.tokens_used > 100
-
