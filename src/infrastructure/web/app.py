@@ -45,6 +45,34 @@ def create_app() -> FastAPI:
     # Adiciona middleware de segurança HTTP
     app.add_middleware(SecurityHeadersMiddleware)
 
+    import time
+    from typing import Any
+
+    from fastapi import Request
+    from fastapi.responses import (
+        HTMLResponse,
+        JSONResponse,
+        PlainTextResponse,
+        RedirectResponse,
+        Response,
+    )
+
+    from src.infrastructure.logging import in_memory_log_handler
+
+    @app.middleware("http")
+    async def request_logging_middleware(request: Request, call_next: Any) -> Response:
+        start_time = time.perf_counter()
+        response: Response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        logger.info(
+            "%s %s -> %s (%.2fms)",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+        )
+        return response
+
     # Monta arquivos estáticos locais (CSS/JS)
     from pathlib import Path
 
@@ -55,8 +83,6 @@ def create_app() -> FastAPI:
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     # Registra rotas web (Jinja2 / HTMX) e API REST (JSON)
-    from fastapi import Request
-    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
     from src.adapters.api.auth_controllers import api_auth_router
     from src.adapters.api.evaluation_controllers import api_evaluation_router
@@ -153,6 +179,28 @@ def create_app() -> FastAPI:
             "environment": settings.ENVIRONMENT,
             "storage": settings.STUDY_EVENTS_BACKEND,
         }
+
+    @app.get("/health/logs", tags=["Health"])
+    async def get_recent_logs(
+        limit: int = 100,
+        format: str = "json",
+    ) -> Response:
+        """Retorna os logs mais recentes em memória para observabilidade imediata."""
+        logs = in_memory_log_handler.get_logs(limit=limit)
+        if format == "text":
+            lines = [
+                f"[{entry['datetime']}] [{entry['level']}] [{entry['logger']}] {entry['message']}"
+                for entry in logs
+            ]
+            return PlainTextResponse("\n".join(lines))
+        return JSONResponse(
+            content={
+                "environment": settings.ENVIRONMENT,
+                "total_buffered": len(in_memory_log_handler.buffer),
+                "limit": limit,
+                "logs": logs,
+            }
+        )
 
     return app
 

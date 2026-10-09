@@ -135,3 +135,21 @@ def test_health_check_endpoint(app_with_test_routes: TestClient) -> None:
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "healthy"
+
+
+@pytest.mark.unit
+def test_health_logs_endpoint(app_with_test_routes: TestClient) -> None:
+    """Verifica que o endpoint /health/logs retorna 200 em formato JSON e texto."""
+    # 1. JSON default
+    res = app_with_test_routes.get("/health/logs?limit=50")
+    assert res.status_code == 200
+    data = res.json()
+    assert "environment" in data
+    assert "total_buffered" in data
+    assert "logs" in data
+    assert isinstance(data["logs"], list)
+
+    # 2. Text format
+    res_text = app_with_test_routes.get("/health/logs?format=text&limit=10")
+    assert res_text.status_code == 200
+    assert "text/plain" in res_text.headers.get("content-type", "")

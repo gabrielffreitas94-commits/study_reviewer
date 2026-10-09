@@ -352,8 +352,8 @@ class ReviewQuestionUseCase:
                 if log.question_id == dto.question_id and log.review_date == today
             ]
             if today_logs:
-                latest_log = today_logs[0]
-                if latest_log.evaluation_mode != "MANUAL":
+                has_manual_review_today = any(log.evaluation_mode == "MANUAL" for log in today_logs)
+                if not has_manual_review_today and today_logs[0].evaluation_mode != "MANUAL":
                     is_confirming_ai_review = True
                     previous_level = today_logs[-1].level_before
 
