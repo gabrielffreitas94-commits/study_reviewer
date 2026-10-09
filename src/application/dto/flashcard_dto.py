@@ -5,7 +5,7 @@ from datetime import date
 from uuid import UUID
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CreateFlashcardDTO:
     """Dados de entrada para criação de Flashcard (ADR-004)."""
 
@@ -19,7 +19,7 @@ class CreateFlashcardDTO:
             object.__setattr__(self, "topic_ids", [self.topic_id])
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FlashcardDTO:
     """Dados de saída representando um Flashcard (ADR-004)."""
 

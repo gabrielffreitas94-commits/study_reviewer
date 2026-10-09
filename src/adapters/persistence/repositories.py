@@ -234,7 +234,6 @@ class SqlAlchemyFlashcardRepository(IFlashcardRepository):
     def save(self, flashcard: Flashcard) -> None:
         model = FlashcardMapper.to_model(flashcard)
         self._session.merge(model)
-        self._session.commit()
 
         # Atualiza a tabela associativa N:N (flashcard_topics)
         self._session.query(FlashcardTopicModel).filter(
@@ -809,8 +808,12 @@ class SqlAlchemyTokenLedgerRepository(ITokenLedgerRepository):
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def get_by_user_id(self, user_id: UUID) -> TokenLedger | None:
-        model = self._session.get(TokenLedgerModel, user_id)
+    def get_by_user_id(self, user_id: UUID, for_update: bool = False) -> TokenLedger | None:
+        model = (
+            self._session.get(TokenLedgerModel, user_id, with_for_update=True)
+            if for_update
+            else self._session.get(TokenLedgerModel, user_id)
+        )
         return TokenLedgerMapper.to_domain(model) if model else None
 
     def save(self, ledger: TokenLedger) -> TokenLedger:

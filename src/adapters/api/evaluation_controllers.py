@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from src.adapters.ai.gemini_adapters import (
     GeminiAnswerEvaluationAdapter,
     GeminiAudioEvaluationAdapter,
+    GeminiEmbeddingAdapter,
     GeminiMultiAgentDisputeAdapter,
 )
 from src.adapters.persistence.repositories import (
@@ -46,6 +47,7 @@ from src.domain.exceptions import (
     ResourceOwnershipError,
 )
 from src.infrastructure.clock import SystemClockService
+from src.infrastructure.config import settings
 from src.infrastructure.database import get_db
 from src.infrastructure.security.dependencies import get_current_user
 
@@ -91,10 +93,11 @@ async def evaluate_text_answer(
         progress_repo=SqlAlchemyQuestionProgressRepository(db),
         chunk_repo=SqlAlchemyKnowledgeChunkRepository(db),
         ledger_repo=SqlAlchemyTokenLedgerRepository(db),
-        evaluation_service=GeminiAnswerEvaluationAdapter(),
+        evaluation_service=GeminiAnswerEvaluationAdapter(api_key=settings.GEMINI_API_KEY or None),
         clock=clock,
         audit_repo=SqlAlchemyReviewAuditRepository(db),
         uow=db,
+        embedding_service=GeminiEmbeddingAdapter(api_key=settings.GEMINI_API_KEY or None),
     )
 
     try:
@@ -167,10 +170,11 @@ async def evaluate_audio_answer(
         progress_repo=SqlAlchemyQuestionProgressRepository(db),
         chunk_repo=SqlAlchemyKnowledgeChunkRepository(db),
         ledger_repo=SqlAlchemyTokenLedgerRepository(db),
-        audio_service=GeminiAudioEvaluationAdapter(),
+        audio_service=GeminiAudioEvaluationAdapter(api_key=settings.GEMINI_API_KEY or None),
         clock=clock,
         audit_repo=SqlAlchemyReviewAuditRepository(db),
         uow=db,
+        embedding_service=GeminiEmbeddingAdapter(api_key=settings.GEMINI_API_KEY or None),
     )
 
     audio_bytes = await audio_file.read()
@@ -250,10 +254,11 @@ async def dispute_evaluation_endpoint(
         progress_repo=SqlAlchemyQuestionProgressRepository(db),
         chunk_repo=SqlAlchemyKnowledgeChunkRepository(db),
         ledger_repo=SqlAlchemyTokenLedgerRepository(db),
-        dispute_service=GeminiMultiAgentDisputeAdapter(),
+        dispute_service=GeminiMultiAgentDisputeAdapter(api_key=settings.GEMINI_API_KEY or None),
         clock=clock,
         audit_repo=SqlAlchemyReviewAuditRepository(db),
         uow=db,
+        embedding_service=GeminiEmbeddingAdapter(api_key=settings.GEMINI_API_KEY or None),
     )
 
     try:

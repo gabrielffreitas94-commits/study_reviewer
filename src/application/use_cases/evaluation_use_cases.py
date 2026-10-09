@@ -41,11 +41,41 @@ from src.domain.exceptions import (
 from src.domain.protocols import (
     IAnswerEvaluationService,
     IAudioAnswerEvaluationService,
+    IEmbeddingService,
     IMultiAgentDisputeService,
 )
-from src.domain.services import SpacingPolicyService
+from src.domain.services import KnowledgeGroundingService, SpacingPolicyService
 
 logger = logging.getLogger(__name__)
+
+
+async def _retrieve_rag_context(
+    chunk_repo: IKnowledgeChunkRepository,
+    embedding_service: IEmbeddingService | None,
+    topic_id: UUID,
+    query_text: str,
+    expected_answer: str,
+) -> list[str]:
+    """Recupera contexto RAG com ordenação vetorial ou fallback gracioso para cold-start."""
+    chunks = chunk_repo.list_by_topic(topic_id)
+    if not chunks:
+        return [f"Gabarito Canônico Oficial: {expected_answer}"]
+
+    if embedding_service is not None and query_text.strip():
+        try:
+            query_embedding = await embedding_service.generate_embedding(query_text.strip())
+            ranked = KnowledgeGroundingService.rank_chunks_by_similarity(
+                query_embedding, chunks, threshold=0.70, top_k=5
+            )
+            if ranked:
+                return [chunk.content for chunk, _ in ranked]
+        except Exception as err:
+            logger.warning(
+                "Falha na busca vetorial RAG por embedding, utilizando fallback determinístico: %s",
+                err,
+            )
+
+    return [c.content for c in chunks[:5]]
 
 
 class EvaluateStudentAnswerUseCase:
@@ -64,6 +94,7 @@ class EvaluateStudentAnswerUseCase:
         audit_repo: IReviewAuditRepository | None = None,
         uow: Any | None = None,
         estimated_hold_tokens: int = 500,
+        embedding_service: IEmbeddingService | None = None,
     ) -> None:
         self._question_repo = question_repo
         self._topic_repo = topic_repo
@@ -76,6 +107,7 @@ class EvaluateStudentAnswerUseCase:
         self._audit_repo = audit_repo
         self._uow = uow
         self._estimated_hold_tokens = estimated_hold_tokens
+        self._embedding_service = embedding_service
 
     async def execute(
         self, dto: EvaluateAnswerInputDTO, user_id: UUID
@@ -140,11 +172,13 @@ class EvaluateStudentAnswerUseCase:
             self._uow.commit()
 
         # 5. Recuperação de contexto RAG com fallback para Cold-Start
-        chunks = self._chunk_repo.list_by_topic(topic.id)
-        if chunks:
-            context_chunks = [c.content for c in chunks[:5]]
-        else:
-            context_chunks = [f"Gabarito Canônico Oficial: {question.expected_answer}"]
+        context_chunks = await _retrieve_rag_context(
+            chunk_repo=self._chunk_repo,
+            embedding_service=self._embedding_service,
+            topic_id=topic.id,
+            query_text=f"{clean_answer} {question.prompt}",
+            expected_answer=question.expected_answer,
+        )
 
         # 6. Avaliação semântica via IA com estorno em caso de falha
         try:
@@ -343,6 +377,7 @@ class EvaluateAudioAnswerUseCase:
         audit_repo: IReviewAuditRepository | None = None,
         uow: Any | None = None,
         estimated_hold_tokens: int = 800,
+        embedding_service: IEmbeddingService | None = None,
     ) -> None:
         self._question_repo = question_repo
         self._topic_repo = topic_repo
@@ -355,6 +390,7 @@ class EvaluateAudioAnswerUseCase:
         self._audit_repo = audit_repo
         self._uow = uow
         self._estimated_hold_tokens = estimated_hold_tokens
+        self._embedding_service = embedding_service
 
     async def execute(
         self, dto: EvaluateAudioAnswerInputDTO, user_id: UUID
@@ -432,11 +468,13 @@ class EvaluateAudioAnswerUseCase:
             self._uow.commit()
 
         # 5. Recuperação de contexto RAG com fallback para Cold-Start
-        chunks = self._chunk_repo.list_by_topic(topic.id)
-        if chunks:
-            context_chunks = [c.content for c in chunks[:5]]
-        else:
-            context_chunks = [f"Gabarito Canônico Oficial: {question.expected_answer}"]
+        context_chunks = await _retrieve_rag_context(
+            chunk_repo=self._chunk_repo,
+            embedding_service=self._embedding_service,
+            topic_id=topic.id,
+            query_text=question.prompt,
+            expected_answer=question.expected_answer,
+        )
 
         # 6. Avaliação multimodal efêmera com estorno em caso de falha
         try:
@@ -557,6 +595,7 @@ class DisputeEvaluationUseCase:
         audit_repo: IReviewAuditRepository | None = None,
         uow: Any | None = None,
         estimated_hold_tokens: int = 1000,
+        embedding_service: IEmbeddingService | None = None,
     ) -> None:
         self._question_repo = question_repo
         self._topic_repo = topic_repo
@@ -569,6 +608,7 @@ class DisputeEvaluationUseCase:
         self._audit_repo = audit_repo
         self._uow = uow
         self._estimated_hold_tokens = estimated_hold_tokens
+        self._embedding_service = embedding_service
 
     async def execute(
         self, dto: DisputeEvaluationInputDTO, user_id: UUID
@@ -629,11 +669,13 @@ class DisputeEvaluationUseCase:
             self._uow.commit()
 
         # 5. RAG Chunks com fallback Cold-Start
-        chunks = self._chunk_repo.list_by_topic(topic.id)
-        if chunks:
-            context_chunks = [c.content for c in chunks[:5]]
-        else:
-            context_chunks = [f"Gabarito Canônico Oficial: {question.expected_answer}"]
+        context_chunks = await _retrieve_rag_context(
+            chunk_repo=self._chunk_repo,
+            embedding_service=self._embedding_service,
+            topic_id=topic.id,
+            query_text=f"{clean_arg} {clean_answer} {question.prompt}",
+            expected_answer=question.expected_answer,
+        )
 
         # 6. Deliberação da Câmara Multiagente
         try:

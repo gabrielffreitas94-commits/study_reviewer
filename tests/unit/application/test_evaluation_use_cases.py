@@ -608,3 +608,263 @@ def test_list_token_transactions_use_case() -> None:
     assert transactions[0].amount == 500
     assert transactions[0].reference_id == "TEST"
     assert transactions[0].created_at == now
+
+
+def test_evaluate_student_answer_with_embedding_service_ranking() -> None:
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        eval_svc,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id,
+        topic_id=t_id,
+        prompt="O que é mandado de segurança?",
+        expected_answer="Remédio constitucional para direito líquido e certo.",
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    s_repo.get_by_id.return_value = Subject(id=s_id, name="Matéria", owner_id=user_id)
+    p_repo.get_by_user_and_question.return_value = None
+    ledger = TokenLedger(user_id=user_id, balance=2000)
+    l_repo.get_by_user_id.return_value = ledger
+
+    c1 = KnowledgeChunk(
+        source_id=uuid4(),
+        topic_id=t_id,
+        chunk_index=0,
+        content="Chunk sobre mandado de segurança e direito líquido e certo",
+        embedding=(1.0, 0.0, 0.0),
+    )
+    c2 = KnowledgeChunk(
+        source_id=uuid4(),
+        topic_id=t_id,
+        chunk_index=1,
+        content="Chunk irrelevante sobre receita de bolo",
+        embedding=(0.0, 1.0, 0.0),
+    )
+    k_repo.list_by_topic.return_value = [c1, c2]
+
+    embedding_svc = MagicMock()
+    embedding_svc.generate_embedding = AsyncMock(return_value=[1.0, 0.0, 0.0])
+
+    eval_svc.evaluate_answer = AsyncMock(
+        return_value=AnswerEvaluationResult(
+            score=90,
+            feedback="Excelente!",
+            coverage_score=90,
+            accuracy_score=90,
+            depth_score=90,
+            evidence_quotes=("Evidência",),
+            tokens_used=150,
+            cached_context=True,
+            evaluation_mode="AI_TEXT",
+        )
+    )
+
+    use_case = EvaluateStudentAnswerUseCase(
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        eval_svc,
+        clock,
+        audit_repo,
+        uow,
+        embedding_service=embedding_svc,
+    )
+
+    result = asyncio.run(
+        use_case.execute(
+            EvaluateAnswerInputDTO(
+                question_id=q_id,
+                student_answer="Mandado de segurança protege direito líquido e certo.",
+            ),
+            user_id=user_id,
+        )
+    )
+
+    assert result.score == 90
+    embedding_svc.generate_embedding.assert_called_once()
+    eval_svc.evaluate_answer.assert_called_once()
+    # Verifica que apenas o chunk c1 (similaridade 1.0 >= 0.70) foi passado no contexto
+    context_passed = eval_svc.evaluate_answer.call_args.kwargs["context_chunks"]
+    assert len(context_passed) == 1
+    assert "direito líquido e certo" in context_passed[0]
+
+
+def test_evaluate_student_answer_with_embedding_service_fallback_below_threshold() -> None:
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        eval_svc,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id,
+        topic_id=t_id,
+        prompt="Pergunta de teste",
+        expected_answer="Gabarito de teste",
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    s_repo.get_by_id.return_value = Subject(id=s_id, name="Matéria", owner_id=user_id)
+    p_repo.get_by_user_and_question.return_value = None
+    l_repo.get_by_user_id.return_value = TokenLedger(user_id=user_id, balance=2000)
+
+    # Chunks com baixa similaridade (ortogonal = 0.0 < 0.70)
+    c1 = KnowledgeChunk(
+        source_id=uuid4(),
+        topic_id=t_id,
+        chunk_index=0,
+        content="Chunk 1 existente",
+        embedding=(0.0, 1.0, 0.0),
+    )
+    k_repo.list_by_topic.return_value = [c1]
+
+    embedding_svc = MagicMock()
+    embedding_svc.generate_embedding = AsyncMock(return_value=[1.0, 0.0, 0.0])
+
+    eval_svc.evaluate_answer = AsyncMock(
+        return_value=AnswerEvaluationResult(
+            score=70,
+            feedback="Bom",
+            coverage_score=70,
+            accuracy_score=70,
+            depth_score=70,
+            evidence_quotes=(),
+            tokens_used=120,
+            cached_context=False,
+            evaluation_mode="AI_TEXT",
+        )
+    )
+
+    use_case = EvaluateStudentAnswerUseCase(
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        eval_svc,
+        clock,
+        audit_repo,
+        uow,
+        embedding_service=embedding_svc,
+    )
+
+    asyncio.run(
+        use_case.execute(
+            EvaluateAnswerInputDTO(question_id=q_id, student_answer="Minha resposta"),
+            user_id=user_id,
+        )
+    )
+
+    # Como a similaridade foi 0.0 < 0.70, fallback gracioso para os primeiros chunks
+    context_passed = eval_svc.evaluate_answer.call_args.kwargs["context_chunks"]
+    assert len(context_passed) == 1
+    assert context_passed[0] == "Chunk 1 existente"
+
+
+def test_evaluate_student_answer_with_embedding_service_exception_fallback() -> None:
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        eval_svc,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id,
+        topic_id=t_id,
+        prompt="Pergunta",
+        expected_answer="Gabarito",
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    s_repo.get_by_id.return_value = Subject(id=s_id, name="Matéria", owner_id=user_id)
+    p_repo.get_by_user_and_question.return_value = None
+    l_repo.get_by_user_id.return_value = TokenLedger(user_id=user_id, balance=2000)
+
+    c1 = KnowledgeChunk(
+        source_id=uuid4(),
+        topic_id=t_id,
+        chunk_index=0,
+        content="Conteúdo de fallback",
+        embedding=(1.0, 0.0, 0.0),
+    )
+    k_repo.list_by_topic.return_value = [c1]
+
+    embedding_svc = MagicMock()
+    embedding_svc.generate_embedding = AsyncMock(side_effect=RuntimeError("Timeout no embedding"))
+
+    eval_svc.evaluate_answer = AsyncMock(
+        return_value=AnswerEvaluationResult(
+            score=80,
+            feedback="Ok",
+            coverage_score=80,
+            accuracy_score=80,
+            depth_score=80,
+            evidence_quotes=(),
+            tokens_used=120,
+            cached_context=False,
+            evaluation_mode="AI_TEXT",
+        )
+    )
+
+    use_case = EvaluateStudentAnswerUseCase(
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        eval_svc,
+        clock,
+        audit_repo,
+        uow,
+        embedding_service=embedding_svc,
+    )
+
+    asyncio.run(
+        use_case.execute(
+            EvaluateAnswerInputDTO(question_id=q_id, student_answer="Resposta do aluno"),
+            user_id=user_id,
+        )
+    )
+
+    # Fallback determinístico acionado
+    context_passed = eval_svc.evaluate_answer.call_args.kwargs["context_chunks"]
+    assert context_passed == ["Conteúdo de fallback"]

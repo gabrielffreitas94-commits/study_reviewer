@@ -121,6 +121,403 @@
             </div>
         </div>
     </form>
+
+    <!-- Barra de Ferramentas: Avaliação com IA e Contestação Multiagente -->
+    <div id="advanced-evaluation-toolbar" class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800" role="region" aria-label="Ferramentas avançadas de avaliação">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Botão: Responder por Áudio -->
+                <button
+                    type="button"
+                    id="btn-audio-answer"
+                    aria-haspopup="dialog"
+                    aria-expanded="false"
+                    aria-controls="audio-answer-modal"
+                    onclick="openAudioModal()"
+                    class="inline-flex items-center justify-center min-h-[44px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all transform active:scale-95 cursor-pointer"
+                >
+                    <svg class="w-4 h-4 mr-2 shrink-0 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                    </svg>
+                    <span>Responder por Áudio</span>
+                </button>
+
+                <!-- Botão: Contestar Avaliação (Conselho Multiagente) -->
+                <button
+                    type="button"
+                    id="btn-dispute-evaluation"
+                    aria-haspopup="dialog"
+                    aria-expanded="false"
+                    aria-controls="dispute-modal"
+                    onclick="openDisputeModal()"
+                    class="inline-flex items-center justify-center min-h-[44px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 shadow-sm transition-all transform active:scale-95 cursor-pointer"
+                    title="Acione o Conselho Multiagente (Advogado, Crítico e Árbitro) caso discorde da avaliação"
+                >
+                    <svg class="w-4 h-4 mr-2 shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path>
+                    </svg>
+                    <span>Contestar Avaliação</span>
+                </button>
+            </div>
+
+            <!-- Status Informativo LGPD Art. 16 -->
+            <div class="inline-flex items-center text-[11px] leading-tight text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60" role="note" aria-label="Informação de privacidade de dados">
+                <svg class="w-3.5 h-3.5 mr-1.5 shrink-0 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                </svg>
+                <span><strong>Privacidade Efêmera (LGPD Art. 16):</strong> Áudio em memória volátil e eliminado pós-avaliação.</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Acessível: Responder por Áudio (WCAG 2.1 AA) -->
+<div
+    id="audio-answer-modal"
+    class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 flex items-center justify-center transition-opacity"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="audio-modal-title"
+    aria-describedby="audio-modal-description"
+>
+    <div class="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-7 flex flex-col space-y-4 max-h-[90vh] overflow-y-auto">
+        <!-- Cabeçalho do Modal -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <h2 id="audio-modal-title" class="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center">
+                <svg class="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                </svg>
+                <span>Responder por Áudio com IA</span>
+            </h2>
+            <button
+                type="button"
+                aria-label="Fechar janela de gravação de áudio"
+                onclick="closeAudioModal()"
+                class="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Alerta de Privacidade Efêmera LGPD Art. 16 -->
+        <div id="audio-modal-description" class="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-900 dark:text-emerald-200 flex items-start space-x-2.5" role="note">
+            <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+            </svg>
+            <div class="leading-relaxed">
+                <strong class="font-semibold">Garantia de Privacidade Efêmera (LGPD Art. 16):</strong>
+                O fluxo de voz é transmitido criptografado e processado estritamente em memória volátil para transcrição e avaliação pedagógica multimodal. O áudio bruto é destruído imediatamente após o término da requisição, sem persistência física em banco de dados ou disco.
+            </div>
+        </div>
+
+        <!-- Painel de Gravação Interativo -->
+        <div class="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-4">
+            <!-- Status e Timer -->
+            <div class="flex items-center space-x-2">
+                <span id="audio-rec-indicator" class="hidden w-3 h-3 rounded-full bg-rose-500 animate-pulse" aria-hidden="true"></span>
+                <span id="audio-record-status" class="text-xs font-semibold text-slate-600 dark:text-slate-300" aria-live="polite">Microfone pronto para gravação</span>
+            </div>
+            <div id="audio-timer" class="font-mono text-3xl font-extrabold text-slate-800 dark:text-slate-100" aria-label="Tempo de gravação">00:00</div>
+
+            <!-- Botão de Ação Primária: Iniciar / Parar Gravação -->
+            <button
+                type="button"
+                id="btn-toggle-record"
+                onclick="toggleAudioRecording()"
+                class="inline-flex items-center justify-center min-h-[48px] px-6 py-3 rounded-full text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-md transition-all transform active:scale-95 cursor-pointer"
+            >
+                <svg id="icon-record" class="w-5 h-5 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                </svg>
+                <span id="label-toggle-record">Iniciar Gravação</span>
+            </button>
+
+            <!-- Player de Reprodução do Áudio Gravado -->
+            <audio id="audio-playback" controls class="hidden w-full max-w-xs mt-3 rounded-lg" aria-label="Pré-visualização do áudio gravado"></audio>
+
+            <!-- Fallback Acessível para Upload de Arquivo -->
+            <div class="pt-2 text-center">
+                <label for="audio-file-input" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer focus-within:ring-2 focus-within:ring-indigo-500 rounded p-1">
+                    Ou selecione um arquivo de áudio gravado previamente (.webm, .wav, .mp3, .m4a)
+                </label>
+                <input
+                    type="file"
+                    id="audio-file-input"
+                    accept="audio/*"
+                    onchange="handleAudioFileSelect(event)"
+                    class="sr-only"
+                    aria-label="Upload de arquivo de áudio alternativo"
+                >
+            </div>
+        </div>
+
+        <!-- Botão para Submeter ao Backend -->
+        <div id="audio-submit-container" class="hidden flex justify-end space-x-2">
+            <button
+                type="button"
+                id="btn-submit-audio-eval"
+                onclick="submitAudioEvaluation('{{ card.question_id }}')"
+                class="inline-flex items-center justify-center min-h-[44px] px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all transform active:scale-95 cursor-pointer"
+            >
+                <span class="mr-2" aria-hidden="true">✨</span>
+                <span>Avaliar Resposta com IA</span>
+            </button>
+        </div>
+
+        <!-- Indicador de Carregamento / Transcrição -->
+        <div id="audio-eval-loading" class="hidden flex flex-col items-center justify-center py-6 space-y-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400" aria-live="polite">
+            <svg class="animate-spin h-6 w-6 text-indigo-600 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span>Transcrevendo áudio e avaliando com IA multimodal...</span>
+        </div>
+
+        <!-- Mensagens de Erro -->
+        <div id="audio-eval-error" class="hidden p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-800 dark:text-rose-200" role="alert" aria-live="assertive"></div>
+
+        <!-- Resultado da Avaliação por Áudio -->
+        <div id="audio-eval-result" class="hidden space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800" aria-live="polite">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Avaliação da IA Multimodal</span>
+                <span id="audio-result-score-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-200"></span>
+            </div>
+
+            <!-- Transcrição -->
+            <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                <div class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Transcrição da Fala:</div>
+                <p id="audio-transcribed-text" class="text-xs sm:text-sm text-slate-800 dark:text-slate-200 italic"></p>
+            </div>
+
+            <!-- Feedback -->
+            <div class="p-3 bg-indigo-50/50 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
+                <div class="text-[11px] font-bold text-indigo-900 dark:text-indigo-300 uppercase tracking-wider mb-1">Feedback Pedagógico:</div>
+                <p id="audio-feedback-text" class="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed"></p>
+            </div>
+
+            <!-- Métricas Detalhadas -->
+            <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Cobertura</div>
+                    <div id="audio-coverage-metric" class="font-bold text-slate-800 dark:text-slate-200 text-sm">--</div>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Precisão</div>
+                    <div id="audio-accuracy-metric" class="font-bold text-slate-800 dark:text-slate-200 text-sm">--</div>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Profundidade</div>
+                    <div id="audio-depth-metric" class="font-bold text-slate-800 dark:text-slate-200 text-sm">--</div>
+                </div>
+            </div>
+
+            <!-- Ações pós-avaliação -->
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
+                <button
+                    type="button"
+                    id="btn-contest-from-audio"
+                    onclick="openDisputeModalFromAudio()"
+                    class="inline-flex items-center justify-center min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors cursor-pointer"
+                >
+                    <span class="mr-1.5" aria-hidden="true">⚖️</span>
+                    <span>Contestar Avaliação</span>
+                </button>
+                <button
+                    type="button"
+                    id="btn-apply-audio-score"
+                    onclick="applyAudioScoreToCard()"
+                    class="inline-flex items-center justify-center min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all cursor-pointer"
+                >
+                    <span>Aplicar Nota ao Card</span>
+                    <span class="ml-1.5" aria-hidden="true">➔</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Acessível: Contestar Avaliação — Conselho Multiagente (WCAG 2.1 AA) -->
+<div
+    id="dispute-modal"
+    class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 flex items-center justify-center transition-opacity"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="dispute-modal-title"
+    aria-describedby="dispute-modal-description"
+>
+    <div class="relative w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-7 flex flex-col space-y-4 max-h-[90vh] overflow-y-auto">
+        <!-- Cabeçalho do Modal -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <h2 id="dispute-modal-title" class="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center">
+                <svg class="w-5 h-5 mr-2 text-amber-600 dark:text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path>
+                </svg>
+                <span>Conselho Multiagente de Contestação</span>
+            </h2>
+            <button
+                type="button"
+                aria-label="Fechar janela de contestação de avaliação"
+                onclick="closeDisputeModal()"
+                class="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Descritivo do Conselho Tripartite -->
+        <div id="dispute-modal-description" class="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 space-y-1.5" role="note">
+            <div class="font-semibold flex items-center">
+                <span class="mr-1.5" aria-hidden="true">🏛️</span>
+                <span>Tribunal Deliberativo Tripartite:</span>
+            </div>
+            <p class="leading-relaxed">
+                Sua contestação será julgada por três agentes com papéis dialéticos: o <strong>Advogado do Estudante</strong> (defesa técnica dos seus acertos), o <strong>Crítico Técnico</strong> (apontamento de lacunas frente ao gabarito) e o <strong>Árbitro Imparcial</strong> (decisão vinculante de nota e ajuste SRS).
+            </p>
+        </div>
+
+        <!-- Formulário de Contestação -->
+        <form id="dispute-form" onsubmit="event.preventDefault(); submitDispute('{{ card.question_id }}');" class="space-y-4">
+            <!-- Resposta do Estudante -->
+            <div>
+                <label for="dispute-student-answer" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Sua Resposta Dissertativa submetida ou declarada:
+                </label>
+                <textarea
+                    id="dispute-student-answer"
+                    name="student_answer"
+                    rows="3"
+                    required
+                    placeholder="Descreva a resposta que você forneceu..."
+                    class="w-full text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 p-3 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors"
+                ></textarea>
+            </div>
+
+            <!-- Argumentação de Contestação -->
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label for="dispute-argument" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Fundamentação e Argumentação da Contestação:
+                    </label>
+                    <span id="dispute-char-counter" class="text-[11px] text-slate-400 dark:text-slate-500" aria-live="polite">0 / 5000</span>
+                </div>
+                <textarea
+                    id="dispute-argument"
+                    name="dispute_argument"
+                    rows="4"
+                    minlength="5"
+                    maxlength="5000"
+                    required
+                    oninput="updateDisputeCharCounter(this)"
+                    placeholder="Explique tecnicamente por que sua resposta é válida ou por que a pontuação anterior foi injusta frente aos conceitos exigidos..."
+                    class="w-full text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 p-3 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors"
+                ></textarea>
+                <p class="mt-1 text-[11px] text-slate-400 dark:text-slate-500">Mínimo de 5 caracteres e máximo de 5.000 caracteres.</p>
+            </div>
+
+            <!-- Botão de Envio para o Conselho -->
+            <div class="pt-2 flex justify-end">
+                <button
+                    type="submit"
+                    id="btn-submit-dispute"
+                    class="w-full sm:w-auto inline-flex items-center justify-center min-h-[44px] px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 shadow-md transition-all transform active:scale-95 cursor-pointer"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Acionar Conselho Multiagente</span>
+                </button>
+            </div>
+        </form>
+
+        <!-- Indicador de Deliberação em Andamento -->
+        <div id="dispute-loading" class="hidden flex flex-col items-center justify-center py-6 space-y-3 text-xs font-semibold text-amber-700 dark:text-amber-300" aria-live="polite">
+            <svg class="animate-spin h-7 w-7 text-amber-600 dark:text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <div class="text-center">
+                <div>Conselho Multiagente em sessão deliberativa...</div>
+                <div class="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-1">Advogado, Crítico e Árbitro ponderando teses e jurisprudência cognitiva.</div>
+            </div>
+        </div>
+
+        <!-- Mensagens de Erro da Contestação -->
+        <div id="dispute-error" class="hidden p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-800 dark:text-rose-200" role="alert" aria-live="assertive"></div>
+
+        <!-- Resultados da Deliberação Multiagente -->
+        <div id="dispute-result" class="hidden space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800" aria-live="polite">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Veredito do Conselho</span>
+                <span id="dispute-verdict-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold"></span>
+            </div>
+
+            <!-- Evolução de Nota -->
+            <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs sm:text-sm">
+                <div>
+                    <span class="text-slate-500 dark:text-slate-400 font-medium">Nota Anterior: </span>
+                    <span id="dispute-prev-score" class="font-bold text-slate-700 dark:text-slate-300"></span>
+                </div>
+                <span class="text-slate-400" aria-hidden="true">➔</span>
+                <div>
+                    <span class="text-slate-500 dark:text-slate-400 font-medium">Nota Revisada: </span>
+                    <span id="dispute-revised-score" class="font-extrabold text-emerald-600 dark:text-emerald-400"></span>
+                </div>
+            </div>
+
+            <!-- Pareceres Individuais do Conselho -->
+            <div class="space-y-2 text-xs">
+                <!-- Advogado -->
+                <div class="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900/40">
+                    <div class="font-bold text-blue-900 dark:text-blue-300 mb-1 flex items-center">
+                        <span class="mr-1.5" aria-hidden="true">🛡️</span>
+                        <span>Parecer do Advogado do Estudante:</span>
+                    </div>
+                    <p id="dispute-advocate-rationale" class="text-slate-800 dark:text-slate-200 leading-relaxed"></p>
+                </div>
+
+                <!-- Crítico -->
+                <div class="p-3 bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-900/40">
+                    <div class="font-bold text-rose-900 dark:text-rose-300 mb-1 flex items-center">
+                        <span class="mr-1.5" aria-hidden="true">🔍</span>
+                        <span>Contraponto do Crítico Técnico:</span>
+                    </div>
+                    <p id="dispute-critic-rationale" class="text-slate-800 dark:text-slate-200 leading-relaxed"></p>
+                </div>
+
+                <!-- Árbitro -->
+                <div class="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-900/40">
+                    <div class="font-bold text-emerald-900 dark:text-emerald-300 mb-1 flex items-center">
+                        <span class="mr-1.5" aria-hidden="true">⚖️</span>
+                        <span>Veredito Decisório do Árbitro Imparcial:</span>
+                    </div>
+                    <p id="dispute-arbitrator-verdict" class="text-slate-800 dark:text-slate-200 leading-relaxed font-medium"></p>
+                </div>
+            </div>
+
+            <!-- Notificação de Reembolso de Tokens quando aplicável -->
+            <div id="dispute-refund-banner" class="hidden p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs text-emerald-800 dark:text-emerald-200 font-semibold flex items-center">
+                <span class="mr-1.5" aria-hidden="true">💰</span>
+                <span>Reembolso integral: Devido à procedência da contestação, os tokens foram estornados ao seu saldo!</span>
+            </div>
+
+            <!-- Botão de Aplicação da Nota Revisada -->
+            <div class="pt-2 flex justify-end">
+                <button
+                    type="button"
+                    id="btn-apply-dispute-score"
+                    onclick="applyDisputeScoreToCard()"
+                    class="inline-flex items-center justify-center min-h-[44px] px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all cursor-pointer"
+                >
+                    <span>Aplicar Nota Revisada ao Card</span>
+                    <span class="ml-1.5" aria-hidden="true">➔</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Out-of-band updates para o badge de revisão da navbar -->
@@ -134,7 +531,395 @@
 <!-- WAI-ARIA Live Announcer Out-of-Band update para leitores de tela -->
 <div id="srs-announcer" hx-swap-oob="innerHTML">Pergunta {{ current_num }} de {{ total_due }}: {{ card.subject_name }} / {{ card.topic_name }}. Pressione Espaço ou Enter para revelar a resposta esperada.</div>
 
-<!-- Redefine estado de resposta no swap HTMX sem acumular listeners -->
+<!-- Scripts de Interação Acessível, Áudio Efêmero e Contestação Multiagente -->
 <script>
     window.isAnswerRevealed = false;
+    window.__activeAudioScore = null;
+    window.__lastAudioTranscript = '';
+    window.__activeDisputeRevisedScore = null;
+    window.__lastFocusedElement = null;
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let audioRecordInterval = null;
+    let audioRecordSeconds = 0;
+    let recordedAudioBlob = null;
+
+    // --- Modal Audio ---
+    window.openAudioModal = function() {
+        window.__lastFocusedElement = document.activeElement;
+        const modal = document.getElementById('audio-answer-modal');
+        const trigger = document.getElementById('btn-audio-answer');
+        if (modal) {
+            modal.classList.remove('hidden');
+            if (trigger) trigger.setAttribute('aria-expanded', 'true');
+            const focusTarget = document.getElementById('btn-toggle-record');
+            if (focusTarget) focusTarget.focus();
+        }
+    };
+
+    window.closeAudioModal = function() {
+        stopActiveRecording();
+        const modal = document.getElementById('audio-answer-modal');
+        const trigger = document.getElementById('btn-audio-answer');
+        if (modal) {
+            modal.classList.add('hidden');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+            if (window.__lastFocusedElement) window.__lastFocusedElement.focus();
+        }
+    };
+
+    function stopActiveRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+        }
+        if (audioRecordInterval) {
+            clearInterval(audioRecordInterval);
+            audioRecordInterval = null;
+        }
+    }
+
+    window.toggleAudioRecording = async function() {
+        const btn = document.getElementById('btn-toggle-record');
+        const label = document.getElementById('label-toggle-record');
+        const indicator = document.getElementById('audio-rec-indicator');
+        const statusEl = document.getElementById('audio-record-status');
+        const timerEl = document.getElementById('audio-timer');
+        const playback = document.getElementById('audio-playback');
+        const submitContainer = document.getElementById('audio-submit-container');
+        const errorEl = document.getElementById('audio-eval-error');
+
+        if (errorEl) errorEl.classList.add('hidden');
+
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            if (audioRecordInterval) clearInterval(audioRecordInterval);
+            if (indicator) indicator.classList.add('hidden');
+            if (btn) {
+                btn.className = 'inline-flex items-center justify-center min-h-[48px] px-6 py-3 rounded-full text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-md transition-all cursor-pointer';
+            }
+            if (label) label.textContent = 'Regravar Resposta';
+            if (statusEl) statusEl.textContent = 'Gravação concluída. Ouça abaixo ou envie para avaliação.';
+            return;
+        }
+
+        try {
+            audioChunks = [];
+            audioRecordSeconds = 0;
+            if (timerEl) timerEl.textContent = '00:00';
+            if (playback) playback.classList.add('hidden');
+            if (submitContainer) submitContainer.classList.add('hidden');
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mimeType = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))
+                ? 'audio/webm;codecs=opus'
+                : ((typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')) ? 'audio/webm' : 'audio/ogg');
+            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data && e.data.size > 0) {
+                    audioChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = function() {
+                recordedAudioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                stream.getTracks().forEach(t => t.stop());
+                if (playback) {
+                    playback.src = URL.createObjectURL(recordedAudioBlob);
+                    playback.classList.remove('hidden');
+                }
+                if (submitContainer) submitContainer.classList.remove('hidden');
+            };
+
+            mediaRecorder.start(250);
+            if (indicator) indicator.classList.remove('hidden');
+            if (btn) {
+                btn.className = 'inline-flex items-center justify-center min-h-[48px] px-6 py-3 rounded-full text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 shadow-md transition-all animate-pulse cursor-pointer';
+            }
+            if (label) label.textContent = 'Parar Gravação';
+            if (statusEl) statusEl.textContent = 'Gravando sua resposta... (fale claramente)';
+
+            audioRecordInterval = setInterval(function() {
+                audioRecordSeconds++;
+                const mins = String(Math.floor(audioRecordSeconds / 60)).padStart(2, '0');
+                const secs = String(audioRecordSeconds % 60).padStart(2, '0');
+                if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+                if (audioRecordSeconds >= 120) {
+                    window.toggleAudioRecording();
+                }
+            }, 1000);
+        } catch (err) {
+            console.error('Erro ao acessar microfone:', err);
+            if (errorEl) {
+                errorEl.textContent = 'Não foi possível acessar o microfone. Verifique as permissões de mídia do navegador ou utilize o upload de arquivo de áudio abaixo.';
+                errorEl.classList.remove('hidden');
+            }
+        }
+    };
+
+    window.handleAudioFileSelect = function(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        recordedAudioBlob = file;
+        const playback = document.getElementById('audio-playback');
+        const submitContainer = document.getElementById('audio-submit-container');
+        const statusEl = document.getElementById('audio-record-status');
+        if (playback) {
+            playback.src = URL.createObjectURL(file);
+            playback.classList.remove('hidden');
+        }
+        if (submitContainer) submitContainer.classList.remove('hidden');
+        if (statusEl) statusEl.textContent = `Arquivo carregado: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+    };
+
+    window.submitAudioEvaluation = async function(questionId) {
+        if (!recordedAudioBlob) return;
+        const loadingEl = document.getElementById('audio-eval-loading');
+        const resultEl = document.getElementById('audio-eval-result');
+        const errorEl = document.getElementById('audio-eval-error');
+        const submitBtn = document.getElementById('btn-submit-audio-eval');
+
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        if (resultEl) resultEl.classList.add('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append('audio_file', recordedAudioBlob, 'resposta_audio.webm');
+
+            const resp = await fetch(`/api/v1/questions/${questionId}/evaluate-audio`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+
+            const data = await resp.json();
+            if (!resp.ok) {
+                throw new Error(data.detail || 'Falha ao processar avaliação por áudio.');
+            }
+
+            window.__activeAudioScore = data.score;
+            window.__lastAudioTranscript = data.transcribed_text || '';
+
+            const scoreBadge = document.getElementById('audio-result-score-badge');
+            const transcribedEl = document.getElementById('audio-transcribed-text');
+            const feedbackEl = document.getElementById('audio-feedback-text');
+            const covMetric = document.getElementById('audio-coverage-metric');
+            const accMetric = document.getElementById('audio-accuracy-metric');
+            const depMetric = document.getElementById('audio-depth-metric');
+
+            if (scoreBadge) scoreBadge.textContent = `${data.score}% de Domínio`;
+            if (transcribedEl) transcribedEl.textContent = `"${data.transcribed_text}"`;
+            if (feedbackEl) feedbackEl.textContent = data.feedback;
+            if (covMetric) covMetric.textContent = `${data.coverage_score}%`;
+            if (accMetric) accMetric.textContent = `${data.accuracy_score}%`;
+            if (depMetric) depMetric.textContent = `${data.depth_score}%`;
+
+            if (resultEl) resultEl.classList.remove('hidden');
+        } catch (err) {
+            console.error('Erro na avaliação de áudio:', err);
+            if (errorEl) {
+                errorEl.textContent = err.message || 'Erro ao comunicar com o serviço de avaliação por IA.';
+                errorEl.classList.remove('hidden');
+            }
+        } finally {
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    };
+
+    window.applyAudioScoreToCard = function() {
+        if (window.__activeAudioScore !== null) {
+            if (typeof revealAnswer === 'function' && !window.isAnswerRevealed) {
+                revealAnswer();
+            }
+            if (typeof syncSlider === 'function') {
+                syncSlider(window.__activeAudioScore);
+            }
+            const slider = document.getElementById('score-slider');
+            if (slider) slider.value = window.__activeAudioScore;
+        }
+        window.closeAudioModal();
+        const confirmBtn = document.getElementById('btn-confirm-review');
+        if (confirmBtn) confirmBtn.focus();
+    };
+
+    window.openDisputeModalFromAudio = function() {
+        const transcript = window.__lastAudioTranscript || '';
+        window.closeAudioModal();
+        window.openDisputeModal(transcript);
+    };
+
+    // --- Modal Contestação / Conselho Multiagente ---
+    window.openDisputeModal = function(initialAnswer) {
+        window.__lastFocusedElement = document.activeElement;
+        const modal = document.getElementById('dispute-modal');
+        const trigger = document.getElementById('btn-dispute-evaluation');
+        const answerInput = document.getElementById('dispute-student-answer');
+        const argInput = document.getElementById('dispute-argument');
+
+        if (initialAnswer && answerInput) {
+            answerInput.value = initialAnswer;
+        } else if (answerInput && !answerInput.value && window.__lastAudioTranscript) {
+            answerInput.value = window.__lastAudioTranscript;
+        }
+
+        if (modal) {
+            modal.classList.remove('hidden');
+            if (trigger) trigger.setAttribute('aria-expanded', 'true');
+            if (argInput) argInput.focus();
+        }
+    };
+
+    window.closeDisputeModal = function() {
+        const modal = document.getElementById('dispute-modal');
+        const trigger = document.getElementById('btn-dispute-evaluation');
+        if (modal) {
+            modal.classList.add('hidden');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+            if (window.__lastFocusedElement) window.__lastFocusedElement.focus();
+        }
+    };
+
+    window.updateDisputeCharCounter = function(textarea) {
+        const counter = document.getElementById('dispute-char-counter');
+        if (counter && textarea) {
+            const count = textarea.value.length;
+            counter.textContent = `${count} / 5000`;
+            if (count < 5) {
+                counter.className = 'text-[11px] text-rose-500 font-semibold';
+            } else {
+                counter.className = 'text-[11px] text-slate-400 dark:text-slate-500';
+            }
+        }
+    };
+
+    window.submitDispute = async function(questionId) {
+        const studentAnswer = (document.getElementById('dispute-student-answer')?.value || '').trim();
+        const disputeArg = (document.getElementById('dispute-argument')?.value || '').trim();
+        const loadingEl = document.getElementById('dispute-loading');
+        const resultEl = document.getElementById('dispute-result');
+        const errorEl = document.getElementById('dispute-error');
+        const submitBtn = document.getElementById('btn-submit-dispute');
+
+        if (!studentAnswer) {
+            if (errorEl) {
+                errorEl.textContent = 'Por favor, informe a resposta dissertativa para apreciação do conselho.';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+        if (disputeArg.length < 5) {
+            if (errorEl) {
+                errorEl.textContent = 'O argumento da contestação deve conter no mínimo 5 caracteres.';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        if (resultEl) resultEl.classList.add('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            const resp = await fetch(`/api/v1/questions/${questionId}/dispute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    student_answer: studentAnswer,
+                    dispute_argument: disputeArg
+                }),
+                credentials: 'same-origin'
+            });
+
+            const data = await resp.json();
+            if (!resp.ok) {
+                throw new Error(data.detail || 'Falha ao processar julgamento do conselho.');
+            }
+
+            window.__activeDisputeRevisedScore = data.revised_score;
+
+            const verdictBadge = document.getElementById('dispute-verdict-badge');
+            const prevScoreEl = document.getElementById('dispute-prev-score');
+            const revScoreEl = document.getElementById('dispute-revised-score');
+            const advocateEl = document.getElementById('dispute-advocate-rationale');
+            const criticEl = document.getElementById('dispute-critic-rationale');
+            const arbEl = document.getElementById('dispute-arbitrator-verdict');
+            const refundBanner = document.getElementById('dispute-refund-banner');
+
+            if (verdictBadge) {
+                if (data.status === 'OVERTURNED') {
+                    verdictBadge.textContent = 'Decisão Reformada (Procedente)';
+                    verdictBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200';
+                } else if (data.status === 'PARTIAL_OVERTURN') {
+                    verdictBadge.textContent = 'Decisão Parcialmente Reformada';
+                    verdictBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200';
+                } else {
+                    verdictBadge.textContent = 'Decisão Mantida (Improcedente)';
+                    verdictBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
+                }
+            }
+
+            if (prevScoreEl) prevScoreEl.textContent = `${data.previous_score}%`;
+            if (revScoreEl) revScoreEl.textContent = `${data.revised_score}%`;
+            if (advocateEl) advocateEl.textContent = data.advocate_rationale;
+            if (criticEl) criticEl.textContent = data.critic_rationale;
+            if (arbEl) arbEl.textContent = data.arbitrator_verdict;
+
+            if (refundBanner) {
+                if (data.refund_dispute_tokens) {
+                    refundBanner.classList.remove('hidden');
+                } else {
+                    refundBanner.classList.add('hidden');
+                }
+            }
+
+            if (resultEl) resultEl.classList.remove('hidden');
+        } catch (err) {
+            console.error('Erro na contestação multiagente:', err);
+            if (errorEl) {
+                errorEl.textContent = err.message || 'Erro ao conectar com o conselho multiagente.';
+                errorEl.classList.remove('hidden');
+            }
+        } finally {
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    };
+
+    window.applyDisputeScoreToCard = function() {
+        if (window.__activeDisputeRevisedScore !== null) {
+            if (typeof revealAnswer === 'function' && !window.isAnswerRevealed) {
+                revealAnswer();
+            }
+            if (typeof syncSlider === 'function') {
+                syncSlider(window.__activeDisputeRevisedScore);
+            }
+            const slider = document.getElementById('score-slider');
+            if (slider) slider.value = window.__activeDisputeRevisedScore;
+        }
+        window.closeDisputeModal();
+        const confirmBtn = document.getElementById('btn-confirm-review');
+        if (confirmBtn) confirmBtn.focus();
+    };
+
+    // Fechar modais ao teclar Escape
+    if (!window.__modalEscapeListenerBound) {
+        window.__modalEscapeListenerBound = true;
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const audioModal = document.getElementById('audio-answer-modal');
+                const disputeModal = document.getElementById('dispute-modal');
+                if (audioModal && !audioModal.classList.contains('hidden')) {
+                    window.closeAudioModal();
+                } else if (disputeModal && !disputeModal.classList.contains('hidden')) {
+                    window.closeDisputeModal();
+                }
+            }
+        });
+    }
 </script>
+

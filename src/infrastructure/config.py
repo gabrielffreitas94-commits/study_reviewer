@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = ""
 
+    # Google Gemini AI
+    GEMINI_API_KEY: str = ""
+
     # Redis Cache & Efêmero
     REDIS_URL: str = "redis://localhost:6379/0"
 

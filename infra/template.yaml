@@ -46,6 +46,12 @@ Parameters:
     Default: ""
     Description: 'ARN da Role IAM de execucao do Lambda (se omitido, sera criada pelo template)'
 
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: "Chave da API do Google Gemini para avaliações dissertativas"
+
 Conditions:
   CreateLambdaRole: !Equals [!Ref LambdaRoleArn, ""]
 
@@ -131,6 +137,7 @@ Resources:
           STUDY_EVENTS_BACKEND: "dynamodb"
           DYNAMODB_TABLE_STUDY_EVENTS: !Ref StudyEventsTable
           DYNAMODB_TTL_DAYS: "90"
+          GEMINI_API_KEY: !Ref GeminiApiKey
       Tags:
         - Key: Project
           Value: StudyReviewer

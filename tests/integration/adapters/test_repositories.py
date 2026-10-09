@@ -265,3 +265,32 @@ def test_flashcard_repository_multi_topic_operations(db_session: Session) -> Non
     reloaded = card_repo.get_by_id(card.id)
     assert reloaded is not None
     assert reloaded.topic_ids == (t1.id,)
+
+
+@pytest.mark.integration
+def test_flashcard_repository_save_single_commit(db_session: Session) -> None:
+    """Verifica atomicidade Unit of Work: save() deve realizar exatamente um commit no final."""
+    sub_repo = SqlAlchemySubjectRepository(db_session)
+    topic_repo = SqlAlchemyTopicRepository(db_session)
+    sub = Subject(name="Direito Administrativo")
+    sub_repo.save(sub)
+    topic = Topic(subject_id=sub.id, name="Atos")
+    topic_repo.save(topic)
+
+    card = Flashcard(topic_id=topic.id, front="Pergunta", back="Resposta", position=10)
+    card_repo = SqlAlchemyFlashcardRepository(db_session)
+
+    real_commit = db_session.commit
+    commit_count = 0
+
+    def spy_commit() -> None:
+        nonlocal commit_count
+        commit_count += 1
+        real_commit()
+
+    db_session.commit = spy_commit  # type: ignore[method-assign]
+    try:
+        card_repo.save(card)
+        assert commit_count == 1
+    finally:
+        db_session.commit = real_commit  # type: ignore[method-assign]

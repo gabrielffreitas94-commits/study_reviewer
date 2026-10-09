@@ -5,7 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GetNextCardDTO:
     """Filtros para obtenção do próximo card."""
 
@@ -14,7 +14,7 @@ class GetNextCardDTO:
     current_index: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StudyCardDTO:
     """Card formatado para estudo ativo (ADR-004)."""
 
@@ -38,7 +38,7 @@ class StudyCardDTO:
             object.__setattr__(self, "topic_id", self.topic_ids[0])
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StudyBatchDTO:
     """Lote paginado de flashcards para estudo (ex: 100 cards por requisição)."""
 
@@ -48,7 +48,7 @@ class StudyBatchDTO:
     has_more: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StudyEventDTO:
     """Evento individual de revisão de card registrado pelo estudante (PRD v7.0)."""
 
@@ -60,7 +60,7 @@ class StudyEventDTO:
     device_id: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SyncStudyBatchDTO:
     """Lote de eventos para sincronização de progresso e convergência de cursor."""
 
@@ -69,7 +69,7 @@ class SyncStudyBatchDTO:
     batch_index: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SyncStudyResultDTO:
     """Resultado da ingestão em lote de eventos de estudo."""
 
