@@ -1,0 +1,36 @@
+name: Fetch Lambda CloudWatch Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: 'Período retroativo (ex: 30m, 1h, 3h, 24h)'
+        required: false
+        default: '3h'
+      limit:
+        description: 'Limite de eventos'
+        required: false
+        default: '100'
+
+jobs:
+  fetch-logs:
+    name: Fetch CloudWatch Logs
+    runs-on: ubuntu-latest
+    if: github.repository == 'gabrielffreitas94-commits/study_reviewer'
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'sa-east-1' }}
+
+      - name: Fetch Recent CloudWatch Log Events
+        run: |
+          echo "=========================================================="
+          echo ">>> Buscando logs recentes do CloudWatch para a Lambda <<<"
+          echo "Log Group: /aws/lambda/study-reviewer-staging"
+          echo "Since: ${{ github.event.inputs.since || '3h' }}"
+          echo "=========================================================="
+          aws logs tail "/aws/lambda/study-reviewer-staging" --since "${{ github.event.inputs.since || '3h' }}" --format short
