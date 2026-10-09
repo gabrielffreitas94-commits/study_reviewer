@@ -7,6 +7,14 @@ on:
         description: 'Ambiente de Deploy (staging ou production)'
         required: true
         default: 'staging'
+      fetch_logs_only:
+        description: 'Apenas consultar logs do CloudWatch sem executar deploy (true/false)'
+        required: false
+        default: 'false'
+      since:
+        description: 'Período retroativo de logs (ex: 30m, 1h, 3h, 24h)'
+        required: false
+        default: '3h'
   push:
     branches:
       - staging
@@ -33,15 +41,18 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION || 'sa-east-1' }}
 
       - name: Install uv and Python
+        if: github.event.inputs.fetch_logs_only != 'true'
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
           version: "latest"
 
       - name: Set up Python 3.13
+        if: github.event.inputs.fetch_logs_only != 'true'
         run: uv python install 3.13
 
       - name: Execute Alembic Database Migrations
+        if: github.event.inputs.fetch_logs_only != 'true'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -53,10 +64,12 @@ jobs:
           fi
 
       - name: Log in to Amazon ECR
+        if: github.event.inputs.fetch_logs_only != 'true'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Ensure ECR Repository Exists
+        if: github.event.inputs.fetch_logs_only != 'true'
         env:
           AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
         run: |
@@ -64,6 +77,7 @@ jobs:
           aws ecr create-repository --repository-name study-reviewer --region $AWS_REGION
 
       - name: Build, Tag and Push Container Image to ECR
+        if: github.event.inputs.fetch_logs_only != 'true'
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.event.inputs.environment || 'staging' }}
@@ -74,6 +88,7 @@ jobs:
           docker push $ECR_REGISTRY/study-reviewer:$IMAGE_TAG
 
       - name: Deploy CloudFormation Stack (Lambda + Function URL + DynamoDB)
+        if: github.event.inputs.fetch_logs_only != 'true'
         env:
           ENV_NAME: ${{ github.event.inputs.environment || 'staging' }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
@@ -99,6 +114,7 @@ jobs:
                 LambdaRoleArn="$ROLE_ARN" \
                 GeminiApiKey="${{ secrets.GEMINI_API_KEY || '' }}" \
                 GeminiModel="gemini-3.8-flash" \
+                RateLimitPerMinute=120 \
             --region $AWS_REGION
 
           echo "==> Atualizando código da função Lambda com o digest mais recente do ECR..."
@@ -112,6 +128,7 @@ jobs:
             --region $AWS_REGION
 
       - name: Output Public Production URL
+        if: github.event.inputs.fetch_logs_only != 'true'
         env:
           ENV_NAME: ${{ github.event.inputs.environment || 'staging' }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
@@ -126,3 +143,19 @@ jobs:
             --output text)
           echo "URL Pública: $PROD_URL"
           echo "production_url=$PROD_URL" >> $GITHUB_ENV
+
+      - name: Fetch and Display CloudWatch Logs
+        if: github.event.inputs.fetch_logs_only == 'true' || always()
+        env:
+          ENV_NAME: ${{ github.event.inputs.environment || 'staging' }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
+          SINCE: ${{ github.event.inputs.since || '3h' }}
+        run: |
+          echo "=========================================================="
+          echo ">>> CloudWatch Logs: /aws/lambda/study-reviewer-$ENV_NAME <<<"
+          echo "Region: $AWS_REGION | Since: $SINCE"
+          echo "=========================================================="
+          aws logs tail "/aws/lambda/study-reviewer-$ENV_NAME" \
+            --since "$SINCE" \
+            --format short \
+            --region "$AWS_REGION" || true
