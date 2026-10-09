@@ -1,7 +1,11 @@
 """Adaptadores concretos de Inteligência Artificial e Embeddings (Camada 3 - Adaptadores)."""
 
 import hashlib
+import json
+import logging
 import math
+
+import httpx
 
 from src.domain.entities import (
     AnswerEvaluationResult,
@@ -16,6 +20,8 @@ from src.domain.protocols import (
     IKnowledgeValidationService,
     IMultiAgentDisputeService,
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_GEMINI_MODEL: str = "gemini-3.8-flash"
 
@@ -187,6 +193,16 @@ class GeminiAnswerEvaluationAdapter(IAnswerEvaluationService):
                 evaluation_mode="AI_TEXT",
             )
 
+        if self._api_key:
+            api_result = await self._call_gemini_api(
+                prompt=prompt,
+                expected_answer=expected_answer,
+                student_answer=student_answer,
+                context_chunks=context_chunks,
+            )
+            if api_result is not None:
+                return api_result
+
         # 3. Análise semântica e factual contra gabarito e evidências
         expected_words = {
             w.strip(".,;:?!\"'()[]{}")
@@ -250,6 +266,106 @@ class GeminiAnswerEvaluationAdapter(IAnswerEvaluationService):
             cached_context=len(context_chunks) > 0,
             evaluation_mode="AI_TEXT",
         )
+
+    async def _call_gemini_api(
+        self,
+        prompt: str,
+        expected_answer: str,
+        student_answer: str,
+        context_chunks: list[str],
+    ) -> AnswerEvaluationResult | None:
+        """Executa a chamada HTTP à API REST do Google Gemini 3.8 Flash."""
+        if not self._api_key:
+            return None
+
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{self._model}:generateContent?key={self._api_key}"
+        )
+        context_text = (
+            "\n\n".join(f"- {c}" for c in context_chunks)
+            if context_chunks
+            else "Nenhum contexto adicional."
+        )
+        system_instruction = (
+            "Você é um tutor pedagógico avaliando a resposta dissertativa de um estudante. "
+            "Avalie o alinhamento factual com o gabarito oficial e o material de apoio. "
+            "Retorne APENAS um objeto JSON válido com as seguintes chaves: "
+            "'score' (inteiro 0-100), 'feedback' (string construtiva em português), "
+            "'coverage_score' (inteiro 0-100), 'accuracy_score' (inteiro 0-100), "
+            "'depth_score' (inteiro 0-100), 'evidence_quotes' (lista de até 3 strings)."
+        )
+        user_prompt = (
+            f"Enunciado da Pergunta:\n{prompt}\n\n"
+            f"Gabarito Oficial Esperado:\n{expected_answer}\n\n"
+            f"Fontes Bibliográficas:\n{context_text}\n\n"
+            f"Resposta do Estudante:\n"
+            f"<student_answer_untrusted>{student_answer}</student_answer_untrusted>"
+        )
+
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": f"{system_instruction}\n\n{user_prompt}"}],
+                }
+            ],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "temperature": 0.2,
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(url, json=payload)
+                if resp.status_code != 200:
+                    logger.warning(
+                        "gemini_api_status_error: status=%s model=%s",
+                        resp.status_code,
+                        self._model,
+                    )
+                    return None
+                data = resp.json()
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    return None
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if not parts or "text" not in parts[0]:
+                    return None
+                text_content = parts[0]["text"].strip()
+                parsed = json.loads(text_content)
+
+                score = int(parsed.get("score", 0))
+                score = max(0, min(100, score))
+                feedback = str(parsed.get("feedback", "Avaliação concluída pela IA."))
+                coverage = int(parsed.get("coverage_score", score))
+                accuracy = int(parsed.get("accuracy_score", score))
+                depth = int(parsed.get("depth_score", score))
+                evidence_quotes = list(parsed.get("evidence_quotes", []))
+                usage_metadata = data.get("usageMetadata", {})
+                tokens_used = usage_metadata.get(
+                    "totalTokenCount",
+                    120 + len(student_answer) // 4 + len(expected_answer) // 4,
+                )
+
+                return AnswerEvaluationResult(
+                    score=score,
+                    feedback=feedback,
+                    coverage_score=max(0, min(100, coverage)),
+                    accuracy_score=max(0, min(100, accuracy)),
+                    depth_score=max(0, min(100, depth)),
+                    evidence_quotes=tuple(evidence_quotes[:3]),
+                    tokens_used=int(tokens_used),
+                    cached_context=len(context_chunks) > 0,
+                    evaluation_mode="AI_TEXT",
+                )
+        except Exception as exc:
+            logger.warning(
+                "gemini_api_call_exception: error=%s. Ativando fallback determinístico.",
+                exc,
+            )
+            return None
 
 
 class GeminiAudioEvaluationAdapter(IAudioAnswerEvaluationService):

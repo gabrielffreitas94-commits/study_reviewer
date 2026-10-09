@@ -97,6 +97,8 @@ jobs:
                 GoogleClientSecret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
                 GoogleRedirectUri="${{ secrets.GOOGLE_REDIRECT_URI || '' }}" \
                 LambdaRoleArn="$ROLE_ARN" \
+                GeminiApiKey="${{ secrets.GEMINI_API_KEY || '' }}" \
+                GeminiModel="gemini-3.8-flash" \
             --region $AWS_REGION
 
           echo "==> Atualizando código da função Lambda com o digest mais recente do ECR..."

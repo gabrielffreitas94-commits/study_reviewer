@@ -341,13 +341,28 @@ class ReviewQuestionUseCase:
             )
 
         today = self._clock.today()
-        if progress.next_review_date > today:
+        is_confirming_ai_review = False
+        previous_level = progress.current_level
+
+        if self._audit_repo is not None:
+            recent_logs = self._audit_repo.list_by_user(user_id=user_id, limit=20)
+            today_logs = [
+                log
+                for log in recent_logs
+                if log.question_id == dto.question_id and log.review_date == today
+            ]
+            if today_logs:
+                latest_log = today_logs[0]
+                if latest_log.evaluation_mode != "MANUAL":
+                    is_confirming_ai_review = True
+                    previous_level = today_logs[-1].level_before
+
+        if progress.next_review_date > today and not is_confirming_ai_review:
             raise QuestionNotDueError(
                 f"A pergunta '{dto.question_id}' não está vencida para revisão "
                 f"(vencimento: {progress.next_review_date})."
             )
 
-        previous_level = progress.current_level
         new_level, next_date = SpacingPolicyService.calculate_next_schedule(
             current_level=previous_level,
             score=dto.score,

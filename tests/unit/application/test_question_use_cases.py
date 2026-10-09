@@ -1,6 +1,6 @@
 """Testes unitários para os casos de uso de Perguntas Abertas e SRS Estrito (Sprint 03)."""
 
-from datetime import date
+from datetime import date, timedelta
 from uuid import uuid4
 
 import pytest
@@ -19,7 +19,7 @@ from src.application.use_cases.question_use_cases import (
     ReviewQuestionUseCase,
     UpdateQuestionUseCase,
 )
-from src.domain.entities import Question, Subject, Topic, UserQuestionProgress
+from src.domain.entities import Question, ReviewAuditLog, Subject, Topic, UserQuestionProgress
 from src.domain.exceptions import (
     EntityNotFoundError,
     QuestionNotDueError,
@@ -525,6 +525,65 @@ def test_review_question_premature_review_rejected(repos: RepoFixture) -> None:
 
     use_case = ReviewQuestionUseCase(prog_repo, q_repo, top_repo, subj_repo, clock)
     with pytest.raises(QuestionNotDueError, match="não está vencida para revisão"):
+        use_case.execute(ReviewQuestionInputDTO(question_id=q.id, score=100), user_id=user_id)
+
+
+@pytest.mark.unit
+def test_review_question_confirm_ai_evaluation_same_day(repos: RepoFixture) -> None:
+    """Verifica que confirmação humana pós-avaliação de IA é permitida no mesmo dia
+    sem erro de vencimento.
+    """
+    subj_repo, top_repo, q_repo, prog_repo, clock = repos
+    user_id = uuid4()
+    subj = Subject(id=uuid4(), name="Biologia", owner_id=user_id)
+    subj_repo.save(subj)
+    topic = Topic(id=uuid4(), subject_id=subj.id, name="Citologia")
+    top_repo.save(topic)
+    q = Question(id=uuid4(), topic_id=topic.id, prompt="Q?", expected_answer="A")
+    q_repo.save(q)
+
+    # Simula progresso que foi atualizado pela IA hoje para amanhã (nível 1)
+    today = clock.today()
+    prog = UserQuestionProgress(
+        user_id=user_id,
+        question_id=q.id,
+        current_level=1,
+        next_review_date=today + timedelta(days=1),
+        last_reviewed_at=clock.now(),
+    )
+    prog_repo.save(prog)
+
+    # Registra o log da IA com level_before=0, level_after=1
+    audit_repo = FakeReviewAuditRepository()
+    audit_log = ReviewAuditLog(
+        user_id=user_id,
+        question_id=q.id,
+        subject_id=subj.id,
+        topic_id=topic.id,
+        historical_subject_name=subj.name,
+        historical_topic_name=topic.name,
+        review_date=today,
+        score=85,
+        level_before=0,
+        level_after=1,
+        evaluation_mode="AI_TEXT",
+        logged_at=clock.now(),
+    )
+    audit_repo.save(audit_log)
+
+    # Estudante confirma a nota 100 via Confirmar e Próxima
+    use_case = ReviewQuestionUseCase(
+        prog_repo, q_repo, top_repo, subj_repo, clock, audit_repo=audit_repo
+    )
+    res = use_case.execute(ReviewQuestionInputDTO(question_id=q.id, score=100), user_id=user_id)
+
+    # Confirmação bem-sucedida: baseada no previous_level=0 (não promove duplamente para nível 2)
+    assert res.previous_level == 0
+    assert res.new_level == 1
+    assert res.is_promoted is True
+
+    # Se tentar revisar novamente após confirmação manual, é rejeitado
+    with pytest.raises(QuestionNotDueError):
         use_case.execute(ReviewQuestionInputDTO(question_id=q.id, score=100), user_id=user_id)
 
 

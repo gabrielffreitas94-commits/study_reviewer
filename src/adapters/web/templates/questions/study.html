@@ -28,30 +28,59 @@
 <script>
     window.isAnswerRevealed = false;
 
-    function revealAnswer() {
+    window.revealAnswer = function() {
         const answerSection = document.getElementById('expected-answer-section');
-        const revealBtn = document.getElementById('btn-reveal-answer');
         const form = document.getElementById('srs-evaluation-form');
+        const revealBtn = document.getElementById('btn-reveal-answer');
+        const actionContainer = document.getElementById('reveal-action-container');
         const announcer = document.getElementById('srs-announcer');
 
-        if (answerSection && form && revealBtn) {
+        if (answerSection) {
             answerSection.classList.remove('hidden');
-            revealBtn.setAttribute('aria-expanded', 'true');
-            const actionContainer = document.getElementById('reveal-action-container');
-            if (actionContainer) actionContainer.classList.add('hidden');
-
-            form.classList.remove('opacity-40', 'pointer-events-none');
-            window.isAnswerRevealed = true;
-
-            if (announcer) {
-                announcer.textContent = "Resposta esperada revelada. Painel de avaliação habilitado.";
-            }
-
-            const slider = document.getElementById('score-slider');
-            if (slider) {
-                slider.focus();
-            }
         }
+        if (revealBtn) {
+            revealBtn.setAttribute('aria-expanded', 'true');
+        }
+        if (actionContainer) {
+            actionContainer.classList.add('hidden');
+        }
+        if (form) {
+            form.classList.remove('opacity-40', 'pointer-events-none');
+        }
+        window.isAnswerRevealed = true;
+
+        if (announcer) {
+            announcer.textContent = "Resposta esperada revelada. Painel de avaliação habilitado.";
+        }
+
+        const slider = document.getElementById('score-slider');
+        if (slider) {
+            slider.focus();
+        }
+    };
+
+    function revealAnswer() {
+        window.revealAnswer();
+    }
+
+    if (!window.__htmxStudyListenersBound) {
+        window.__htmxStudyListenersBound = true;
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target && evt.detail.target.id === 'srs-study-container') {
+                window.isAnswerRevealed = false;
+            }
+        });
+
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            const container = document.getElementById('srs-study-container');
+            if (container && evt.detail && evt.detail.xhr) {
+                const errorMsg = evt.detail.xhr.responseText || 'Erro ao processar a requisição.';
+                const banner = document.createElement('div');
+                banner.className = 'mb-4 p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200 rounded-xl text-sm flex items-center justify-between';
+                banner.innerHTML = `<span>⚠️ ${errorMsg}</span><button type="button" onclick="this.parentElement.remove()" class="ml-2 font-bold cursor-pointer">&times;</button>`;
+                container.prepend(banner);
+            }
+        });
     }
 
     function applyPreset(val) {
