@@ -130,6 +130,10 @@ def test_study_page_renders_due_question_card_and_active_recall(
     assert 'aria-expanded="false"' in res.text
     assert 'id="srs-evaluation-form"' in res.text
     assert "pointer-events-none" in res.text
+    assert 'id="tab-mode-text"' in res.text
+    assert 'id="student-text-answer"' in res.text
+    assert 'id="btn-submit-text-eval"' in res.text
+    assert 'id="ai-eval-feedback-panel"' in res.text
 
 
 @pytest.mark.integration

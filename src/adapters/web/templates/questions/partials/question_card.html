@@ -21,8 +21,102 @@
             {{ card.prompt | safe }}
         </div>
 
-        <!-- Botão de Revelação do Gabarito (Fase A) -->
-        <div id="reveal-action-container" class="flex justify-center my-6">
+        <!-- Seletor de Modo de Resposta (Segmented Tabs / Pills) -->
+        <div id="answer-mode-selector" class="flex items-center space-x-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 max-w-md mx-auto" role="tablist" aria-label="Modo de resposta da pergunta">
+            <button
+                type="button"
+                role="tab"
+                id="tab-mode-text"
+                aria-selected="true"
+                aria-controls="panel-mode-text"
+                onclick="switchAnswerMode('text')"
+                class="flex-1 py-1.5 px-3 text-xs sm:text-sm font-semibold rounded-lg bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs transition-all cursor-pointer"
+            >
+                ✍️ Digitar Resposta
+            </button>
+            <button
+                type="button"
+                role="tab"
+                id="tab-mode-audio"
+                aria-selected="false"
+                aria-controls="panel-mode-audio"
+                onclick="switchAnswerMode('audio')"
+                class="flex-1 py-1.5 px-3 text-xs sm:text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all cursor-pointer"
+            >
+                🎙️ Responder por Áudio
+            </button>
+            <button
+                type="button"
+                role="tab"
+                id="tab-mode-manual"
+                aria-selected="false"
+                aria-controls="panel-mode-manual"
+                onclick="switchAnswerMode('manual')"
+                class="flex-1 py-1.5 px-3 text-xs sm:text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all cursor-pointer"
+            >
+                💡 Gabarito Direto
+            </button>
+        </div>
+
+        <!-- Painel 1: Resposta Dissertativa por Texto (#panel-mode-text) -->
+        <div id="panel-mode-text" role="tabpanel" aria-labelledby="tab-mode-text" class="mb-5 space-y-3">
+            <div class="relative">
+                <label for="student-text-answer" class="sr-only">Sua resposta dissertativa para avaliação pela IA</label>
+                <textarea
+                    id="student-text-answer"
+                    rows="4"
+                    maxlength="5000"
+                    placeholder="Digite sua resposta dissertativa aqui... Explique os conceitos solicitados no enunciado com suas próprias palavras."
+                    oninput="handleTextInputChange(this, '{{ card.question_id }}')"
+                    onkeydown="handleTextKeydown(event, '{{ card.question_id }}')"
+                    class="w-full text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 p-3.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all leading-relaxed resize-y min-h-[110px]"
+                ></textarea>
+                <div class="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-1 px-1">
+                    <span>Atalho: <kbd class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono">Ctrl + Enter</kbd> para avaliar</span>
+                    <span id="text-char-counter">0 / 5000</span>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div class="inline-flex items-center text-[11px] text-slate-500 dark:text-slate-400 bg-indigo-50/50 dark:bg-indigo-950/30 px-2.5 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-900/40">
+                    <span class="mr-1.5" aria-hidden="true">✨</span>
+                    <span>Avaliação com RAG Grounding & Gemini 1.5 Flash (~500 tokens)</span>
+                </div>
+                <button
+                    type="button"
+                    id="btn-submit-text-eval"
+                    onclick="submitTextEvaluation('{{ card.question_id }}')"
+                    class="inline-flex items-center justify-center min-h-[44px] px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all transform active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span class="mr-1.5" aria-hidden="true">✨</span>
+                    <span>Avaliar Resposta com IA</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Painel 2: Resposta por Voz / Áudio (#panel-mode-audio) -->
+        <div id="panel-mode-audio" role="tabpanel" aria-labelledby="tab-mode-audio" class="hidden mb-5 p-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-center space-y-3">
+            <div class="flex items-center justify-center space-x-2 text-indigo-600 dark:text-indigo-400">
+                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                <span class="font-bold text-sm text-slate-800 dark:text-slate-100">Avaliação por Áudio com IA Multimodal</span>
+            </div>
+            <p class="text-xs text-slate-600 dark:text-slate-300 max-w-md mx-auto leading-relaxed">
+                Fale sua resposta naturalmente. O modelo Gemini Multimodal transcreverá sua fala e avaliará seu domínio conceitual frente ao gabarito oficial com privacidade efêmera (LGPD Art. 16).
+            </p>
+            <div>
+                <button
+                    type="button"
+                    onclick="openAudioModal()"
+                    class="inline-flex items-center justify-center min-h-[44px] px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all transform active:scale-95 cursor-pointer"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                    <span>Gravar Resposta por Voz</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Painel 3: Revelação Direta sem IA (#panel-mode-manual) -->
+        <div id="panel-mode-manual" role="tabpanel" aria-labelledby="tab-mode-manual" class="hidden mb-5 text-center py-4">
             <button
                 type="button"
                 id="btn-reveal-answer"
@@ -35,6 +129,81 @@
                 <span class="mr-2" aria-hidden="true">💡</span>
                 <span>Revelar Resposta Esperada</span>
             </button>
+        </div>
+
+        <!-- Estado de Carregamento da IA (Skeleton Zero CLS) -->
+        <div id="ai-eval-loading-state" class="hidden mb-5 p-5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 flex flex-col items-center justify-center space-y-3" role="status" aria-live="polite">
+            <svg class="animate-spin h-7 w-7 text-indigo-600 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <div class="text-center">
+                <div class="text-xs sm:text-sm font-bold text-indigo-900 dark:text-indigo-200">Avaliando resposta com IA...</div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Consultando material de referência (RAG) e ponderando critérios do gabarito.</div>
+            </div>
+        </div>
+
+        <!-- Banner de Erro / Saldo de Tokens Insuficiente -->
+        <div id="ai-eval-error-banner" class="hidden mb-4 p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 space-y-1.5" role="alert">
+            <div class="font-bold flex items-center">
+                <span class="mr-1.5" aria-hidden="true">⚠️</span>
+                <span id="ai-error-title">Atenção</span>
+            </div>
+            <p id="ai-error-message" class="leading-relaxed"></p>
+        </div>
+
+        <!-- Painel Unificado de Feedback da IA -->
+        <div id="ai-eval-feedback-panel" class="hidden mb-6 p-4 sm:p-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-4" role="region" aria-label="Resultado da Avaliação por IA">
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/60 dark:border-slate-700/60">
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Avaliação da IA Pedagógica</span>
+                    <span id="ai-feedback-score-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-200">
+                        --% de Domínio
+                    </span>
+                </div>
+                <div id="ai-tokens-info" class="text-[11px] text-slate-500 dark:text-slate-400 font-medium"></div>
+            </div>
+
+            <!-- Grade de Subscores: Cobertura, Precisão e Profundidade -->
+            <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                <div class="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
+                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Cobertura</div>
+                    <div id="ai-coverage-metric" class="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5">--</div>
+                </div>
+                <div class="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
+                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Precisão</div>
+                    <div id="ai-accuracy-metric" class="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5">--</div>
+                </div>
+                <div class="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
+                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Profundidade</div>
+                    <div id="ai-depth-metric" class="font-extrabold text-slate-800 dark:text-slate-100 text-sm mt-0.5">--</div>
+                </div>
+            </div>
+
+            <!-- Feedback Pedagógico Estruturado -->
+            <div class="p-3.5 bg-indigo-50/60 dark:bg-indigo-950/40 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
+                <div class="text-[11px] font-bold text-indigo-900 dark:text-indigo-300 uppercase tracking-wider mb-1 flex items-center">
+                    <span class="mr-1.5" aria-hidden="true">💡</span>
+                    <span>Feedback & Recomendações:</span>
+                </div>
+                <p id="ai-feedback-text" class="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed"></p>
+            </div>
+
+            <!-- Ações de Contestação e Ajuste -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                <span class="text-slate-500 dark:text-slate-400 text-[11px]">
+                    👉 A nota foi preenchida no slider abaixo. Você pode ajustá-la livremente antes de confirmar.
+                </span>
+                <button
+                    type="button"
+                    id="btn-contest-from-ai"
+                    onclick="openDisputeModalFromAI()"
+                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors cursor-pointer"
+                >
+                    <span class="mr-1" aria-hidden="true">⚖️</span>
+                    <span>Contestar Avaliação</span>
+                </button>
+            </div>
         </div>
 
         <!-- Gabarito Esperado (Fase B - Oculto inicialmente) -->
@@ -536,8 +705,196 @@
     window.isAnswerRevealed = false;
     window.__activeAudioScore = null;
     window.__lastAudioTranscript = '';
+    window.__lastStudentAnswer = '';
     window.__activeDisputeRevisedScore = null;
     window.__lastFocusedElement = null;
+
+    // --- Gerenciamento de Modos de Resposta (Texto, Áudio, Manual) ---
+    window.switchAnswerMode = function(mode) {
+        const tabText = document.getElementById('tab-mode-text');
+        const tabAudio = document.getElementById('tab-mode-audio');
+        const tabManual = document.getElementById('tab-mode-manual');
+        const panelText = document.getElementById('panel-mode-text');
+        const panelAudio = document.getElementById('panel-mode-audio');
+        const panelManual = document.getElementById('panel-mode-manual');
+
+        const activeTabClass = 'flex-1 py-1.5 px-3 text-xs sm:text-sm font-semibold rounded-lg bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs transition-all cursor-pointer';
+        const inactiveTabClass = 'flex-1 py-1.5 px-3 text-xs sm:text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all cursor-pointer';
+
+        if (tabText) {
+            tabText.className = (mode === 'text') ? activeTabClass : inactiveTabClass;
+            tabText.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
+        }
+        if (tabAudio) {
+            tabAudio.className = (mode === 'audio') ? activeTabClass : inactiveTabClass;
+            tabAudio.setAttribute('aria-selected', mode === 'audio' ? 'true' : 'false');
+        }
+        if (tabManual) {
+            tabManual.className = (mode === 'manual') ? activeTabClass : inactiveTabClass;
+            tabManual.setAttribute('aria-selected', mode === 'manual' ? 'true' : 'false');
+        }
+
+        if (panelText) panelText.classList.toggle('hidden', mode !== 'text');
+        if (panelAudio) panelAudio.classList.toggle('hidden', mode !== 'audio');
+        if (panelManual) panelManual.classList.toggle('hidden', mode !== 'manual');
+
+        if (mode === 'text') {
+            const textarea = document.getElementById('student-text-answer');
+            if (textarea) textarea.focus();
+        }
+    };
+
+    window.handleTextInputChange = function(textarea, questionId) {
+        const counter = document.getElementById('text-char-counter');
+        if (counter && textarea) {
+            counter.textContent = `${textarea.value.length} / 5000`;
+        }
+        if (textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 360) + 'px';
+            try {
+                if (questionId) {
+                    sessionStorage.setItem('draft_q_' + questionId, textarea.value);
+                }
+            } catch (_) {}
+        }
+    };
+
+    window.handleTextKeydown = function(event, questionId) {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            window.submitTextEvaluation(questionId);
+        }
+    };
+
+    window.submitTextEvaluation = async function(questionId) {
+        const textarea = document.getElementById('student-text-answer');
+        const studentAnswer = (textarea?.value || '').trim();
+        const loadingEl = document.getElementById('ai-eval-loading-state');
+        const feedbackEl = document.getElementById('ai-eval-feedback-panel');
+        const errorEl = document.getElementById('ai-eval-error-banner');
+        const errorTitle = document.getElementById('ai-error-title');
+        const errorMsg = document.getElementById('ai-error-message');
+        const submitBtn = document.getElementById('btn-submit-text-eval');
+        const announcer = document.getElementById('srs-announcer');
+
+        if (!studentAnswer || studentAnswer.length < 3) {
+            if (errorEl && errorMsg && errorTitle) {
+                errorTitle.textContent = 'Resposta muito curta';
+                errorMsg.textContent = 'Por favor, digite uma resposta dissertativa com pelo menos 3 caracteres para que a IA possa avaliar.';
+                errorEl.classList.remove('hidden');
+            }
+            if (textarea) textarea.focus();
+            return;
+        }
+
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        if (feedbackEl) feedbackEl.classList.add('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            const resp = await fetch(`/api/v1/questions/${questionId}/evaluate-text`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_answer: studentAnswer }),
+                credentials: 'same-origin'
+            });
+
+            const data = await resp.json();
+
+            if (resp.status === 402) {
+                // Fallback gracioso: Saldo insuficiente de tokens sem bloquear o estudo
+                if (errorEl && errorMsg && errorTitle) {
+                    errorTitle.textContent = 'Saldo de Tokens Insuficiente';
+                    errorMsg.innerHTML = 'Seu saldo de tokens é insuficiente para avaliação por IA. <strong>O gabarito oficial foi liberado abaixo</strong> para que você continue sua autoavaliação manual normalmente sem qualquer interrupção.';
+                    errorEl.classList.remove('hidden');
+                }
+                if (typeof revealAnswer === 'function' && !window.isAnswerRevealed) {
+                    revealAnswer();
+                }
+                return;
+            }
+
+            if (!resp.ok) {
+                throw new Error(data.detail || 'Não foi possível avaliar sua resposta com a IA.');
+            }
+
+            window.__lastStudentAnswer = studentAnswer;
+            window.__activeAudioScore = data.score;
+
+            // Preenche dados do Painel de Feedback
+            const scoreBadge = document.getElementById('ai-feedback-score-badge');
+            const tokensInfo = document.getElementById('ai-tokens-info');
+            const covMetric = document.getElementById('ai-coverage-metric');
+            const accMetric = document.getElementById('ai-accuracy-metric');
+            const depMetric = document.getElementById('ai-depth-metric');
+            const feedbackText = document.getElementById('ai-feedback-text');
+
+            if (scoreBadge) scoreBadge.textContent = `${data.score}% de Domínio`;
+            if (tokensInfo) tokensInfo.textContent = `${data.tokens_consumed} tokens utilizados`;
+            if (covMetric) covMetric.textContent = `${data.coverage_score}%`;
+            if (accMetric) accMetric.textContent = `${data.accuracy_score}%`;
+            if (depMetric) depMetric.textContent = `${data.depth_score}%`;
+            if (feedbackText) feedbackText.textContent = data.feedback;
+
+            if (feedbackEl) feedbackEl.classList.remove('hidden');
+
+            // Revela gabarito e aplica a nota da IA no slider
+            if (typeof revealAnswer === 'function' && !window.isAnswerRevealed) {
+                revealAnswer();
+            }
+            if (typeof syncSlider === 'function') {
+                syncSlider(data.score);
+            }
+            const slider = document.getElementById('score-slider');
+            if (slider) slider.value = data.score;
+
+            if (announcer) {
+                announcer.textContent = `Avaliação concluída com nota de ${data.score}%. Gabarito revelado. Ajuste a nota ou confirme a próxima.`;
+            }
+
+            // Limpa o rascunho temporário do storage pois já foi submetido com sucesso
+            try {
+                sessionStorage.removeItem('draft_q_' + questionId);
+            } catch (_) {}
+
+            const confirmBtn = document.getElementById('btn-confirm-review');
+            if (confirmBtn) confirmBtn.focus();
+
+        } catch (err) {
+            console.error('Erro na avaliação de texto:', err);
+            if (errorEl && errorMsg && errorTitle) {
+                errorTitle.textContent = 'Falha na Comunicação';
+                errorMsg.textContent = err.message || 'Erro ao conectar com o serviço de avaliação por IA. Seu rascunho permanece salvo.';
+                errorEl.classList.remove('hidden');
+            }
+        } finally {
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    };
+
+    window.openDisputeModalFromAI = function() {
+        const studentAnswer = window.__lastStudentAnswer || (document.getElementById('student-text-answer')?.value || '');
+        window.openDisputeModal(studentAnswer);
+    };
+
+    // Restaura rascunho salvo ao carregar o card
+    (function restoreDraft() {
+        const cardEl = document.getElementById('question-card');
+        const qId = cardEl?.getAttribute('data-question-id');
+        if (qId) {
+            try {
+                const saved = sessionStorage.getItem('draft_q_' + qId);
+                const textarea = document.getElementById('student-text-answer');
+                if (saved && textarea && !textarea.value) {
+                    textarea.value = saved;
+                    window.handleTextInputChange(textarea, qId);
+                }
+            } catch (_) {}
+        }
+    })();
 
     let mediaRecorder = null;
     let audioChunks = [];

@@ -161,4 +161,101 @@ void main() {
       );
     });
   });
+
+  group('evaluateTextQuestion', () {
+    final tEvaluationResponse = <String, dynamic>{
+      'question_id': 'q-1',
+      'score': 90,
+      'feedback': 'Resposta precisa e detalhada.',
+      'coverage_score': 95,
+      'accuracy_score': 90,
+      'depth_score': 85,
+      'tokens_consumed': 480,
+      'remaining_balance': 1520,
+      'rag_grounding_applied': true,
+    };
+
+    test('deve submeter resposta dissertativa e retornar TextEvaluationResultModel', () async {
+      when(
+        () => mockDio.post<Map<String, dynamic>>(
+          ApiConstants.questionEvaluateText('q-1'),
+          data: {'student_answer': 'Mitose gera duas células filhas'},
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: tEvaluationResponse,
+          statusCode: 200,
+          requestOptions: RequestOptions(path: ApiConstants.questionEvaluateText('q-1')),
+        ),
+      );
+
+      final result = await dataSource.evaluateTextQuestion(
+        questionId: 'q-1',
+        studentAnswer: 'Mitose gera duas células filhas',
+      );
+
+      expect(result.questionId, 'q-1');
+      expect(result.score, 90);
+      expect(result.coverageScore, 95);
+      expect(result.accuracyScore, 90);
+      expect(result.depthScore, 85);
+      expect(result.tokensConsumed, 480);
+      expect(result.remainingBalance, 1520);
+      expect(result.ragGroundingApplied, isTrue);
+    });
+
+    test('deve lançar ServerException específica para status 402 de saldo insuficiente', () async {
+      when(
+        () => mockDio.post<Map<String, dynamic>>(
+          ApiConstants.questionEvaluateText('q-1'),
+          data: {'student_answer': 'Resposta sem tokens'},
+        ),
+      ).thenThrow(
+        DioException(
+          type: DioExceptionType.badResponse,
+          requestOptions: RequestOptions(path: ApiConstants.questionEvaluateText('q-1')),
+          response: Response(
+            statusCode: 402,
+            data: {'detail': 'INSUFFICIENT_FUNDS'},
+            requestOptions: RequestOptions(path: ApiConstants.questionEvaluateText('q-1')),
+          ),
+        ),
+      );
+
+      expect(
+        () => dataSource.evaluateTextQuestion(
+          questionId: 'q-1',
+          studentAnswer: 'Resposta sem tokens',
+        ),
+        throwsA(
+          predicate<ServerException>(
+            (e) => e.statusCode == 402 && e.message.contains('Saldo de tokens insuficiente'),
+          ),
+        ),
+      );
+    });
+
+    test('deve lançar NetworkException quando Dio falhar por timeout de rede', () async {
+      when(
+        () => mockDio.post<Map<String, dynamic>>(
+          ApiConstants.questionEvaluateText('q-1'),
+          data: {'student_answer': 'Resposta em conexão lenta'},
+        ),
+      ).thenThrow(
+        DioException(
+          type: DioExceptionType.connectionTimeout,
+          requestOptions: RequestOptions(path: ApiConstants.questionEvaluateText('q-1')),
+          message: 'Timeout ao avaliar resposta com IA',
+        ),
+      );
+
+      expect(
+        () => dataSource.evaluateTextQuestion(
+          questionId: 'q-1',
+          studentAnswer: 'Resposta em conexão lenta',
+        ),
+        throwsA(isA<NetworkException>()),
+      );
+    });
+  });
 }

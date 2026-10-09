@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/text_evaluation_result_entity.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/evaluation_feedback_card.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/question_answer_mode_tabs.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/question_text_input_area.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/score_thumb_selector.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/srs_level_badge.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/subscore_progress_bar.dart';
 
 void main() {
   group('ScoreThumbSelector Widget', () {
@@ -126,6 +131,159 @@ void main() {
         levelAfter: 2,
       );
       expect(maintBadge.type, SrsBadgeType.maintenance);
+    });
+  });
+
+  group('SubscoreProgressBar Widget', () {
+    testWidgets('renderiza rótulo, valor percentual e barra animada',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SubscoreProgressBar(
+              label: 'Cobertura Conceitual',
+              score: 95,
+              icon: Icons.checklist_rtl,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Cobertura Conceitual'), findsOneWidget);
+      expect(find.text('95%'), findsOneWidget);
+      expect(find.byIcon(Icons.checklist_rtl), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    });
+  });
+
+  group('EvaluationFeedbackCard Widget', () {
+    final tEvaluation = TextEvaluationResultEntity(
+      questionId: 'q-10',
+      score: 85,
+      feedback: 'Excelente menção à eficácia horizontal e vertical dos direitos.',
+      coverageScore: 90,
+      accuracyScore: 85,
+      depthScore: 80,
+      tokensConsumed: 482,
+      remainingBalance: 1518,
+      ragGroundingApplied: true,
+    );
+
+    testWidgets('renderiza nota de domínio, métricas analíticas e feedback pedagógico',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: EvaluationFeedbackCard(evaluation: tEvaluation),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('85% de Domínio'), findsOneWidget);
+      expect(find.text('Cobertura Conceitual'), findsOneWidget);
+      expect(find.text('Precisão Técnica'), findsOneWidget);
+      expect(find.text('Profundidade da Resposta'), findsOneWidget);
+      expect(
+        find.text('Excelente menção à eficácia horizontal e vertical dos direitos.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('482 tokens consumidos • Saldo: 1518'),
+        findsOneWidget,
+      );
+      expect(find.text('RAG Ativo'), findsOneWidget);
+    });
+  });
+
+  group('QuestionAnswerModeTabs Widget', () {
+    testWidgets('renderiza as duas abas e dispara callback ao alternar',
+        (tester) async {
+      int selectedMode = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: QuestionAnswerModeTabs(
+              activeMode: selectedMode,
+              onModeChanged: (mode) => selectedMode = mode,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('✍️ Digitar Resposta'), findsOneWidget);
+      expect(find.text('💡 Apenas Gabarito'), findsOneWidget);
+
+      await tester.tap(find.text('💡 Apenas Gabarito'));
+      await tester.pump();
+
+      expect(selectedMode, 1);
+    });
+  });
+
+  group('QuestionTextInputArea Widget', () {
+    testWidgets('renderiza TextField, contador e botão de submissão',
+        (tester) async {
+      final controller = TextEditingController(text: 'Minha resposta');
+      var submitted = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: QuestionTextInputArea(
+                controller: controller,
+                isEvaluating: false,
+                onSubmit: () => submitted = true,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.text('14 caracteres'), findsOneWidget);
+      expect(find.text('✨ Avaliar com IA'), findsOneWidget);
+
+      await tester.tap(find.text('✨ Avaliar com IA'));
+      await tester.pump();
+
+      expect(submitted, isTrue);
+    });
+
+    testWidgets('exibe banner de saldo insuficiente com fallback para modo manual',
+        (tester) async {
+      final controller = TextEditingController(text: 'Resposta curta');
+      var manualRevealed = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: QuestionTextInputArea(
+                controller: controller,
+                isEvaluating: false,
+                errorMessage: 'Saldo de tokens insuficiente para avaliação por IA',
+                onSubmit: () {},
+                onRevealManual: () => manualRevealed = true,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.text('Saldo de tokens insuficiente para avaliação por IA'),
+        findsOneWidget,
+      );
+      expect(find.text('Continuar no Modo Manual'), findsOneWidget);
+
+      await tester.tap(find.text('Continuar no Modo Manual'));
+      await tester.pump();
+
+      expect(manualRevealed, isTrue);
     });
   });
 }

@@ -3,6 +3,7 @@ import 'package:study_reviewer_mobile/core/constants/api_constants.dart';
 import 'package:study_reviewer_mobile/core/errors/exceptions.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/data/models/due_question_model.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/data/models/review_result_model.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/data/models/text_evaluation_result_model.dart';
 
 /// Contrato abstrato do datasource remoto para perguntas abertas e SRS.
 abstract class QuestionRemoteDataSource {
@@ -14,6 +15,11 @@ abstract class QuestionRemoteDataSource {
   Future<ReviewResultModel> reviewQuestion({
     required String questionId,
     required int score,
+  });
+
+  Future<TextEvaluationResultModel> evaluateTextQuestion({
+    required String questionId,
+    required String studentAnswer,
   });
 }
 
@@ -108,6 +114,60 @@ class QuestionRemoteDataSourceImpl implements QuestionRemoteDataSource {
             e.message ??
             'Erro ao submeter revisão SRS',
         statusCode: e.response?.statusCode,
+      );
+    } catch (e) {
+      if (e is NetworkException || e is ServerException) {
+        rethrow;
+      }
+      throw ServerException(message: 'Erro inesperado: $e');
+    }
+  }
+
+  @override
+  Future<TextEvaluationResultModel> evaluateTextQuestion({
+    required String questionId,
+    required String studentAnswer,
+  }) async {
+    try {
+      final response = await client.post<Map<String, dynamic>>(
+        ApiConstants.questionEvaluateText(questionId),
+        data: <String, dynamic>{'student_answer': studentAnswer},
+      );
+
+      final data = response.data;
+      if (data == null) {
+        throw const ServerException(message: 'Resposta vazia do servidor');
+      }
+
+      return TextEvaluationResultModel.fromJson(data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout) {
+        throw NetworkException(
+          message: e.message ?? 'Falha de conexão com a rede',
+        );
+      }
+
+      final statusCode = e.response?.statusCode;
+      final dynamic rawData = e.response?.data;
+      final String? detail = (rawData is Map<String, dynamic>)
+          ? rawData['detail']?.toString()
+          : null;
+
+      if (statusCode == 402 || detail == 'INSUFFICIENT_FUNDS') {
+        throw ServerException(
+          message: (detail != null && detail != 'INSUFFICIENT_FUNDS')
+              ? detail
+              : 'Saldo de tokens insuficiente para avaliação por IA',
+          statusCode: 402,
+        );
+      }
+
+      throw ServerException(
+        message: detail ??
+            e.message ??
+            'Erro ao avaliar resposta dissertativa com IA',
+        statusCode: statusCode,
       );
     } catch (e) {
       if (e is NetworkException || e is ServerException) {

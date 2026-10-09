@@ -5,7 +5,9 @@ import 'package:study_reviewer_mobile/core/errors/failures.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/data/datasources/question_remote_data_source.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/data/models/due_question_model.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/data/models/review_result_model.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/data/models/text_evaluation_result_model.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/data/repositories/question_repository_impl.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/text_evaluation_result_entity.dart';
 
 class MockQuestionRemoteDataSource extends Mock
     implements QuestionRemoteDataSource {}
@@ -38,6 +40,18 @@ void main() {
     isDemoted: false,
     isMaintained: false,
     intervalDays: 2,
+  );
+
+  final tEvaluationModel = TextEvaluationResultModel(
+    questionId: 'q-1',
+    score: 92,
+    feedback: 'Excelente resposta',
+    coverageScore: 95,
+    accuracyScore: 90,
+    depthScore: 90,
+    tokensConsumed: 480,
+    remainingBalance: 1520,
+    ragGroundingApplied: true,
   );
 
   group('getDueQuestions', () {
@@ -106,6 +120,59 @@ void main() {
       expect(
         () => repository.reviewQuestion(questionId: 'q-1', score: 100),
         throwsA(isA<ServerFailure>()),
+      );
+    });
+  });
+
+  group('evaluateTextQuestion', () {
+    test('deve avaliar resposta dissertativa e retornar TextEvaluationResultEntity', () async {
+      when(() => mockRemoteDataSource.evaluateTextQuestion(
+            questionId: 'q-1',
+            studentAnswer: 'Resposta do aluno',
+          )).thenAnswer((_) async => tEvaluationModel);
+
+      final result = await repository.evaluateTextQuestion(
+        questionId: 'q-1',
+        studentAnswer: 'Resposta do aluno',
+      );
+
+      expect(result.questionId, 'q-1');
+      expect(result.score, 92);
+      expect(result.ragGroundingApplied, isTrue);
+      expect(result, isA<TextEvaluationResultEntity>());
+    });
+
+    test('deve remapear NetworkException para NetworkFailure em evaluateTextQuestion', () async {
+      when(() => mockRemoteDataSource.evaluateTextQuestion(
+            questionId: 'q-1',
+            studentAnswer: 'Resposta do aluno',
+          )).thenThrow(const NetworkException(message: 'Sem internet'));
+
+      expect(
+        () => repository.evaluateTextQuestion(
+          questionId: 'q-1',
+          studentAnswer: 'Resposta do aluno',
+        ),
+        throwsA(isA<NetworkFailure>()),
+      );
+    });
+
+    test('deve remapear ServerException para ServerFailure em evaluateTextQuestion', () async {
+      when(() => mockRemoteDataSource.evaluateTextQuestion(
+            questionId: 'q-1',
+            studentAnswer: 'Resposta do aluno',
+          )).thenThrow(const ServerException(message: 'Saldo insuficiente', statusCode: 402));
+
+      expect(
+        () => repository.evaluateTextQuestion(
+          questionId: 'q-1',
+          studentAnswer: 'Resposta do aluno',
+        ),
+        throwsA(
+          predicate<ServerFailure>(
+            (f) => f.statusCode == 402 && f.message.contains('Saldo insuficiente'),
+          ),
+        ),
       );
     });
   });

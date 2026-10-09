@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/due_question_entity.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/review_result_entity.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/text_evaluation_result_entity.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/question_srs_cubit.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/question_srs_state.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/pages/question_srs_page.dart';
@@ -51,18 +52,58 @@ void main() {
     intervalDays: 2,
   );
 
-  testWidgets('exibe enunciado da pergunta e botão Ver Resposta Esperada',
+  final tEvaluationResult = TextEvaluationResultEntity(
+    questionId: 'q-10',
+    score: 90,
+    feedback: 'Excelente definição do princípio OCP.',
+    coverageScore: 95,
+    accuracyScore: 90,
+    depthScore: 85,
+    tokensConsumed: 480,
+    remainingBalance: 1520,
+    ragGroundingApplied: true,
+  );
+
+  testWidgets('exibe abas de modo e campo de digitação no modo texto padrão',
       (tester) async {
     when(() => mockCubit.state).thenReturn(
       QuestionSrsLoaded(
         questions: [tQuestion],
         currentIndex: 0,
+        activeAnswerMode: 0,
         isAnswerRevealed: false,
       ),
     );
     when(() => mockCubit.stream).thenAnswer(
       (_) => Stream<QuestionSrsState>.value(
-        QuestionSrsLoaded(questions: [tQuestion]),
+        QuestionSrsLoaded(questions: [tQuestion], activeAnswerMode: 0),
+      ),
+    );
+
+    await tester.pumpWidget(buildTestableWidget());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Perguntas Abertas SRS'), findsOneWidget);
+    expect(find.text('Explique o princípio Open-Closed da SOLID.'), findsOneWidget);
+    expect(find.text('✍️ Digitar Resposta'), findsOneWidget);
+    expect(find.text('💡 Apenas Gabarito'), findsOneWidget);
+    expect(find.text('✨ Avaliar com IA'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+  });
+
+  testWidgets('exibe botão Ver Resposta Esperada quando no modo manual',
+      (tester) async {
+    when(() => mockCubit.state).thenReturn(
+      QuestionSrsLoaded(
+        questions: [tQuestion],
+        currentIndex: 0,
+        activeAnswerMode: 1,
+        isAnswerRevealed: false,
+      ),
+    );
+    when(() => mockCubit.stream).thenAnswer(
+      (_) => Stream<QuestionSrsState>.value(
+        QuestionSrsLoaded(questions: [tQuestion], activeAnswerMode: 1),
       ),
     );
     when(() => mockCubit.revealAnswer()).thenReturn(null);
@@ -70,8 +111,6 @@ void main() {
     await tester.pumpWidget(buildTestableWidget());
     await tester.pumpAndSettle();
 
-    expect(find.text('Perguntas Abertas SRS'), findsOneWidget);
-    expect(find.text('Explique o princípio Open-Closed da SOLID.'), findsOneWidget);
     expect(find.text('Ver Resposta Esperada'), findsOneWidget);
 
     await tester.tap(find.text('Ver Resposta Esperada'));
@@ -80,12 +119,84 @@ void main() {
     verify(() => mockCubit.revealAnswer()).called(1);
   });
 
-  testWidgets('exibe gabarito e seletor de nota após revelação',
+  testWidgets('aciona submitTextEvaluation ao tocar no botão Avaliar com IA',
       (tester) async {
     when(() => mockCubit.state).thenReturn(
       QuestionSrsLoaded(
         questions: [tQuestion],
         currentIndex: 0,
+        activeAnswerMode: 0,
+        isAnswerRevealed: false,
+      ),
+    );
+    when(() => mockCubit.stream).thenAnswer(
+      (_) => Stream<QuestionSrsState>.value(
+        QuestionSrsLoaded(questions: [tQuestion], activeAnswerMode: 0),
+      ),
+    );
+    when(() => mockCubit.submitTextEvaluation(
+          studentAnswer: any(named: 'studentAnswer'),
+        )).thenAnswer((_) async {});
+
+    await tester.pumpWidget(buildTestableWidget());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byType(TextField),
+      'Entidades devem estar abertas para extensão',
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('✨ Avaliar com IA'));
+    await tester.pump();
+
+    verify(() => mockCubit.submitTextEvaluation(
+          studentAnswer: 'Entidades devem estar abertas para extensão',
+        )).called(1);
+  });
+
+  testWidgets('exibe EvaluationFeedbackCard e gabarito oficial após avaliação por IA',
+      (tester) async {
+    when(() => mockCubit.state).thenReturn(
+      QuestionSrsLoaded(
+        questions: [tQuestion],
+        currentIndex: 0,
+        activeAnswerMode: 0,
+        isAnswerRevealed: true,
+        textEvaluationResult: tEvaluationResult,
+        selectedScore: 90,
+      ),
+    );
+    when(() => mockCubit.stream).thenAnswer(
+      (_) => Stream<QuestionSrsState>.value(
+        QuestionSrsLoaded(
+          questions: [tQuestion],
+          activeAnswerMode: 0,
+          isAnswerRevealed: true,
+          textEvaluationResult: tEvaluationResult,
+          selectedScore: 90,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(buildTestableWidget());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Avaliação da IA'), findsOneWidget);
+    expect(find.text('90% de Domínio'), findsOneWidget);
+    expect(find.text('Excelente definição do princípio OCP.'), findsOneWidget);
+    expect(find.text('Resposta Esperada (Gabarito Oficial):'), findsOneWidget);
+    expect(find.text('Aberto para extensão, fechado para modificação.'), findsOneWidget);
+    expect(find.text('Confirmar e Avançar'), findsOneWidget);
+  });
+
+  testWidgets('exibe gabarito e seletor de nota após revelação manual',
+      (tester) async {
+    when(() => mockCubit.state).thenReturn(
+      QuestionSrsLoaded(
+        questions: [tQuestion],
+        currentIndex: 0,
+        activeAnswerMode: 1,
         isAnswerRevealed: true,
         selectedScore: 100,
       ),
@@ -94,6 +205,7 @@ void main() {
       (_) => Stream<QuestionSrsState>.value(
         QuestionSrsLoaded(
           questions: [tQuestion],
+          activeAnswerMode: 1,
           isAnswerRevealed: true,
           selectedScore: 100,
         ),
@@ -104,7 +216,7 @@ void main() {
     await tester.pumpWidget(buildTestableWidget());
     await tester.pumpAndSettle();
 
-    expect(find.text('Resposta Esperada (Gabarito):'), findsOneWidget);
+    expect(find.text('Resposta Esperada (Gabarito Oficial):'), findsOneWidget);
     expect(find.text('Aberto para extensão, fechado para modificação.'),
         findsOneWidget);
     expect(find.text('Confirmar e Avançar'), findsOneWidget);

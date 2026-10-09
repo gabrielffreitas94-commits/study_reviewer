@@ -24,6 +24,7 @@ import 'package:study_reviewer_mobile/features/sync/data/datasources/sync_remote
 import 'package:study_reviewer_mobile/features/srs_questions/data/datasources/question_remote_data_source.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/data/repositories/question_repository_impl.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/repositories/question_repository.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/usecases/evaluate_text_question_usecase.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/usecases/get_due_questions_usecase.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/usecases/review_question_usecase.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/question_srs_cubit.dart';
@@ -176,12 +177,16 @@ Future<void> initInjection() async {
   sl.registerLazySingleton(
     () => ReviewQuestionUseCase(repository: sl<QuestionRepository>()),
   );
+  sl.registerLazySingleton(
+    () => EvaluateTextQuestionUseCase(repository: sl<QuestionRepository>()),
+  );
 
   // Cubit
   sl.registerFactory(
     () => QuestionSrsCubit(
       getDueQuestionsUseCase: sl<GetDueQuestionsUseCase>(),
       reviewQuestionUseCase: sl<ReviewQuestionUseCase>(),
+      evaluateTextQuestionUseCase: sl<EvaluateTextQuestionUseCase>(),
     ),
   );
 

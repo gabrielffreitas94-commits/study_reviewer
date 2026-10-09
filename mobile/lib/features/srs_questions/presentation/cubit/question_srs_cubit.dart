@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:study_reviewer_mobile/core/errors/failures.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/usecases/evaluate_text_question_usecase.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/usecases/get_due_questions_usecase.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/usecases/review_question_usecase.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/question_srs_state.dart';
@@ -8,10 +9,12 @@ import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/
 class QuestionSrsCubit extends Cubit<QuestionSrsState> {
   final GetDueQuestionsUseCase getDueQuestionsUseCase;
   final ReviewQuestionUseCase reviewQuestionUseCase;
+  final EvaluateTextQuestionUseCase? evaluateTextQuestionUseCase;
 
   QuestionSrsCubit({
     required this.getDueQuestionsUseCase,
     required this.reviewQuestionUseCase,
+    this.evaluateTextQuestionUseCase,
   }) : super(const QuestionSrsInitial());
 
   /// Carrega a fila de perguntas abertas vencidas para revisão.
@@ -39,6 +42,82 @@ class QuestionSrsCubit extends Cubit<QuestionSrsState> {
       emit(QuestionSrsError(failure.message));
     } catch (e) {
       emit(QuestionSrsError('Erro ao carregar perguntas vencidas: $e'));
+    }
+  }
+
+  /// Define o modo ativo de formulação da resposta (0 = Digitar, 1 = Gabarito Manual).
+  void setAnswerMode(int mode) {
+    final currentState = state;
+    if (currentState is QuestionSrsLoaded && !currentState.isEvaluatingText) {
+      emit(currentState.copyWith(activeAnswerMode: mode));
+    }
+  }
+
+  /// Submete resposta dissertativa para avaliação pedagógica pela IA.
+  Future<void> submitTextEvaluation({required String studentAnswer}) async {
+    final currentState = state;
+    if (currentState is! QuestionSrsLoaded || currentState.isEvaluatingText) {
+      return;
+    }
+
+    final currentQuestion = currentState.currentQuestion;
+    if (currentQuestion == null) return;
+
+    if (studentAnswer.trim().length < 3) {
+      emit(currentState.copyWith(
+        textEvaluationError: 'A resposta deve conter pelo menos 3 caracteres.',
+      ));
+      return;
+    }
+
+    emit(currentState.copyWith(
+      isEvaluatingText: true,
+      clearTextEvaluationError: true,
+    ));
+
+    try {
+      final useCase = evaluateTextQuestionUseCase;
+      if (useCase == null) {
+        throw const ServerFailure(
+          message: 'Serviço de avaliação por IA não disponível.',
+        );
+      }
+
+      final result = await useCase(
+        EvaluateTextQuestionParams(
+          questionId: currentQuestion.id,
+          studentAnswer: studentAnswer.trim(),
+        ),
+      );
+
+      emit(currentState.copyWith(
+        isEvaluatingText: false,
+        textEvaluationResult: result,
+        clearTextEvaluationError: true,
+        isAnswerRevealed: true,
+        selectedScore: result.score,
+      ));
+    } on Failure catch (failure) {
+      emit(currentState.copyWith(
+        isEvaluatingText: false,
+        textEvaluationError: failure.message,
+      ));
+    } catch (e) {
+      emit(currentState.copyWith(
+        isEvaluatingText: false,
+        textEvaluationError: 'Erro ao avaliar resposta com IA: $e',
+      ));
+    }
+  }
+
+  /// Limpa o resultado ou erro da avaliação dissertativa por IA.
+  void clearEvaluation() {
+    final currentState = state;
+    if (currentState is QuestionSrsLoaded) {
+      emit(currentState.copyWith(
+        clearTextEvaluationResult: true,
+        clearTextEvaluationError: true,
+      ));
     }
   }
 
@@ -104,6 +183,9 @@ class QuestionSrsCubit extends Cubit<QuestionSrsState> {
         isAnswerRevealed: false,
         selectedScore: 100,
         clearLastReviewResult: true,
+        clearTextEvaluationResult: true,
+        clearTextEvaluationError: true,
+        isEvaluatingText: false,
       ));
     } else {
       emit(currentState.copyWith(isSessionCompleted: true));

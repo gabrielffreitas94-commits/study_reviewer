@@ -43,6 +43,10 @@ class ApiConstants {
   // Endpoints de Perguntas SRS
   static const String questionsDue = '/questions/due';
   static String questionReview(String id) => '/questions/$id/review';
+  static String questionEvaluateText(String id) => '/questions/$id/evaluate-text';
+  static String questionEvaluateAudio(String id) => '/questions/$id/evaluate-audio';
+  static String questionDispute(String id) => '/questions/$id/dispute';
+  static const String userTokenBalance = '/users/me/token-balance';
 
   // Endpoints de Flashcards e Estudo
   static const String studyBatch = '/study/batch';

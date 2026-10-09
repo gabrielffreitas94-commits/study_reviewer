@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/review_result_entity.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/question_srs_cubit.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/question_srs_state.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/evaluation_feedback_card.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/question_answer_mode_tabs.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/question_text_input_area.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/score_thumb_selector.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/widgets/srs_level_badge.dart';
 
-/// Tela principal para o ciclo de autoavaliação e repetição espaçada (SRS) de perguntas abertas.
+/// Tela principal para o ciclo de autoavaliação e repetição espaçada (SRS) de perguntas abertas,
+/// com suporte completo à avaliação dissertativa assistida por Inteligência Artificial.
 class QuestionSrsPage extends StatefulWidget {
   final String? subjectId;
 
@@ -20,15 +25,26 @@ class QuestionSrsPage extends StatefulWidget {
 }
 
 class _QuestionSrsPageState extends State<QuestionSrsPage> {
+  late final TextEditingController _answerController;
+  int _lastQuestionIndex = 0;
+
   @override
   void initState() {
     super.initState();
+    _answerController = TextEditingController();
     context.read<QuestionSrsCubit>().loadDueQuestions(subjectId: widget.subjectId);
+  }
+
+  @override
+  void dispose() {
+    _answerController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text('Perguntas Abertas SRS'),
         centerTitle: true,
@@ -43,6 +59,7 @@ class _QuestionSrsPageState extends State<QuestionSrsPage> {
         ],
       ),
       body: BlocConsumer<QuestionSrsCubit, QuestionSrsState>(
+        listenWhen: (previous, current) => true,
         listener: (context, state) {
           if (state is QuestionSrsError) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -51,6 +68,16 @@ class _QuestionSrsPageState extends State<QuestionSrsPage> {
                 backgroundColor: Colors.redAccent,
               ),
             );
+          } else if (state is QuestionSrsLoaded) {
+            // Limpa o rascunho ao avançar de pergunta
+            if (state.currentIndex != _lastQuestionIndex) {
+              _lastQuestionIndex = state.currentIndex;
+              _answerController.clear();
+            }
+            // Emite feedback háptico ao receber o resultado da IA
+            if (state.textEvaluationResult != null) {
+              HapticFeedback.mediumImpact();
+            }
           }
         },
         builder: (context, state) {
@@ -247,9 +274,10 @@ class _QuestionSrsPageState extends State<QuestionSrsPage> {
           ),
         ),
 
-        // Conteúdo rolável com o card da pergunta e resposta
+        // Conteúdo rolável com o card da pergunta, resposta e formulário
         Expanded(
           child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -302,91 +330,94 @@ class _QuestionSrsPageState extends State<QuestionSrsPage> {
                   ),
                 ),
 
-                const SizedBox(height: 16.0),
+                const SizedBox(height: 12.0),
 
-                // Card da Resposta Esperada (revelada ou oculta)
-                if (state.isAnswerRevealed) ...[
-                  Card(
-                    elevation: 1.5,
-                    color: theme.colorScheme.primaryContainer.withOpacity(0.3),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16.0),
-                      side: BorderSide(
-                        color: theme.colorScheme.primary.withOpacity(0.3),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                color: theme.colorScheme.primary,
-                                size: 20.0,
-                              ),
-                              const SizedBox(width: 8.0),
-                              Text(
-                                'Resposta Esperada (Gabarito):',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12.0),
-                          Text(
-                            question.expectedAnswer,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 16.0,
-                              height: 1.45,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                // Seletor de Modo de Resposta (Tabs)
+                QuestionAnswerModeTabs(
+                  activeMode: state.activeAnswerMode,
+                  isEnabled: !state.isEvaluatingText && !state.isSubmitting,
+                  onModeChanged: (mode) {
+                    context.read<QuestionSrsCubit>().setAnswerMode(mode);
+                  },
+                ),
 
-                  // Feedback imediato de transição de nível após submissão
-                  if (state.lastReviewResult != null) ...[
+                const SizedBox(height: 12.0),
+
+                // Painel de formulação conforme o modo selecionado
+                if (state.activeAnswerMode == 0) ...[
+                  // MODO 0: Digitar Resposta com Avaliação por IA
+                  if (state.textEvaluationResult == null) ...[
+                    QuestionTextInputArea(
+                      controller: _answerController,
+                      isEvaluating: state.isEvaluatingText,
+                      errorMessage: state.textEvaluationError,
+                      onSubmit: () {
+                        FocusScope.of(context).unfocus();
+                        context.read<QuestionSrsCubit>().submitTextEvaluation(
+                              studentAnswer: _answerController.text,
+                            );
+                      },
+                      onRevealManual: () {
+                        FocusScope.of(context).unfocus();
+                        context.read<QuestionSrsCubit>().revealAnswer();
+                      },
+                    ),
+                    if (state.isAnswerRevealed) ...[
+                      const SizedBox(height: 16.0),
+                      _buildExpectedAnswerCard(context, question.expectedAnswer),
+                    ],
+                  ] else ...[
+                    // Resultado da avaliação por IA emitido com sucesso
+                    EvaluationFeedbackCard(
+                      evaluation: state.textEvaluationResult!,
+                    ),
                     const SizedBox(height: 16.0),
-                    _buildReviewFeedbackBanner(
-                      context,
-                      state.lastReviewResult!,
-                    ),
+                    _buildExpectedAnswerCard(context, question.expectedAnswer),
                   ],
                 ] else ...[
-                  // Botão para revelar gabarito
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 48.0),
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24.0,
-                            vertical: 12.0,
+                  // MODO 1: Apenas Gabarito (Active Recall Manual sem consumo de tokens)
+                  if (state.isAnswerRevealed) ...[
+                    _buildExpectedAnswerCard(context, question.expectedAnswer),
+                  ] else ...[
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48.0),
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                              vertical: 12.0,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.0),
-                          ),
-                        ),
-                        onPressed: () =>
-                            context.read<QuestionSrsCubit>().revealAnswer(),
-                        icon: const Icon(Icons.visibility_outlined),
-                        label: const Text(
-                          'Ver Resposta Esperada',
-                          style: TextStyle(
-                            fontSize: 15.0,
-                            fontWeight: FontWeight.w600,
+                          onPressed: () =>
+                              context.read<QuestionSrsCubit>().revealAnswer(),
+                          icon: const Icon(Icons.visibility_outlined),
+                          label: const Text(
+                            'Ver Resposta Esperada',
+                            style: TextStyle(
+                              fontSize: 15.0,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
                     ),
+                  ],
+                ],
+
+                // Feedback de transição SRS após confirmação
+                if (state.lastReviewResult != null) ...[
+                  const SizedBox(height: 16.0),
+                  _buildReviewFeedbackBanner(
+                    context,
+                    state.lastReviewResult!,
                   ),
                 ],
+
+                const SizedBox(height: 20.0),
               ],
             ),
           ),
@@ -404,6 +435,53 @@ class _QuestionSrsPageState extends State<QuestionSrsPage> {
         else if (state.lastReviewResult != null)
           _buildNextQuestionThumbZone(context),
       ],
+    );
+  }
+
+  Widget _buildExpectedAnswerCard(BuildContext context, String expectedAnswer) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 1.5,
+      color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16.0),
+        side: BorderSide(
+          color: theme.colorScheme.primary.withOpacity(0.3),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  color: theme.colorScheme.primary,
+                  size: 20.0,
+                ),
+                const SizedBox(width: 8.0),
+                Text(
+                  'Resposta Esperada (Gabarito Oficial):',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12.0),
+            Text(
+              expectedAnswer,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: 16.0,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

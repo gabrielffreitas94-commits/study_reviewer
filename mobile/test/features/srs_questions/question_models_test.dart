@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/data/models/due_question_model.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/data/models/review_result_model.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/data/models/text_evaluation_result_model.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/due_question_entity.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/review_result_entity.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/text_evaluation_result_entity.dart';
 
 void main() {
   group('DueQuestionModel', () {
@@ -120,6 +122,76 @@ void main() {
       expect(json['previous_level'], 2);
       expect(json['new_level'], 3);
       expect(json['is_promoted'], isTrue);
+    });
+  });
+
+  group('TextEvaluationResultModel', () {
+    final tJson = <String, dynamic>{
+      'question_id': 'q-201',
+      'score': 85,
+      'feedback': 'Excelente domínio dos conceitos de telófase e citocinese.',
+      'coverage_score': 90,
+      'accuracy_score': 85,
+      'depth_score': 80,
+      'tokens_consumed': 482,
+      'remaining_balance': 1518,
+      'rag_grounding_applied': true,
+    };
+
+    test('deve instanciar TextEvaluationResultModel via fromJson com sucesso', () {
+      final model = TextEvaluationResultModel.fromJson(tJson);
+
+      expect(model.questionId, 'q-201');
+      expect(model.score, 85);
+      expect(model.feedback, 'Excelente domínio dos conceitos de telófase e citocinese.');
+      expect(model.coverageScore, 90);
+      expect(model.accuracyScore, 85);
+      expect(model.depthScore, 80);
+      expect(model.tokensConsumed, 482);
+      expect(model.remainingBalance, 1518);
+      expect(model.ragGroundingApplied, isTrue);
+      expect(model, isA<TextEvaluationResultEntity>());
+      expect(model.toEntity(), isA<TextEvaluationResultEntity>());
+    });
+
+    test('deve converter para json compatível com toJson', () {
+      final model = TextEvaluationResultModel.fromJson(tJson);
+      final json = model.toJson();
+
+      expect(json['question_id'], 'q-201');
+      expect(json['score'], 85);
+      expect(json['coverage_score'], 90);
+      expect(json['accuracy_score'], 85);
+      expect(json['depth_score'], 80);
+      expect(json['tokens_consumed'], 482);
+      expect(json['remaining_balance'], 1518);
+      expect(json['rag_grounding_applied'], isTrue);
+    });
+
+    test('deve tratar campos numéricos decimais ou nulos com fallback gracioso', () {
+      final fallbackJson = <String, dynamic>{
+        'questionId': 'q-202',
+        'score': 89.6,
+        'feedback': null,
+        'coverageScore': 95.2,
+        'accuracyScore': 88.0,
+        'depthScore': 75.4,
+        'tokensConsumed': 500,
+        'remainingBalance': 1000,
+        'ragGroundingApplied': false,
+      };
+
+      final model = TextEvaluationResultModel.fromJson(fallbackJson);
+
+      expect(model.questionId, 'q-202');
+      expect(model.score, 90);
+      expect(model.feedback, '');
+      expect(model.coverageScore, 95);
+      expect(model.accuracyScore, 88);
+      expect(model.depthScore, 75);
+      expect(model.tokensConsumed, 500);
+      expect(model.remainingBalance, 1000);
+      expect(model.ragGroundingApplied, isFalse);
     });
   });
 }

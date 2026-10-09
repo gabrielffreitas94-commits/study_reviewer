@@ -1,5 +1,6 @@
 import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/due_question_entity.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/review_result_entity.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/text_evaluation_result_entity.dart';
 
 /// Contrato abstrato do repositório para o módulo de Perguntas Abertas e SRS.
 abstract class QuestionRepository {
@@ -13,5 +14,11 @@ abstract class QuestionRepository {
   Future<ReviewResultEntity> reviewQuestion({
     required String questionId,
     required int score,
+  });
+
+  /// Submete resposta dissertativa para avaliação pedagógica por Inteligência Artificial.
+  Future<TextEvaluationResultEntity> evaluateTextQuestion({
+    required String questionId,
+    required String studentAnswer,
   });
 }

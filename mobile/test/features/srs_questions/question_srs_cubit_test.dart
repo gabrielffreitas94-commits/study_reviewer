@@ -4,6 +4,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:study_reviewer_mobile/core/errors/failures.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/due_question_entity.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/review_result_entity.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/entities/text_evaluation_result_entity.dart';
+import 'package:study_reviewer_mobile/features/srs_questions/domain/usecases/evaluate_text_question_usecase.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/usecases/get_due_questions_usecase.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/domain/usecases/review_question_usecase.dart';
 import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/question_srs_cubit.dart';
@@ -11,10 +13,12 @@ import 'package:study_reviewer_mobile/features/srs_questions/presentation/cubit/
 
 class MockGetDueQuestionsUseCase extends Mock implements GetDueQuestionsUseCase {}
 class MockReviewQuestionUseCase extends Mock implements ReviewQuestionUseCase {}
+class MockEvaluateTextQuestionUseCase extends Mock implements EvaluateTextQuestionUseCase {}
 
 void main() {
   late MockGetDueQuestionsUseCase mockGetDueQuestionsUseCase;
   late MockReviewQuestionUseCase mockReviewQuestionUseCase;
+  late MockEvaluateTextQuestionUseCase mockEvaluateTextQuestionUseCase;
   late QuestionSrsCubit cubit;
 
   setUpAll(() {
@@ -22,15 +26,23 @@ void main() {
     registerFallbackValue(
       const ReviewQuestionParams(questionId: 'fallback', score: 100),
     );
+    registerFallbackValue(
+      const EvaluateTextQuestionParams(
+        questionId: 'fallback',
+        studentAnswer: 'fallback',
+      ),
+    );
   });
 
   setUp(() {
     mockGetDueQuestionsUseCase = MockGetDueQuestionsUseCase();
     mockReviewQuestionUseCase = MockReviewQuestionUseCase();
+    mockEvaluateTextQuestionUseCase = MockEvaluateTextQuestionUseCase();
 
     cubit = QuestionSrsCubit(
       getDueQuestionsUseCase: mockGetDueQuestionsUseCase,
       reviewQuestionUseCase: mockReviewQuestionUseCase,
+      evaluateTextQuestionUseCase: mockEvaluateTextQuestionUseCase,
     );
   });
 
@@ -65,6 +77,18 @@ void main() {
     isPromoted: true,
     isDemoted: false,
     isMaintained: false,
+  );
+
+  final tEvaluationResult = TextEvaluationResultEntity(
+    questionId: 'q-1',
+    score: 85,
+    feedback: 'Excelente domínio!',
+    coverageScore: 90,
+    accuracyScore: 85,
+    depthScore: 80,
+    tokensConsumed: 482,
+    remainingBalance: 1518,
+    ragGroundingApplied: true,
   );
 
   test('estado inicial deve ser QuestionSrsInitial', () {
@@ -116,6 +140,124 @@ void main() {
       expect: () => [
         const QuestionSrsLoading(),
         const QuestionSrsError('Erro no servidor'),
+      ],
+    );
+  });
+
+  group('setAnswerMode', () {
+    blocTest<QuestionSrsCubit, QuestionSrsState>(
+      'deve alterar o modo de resposta para 1 (Gabarito Manual)',
+      build: () => cubit,
+      seed: () => QuestionSrsLoaded(questions: [tQuestion1], activeAnswerMode: 0),
+      act: (c) => c.setAnswerMode(1),
+      expect: () => [
+        QuestionSrsLoaded(
+          questions: [tQuestion1],
+          activeAnswerMode: 1,
+        ),
+      ],
+    );
+
+    blocTest<QuestionSrsCubit, QuestionSrsState>(
+      'não deve alterar o modo se isEvaluatingText for true',
+      build: () => cubit,
+      seed: () => QuestionSrsLoaded(
+        questions: [tQuestion1],
+        activeAnswerMode: 0,
+        isEvaluatingText: true,
+      ),
+      act: (c) => c.setAnswerMode(1),
+      expect: () => [],
+    );
+  });
+
+  group('submitTextEvaluation', () {
+    blocTest<QuestionSrsCubit, QuestionSrsState>(
+      'deve emitir erro de validação se resposta for menor que 3 caracteres',
+      build: () => cubit,
+      seed: () => QuestionSrsLoaded(questions: [tQuestion1]),
+      act: (c) => c.submitTextEvaluation(studentAnswer: 'oi'),
+      expect: () => [
+        QuestionSrsLoaded(
+          questions: [tQuestion1],
+          textEvaluationError: 'A resposta deve conter pelo menos 3 caracteres.',
+        ),
+      ],
+    );
+
+    blocTest<QuestionSrsCubit, QuestionSrsState>(
+      'deve submeter resposta, sincronizar score e revelar resposta com sucesso',
+      build: () {
+        when(() => mockEvaluateTextQuestionUseCase(any()))
+            .thenAnswer((_) async => tEvaluationResult);
+        return cubit;
+      },
+      seed: () => QuestionSrsLoaded(
+        questions: [tQuestion1],
+        isAnswerRevealed: false,
+        selectedScore: 100,
+      ),
+      act: (c) => c.submitTextEvaluation(studentAnswer: 'Mitose gera duas células'),
+      expect: () => [
+        QuestionSrsLoaded(
+          questions: [tQuestion1],
+          isEvaluatingText: true,
+          isAnswerRevealed: false,
+          selectedScore: 100,
+        ),
+        QuestionSrsLoaded(
+          questions: [tQuestion1],
+          isEvaluatingText: false,
+          textEvaluationResult: tEvaluationResult,
+          isAnswerRevealed: true,
+          selectedScore: 85,
+        ),
+      ],
+    );
+
+    blocTest<QuestionSrsCubit, QuestionSrsState>(
+      'deve capturar Failure e registrar textEvaluationError',
+      build: () {
+        when(() => mockEvaluateTextQuestionUseCase(any())).thenThrow(
+          const ServerFailure(
+            message: 'Saldo de tokens insuficiente para avaliação por IA',
+            statusCode: 402,
+          ),
+        );
+        return cubit;
+      },
+      seed: () => QuestionSrsLoaded(questions: [tQuestion1]),
+      act: (c) => c.submitTextEvaluation(studentAnswer: 'Mitose gera duas células'),
+      expect: () => [
+        QuestionSrsLoaded(
+          questions: [tQuestion1],
+          isEvaluatingText: true,
+        ),
+        QuestionSrsLoaded(
+          questions: [tQuestion1],
+          isEvaluatingText: false,
+          textEvaluationError: 'Saldo de tokens insuficiente para avaliação por IA',
+        ),
+      ],
+    );
+  });
+
+  group('clearEvaluation', () {
+    blocTest<QuestionSrsCubit, QuestionSrsState>(
+      'deve limpar textEvaluationResult e textEvaluationError',
+      build: () => cubit,
+      seed: () => QuestionSrsLoaded(
+        questions: [tQuestion1],
+        textEvaluationResult: tEvaluationResult,
+        textEvaluationError: 'Algum erro prévio',
+      ),
+      act: (c) => c.clearEvaluation(),
+      expect: () => [
+        QuestionSrsLoaded(
+          questions: [tQuestion1],
+          textEvaluationResult: null,
+          textEvaluationError: null,
+        ),
       ],
     );
   });
@@ -185,13 +327,14 @@ void main() {
     );
 
     blocTest<QuestionSrsCubit, QuestionSrsState>(
-      'nextQuestion deve avançar para o próximo item',
+      'nextQuestion deve avançar para o próximo item e limpar avaliações prévias',
       build: () => cubit,
       seed: () => QuestionSrsLoaded(
         questions: [tQuestion1, tQuestion2],
         currentIndex: 0,
         isAnswerRevealed: true,
         lastReviewResult: tReviewResult,
+        textEvaluationResult: tEvaluationResult,
       ),
       act: (c) => c.nextQuestion(),
       expect: () => [
@@ -201,6 +344,8 @@ void main() {
           isAnswerRevealed: false,
           selectedScore: 100,
           lastReviewResult: null,
+          textEvaluationResult: null,
+          textEvaluationError: null,
         ),
       ],
     );
