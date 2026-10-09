@@ -3,7 +3,7 @@
 
 > **Changelog v9.0:**
 > - **Integração Integral do Subsistema de IA & RAG Multimodal (Marco 7 - Sprints 07, 08 e 09):** Homologação da base de conhecimento particionada por temas (`KnowledgeSource` e `KnowledgeChunk`), chunking semântico (512 tokens / 10% overlap), embeddings densos (`text-embedding-004`) de 768 dimensões, busca vetorial por cosseno ($\ge 0.70$) e validação factual de questões (`ValidateQuestionWithKnowledgeUseCase`).
-> - **Avaliação Semântica Aterrada de Texto (Sprint 08):** Correção automática via Gemini 1.5 Flash com rubricas analíticas estruturadas (cobertura, precisão e profundidade de 0 a 100), extração de evidências das fontes e fallback em Cold-Start para o gabarito oficial (`expected_answer`).
+> - **Avaliação Semântica Aterrada de Texto (Sprint 08):** Correção automática via Gemini 3.8 Flash com rubricas analíticas estruturadas (cobertura, precisão e profundidade de 0 a 100), extração de evidências das fontes e fallback em Cold-Start para o gabarito oficial (`expected_answer`).
 > - **Economia de Tokens, FinOps & Two-Phase Metering (Sprint 08):** Livro-razão transacional (`TokenLedger` e `TokenTransaction`) com retenção preventiva (*Pre-Auth Hold* de 500/800/1000 tokens), liquidação atômica estrita pelo consumo real (*Settlement*), estorno automático em falhas (*Refund*), rejeição por saldo insuficiente (`HTTP 402 Payment Required`), travas anti-double-spending e conformidade PCI-DSS SAQ A.
 > - **Avaliação Multimodal de Áudio com Privacidade Efêmera (Sprint 09):** Resposta oral com transcrição e avaliação semântica direta via Gemini Multimodal. Estrita conformidade com o Art. 16 da LGPD: eliminação imediata de dados biométricos em memória volátil (`del audio_bytes`), sem persistência de voz em disco, banco de dados ou buckets S3/GCS. Limite anti-DoS de 10 MB.
 > - **Conselho Multiagente de Contestação Pedagógica (Sprint 09):** Deliberação recursal tripartite autônoma (*Student Advocate*, *Factual Critic*, *Arbitrator*). Estorno integral da retenção de garantia e repactuação de agendamento SRS em caso de provimento (*UPHELD*).
@@ -136,7 +136,7 @@ $$\text{Intervalos} = [1, 7, 15, 30, 60, 90, 180] \text{ dias}$$
 ### 3.2 Fases Evolutivas das Perguntas Abertas
 * **Fase 1 (MVP — Sprint 03):** Autoavaliação com visualização da resposta esperada e atribuição manual de nota de 0 a 100.
 * **Fase 2 (RAG & Validação Factual — Sprint 07):** Ingestão de materiais de estudo por tema (`KnowledgeSource` e `KnowledgeChunk`), chunking semântico de 512 tokens com 10% de overlap, geração de embeddings de 768 dimensões (`text-embedding-004`), indexação vetorial e validação de consistência factual das questões antes de sua publicação.
-* **Fase 3 (IA com Texto & FinOps — Sprint 08):** Resposta dissertativa avaliada por IA (Gemini 1.5 Flash) aterrada nos chunks do tema, com subscores analíticos (cobertura, precisão e profundidade), extração de citações e tarifação atômica em duas fases via `TokenLedger`.
+* **Fase 3 (IA com Texto & FinOps — Sprint 08):** Resposta dissertativa avaliada por IA (Gemini 3.8 Flash) aterrada nos chunks do tema, com subscores analíticos (cobertura, precisão e profundidade), extração de citações e tarifação atômica em duas fases via `TokenLedger`.
 * **Fase 4 (IA Multimodal de Áudio & Conselho de Contestação — Sprint 09):** Gravação de resposta por voz processada efemeramente (LGPD Art. 16) e câmara recursal autônoma (*Conselho Multiagente de Contestação*) para julgamento de recursos de notas.
 
 ---
@@ -159,7 +159,7 @@ flowchart TD
         Chunks -->|Cold-Start (Sem Chunks)?| Fallback["Fallback Canônico: expected_answer"]
     end
     
-    subgraph Inference["Inferência Fundacional (Gemini 1.5 Flash)"]
+    subgraph Inference["Inferência Fundacional (Gemini 3.8 Flash)"]
         Context & Fallback --> Adapter["GeminiEvaluationAdapter (Text / Multimodal Audio)"]
         Adapter -->|Zero Persistência de Áudio| Purge["Purga Imediata de Bytes (LGPD Art. 16)"]
         Adapter -->|Gera Avaliação Estruturada| Result["AnswerEvaluationResult (Score 0-100, Subscores, Citações)"]
@@ -504,7 +504,7 @@ flowchart TD
         FastAPI_App["FastAPI Web Framework (Async + Uvicorn)"]
         Redis_Store["Redis Cluster (Filas Efêmeras, TTL 24h)"]
         Postgres_DB["PostgreSQL 16 (Particionado + PgVector)"]
-        Gemini_API["Google Gemini 1.5 Flash Multimodal & Embeddings"]
+        Gemini_API["Google Gemini 3.8 Flash Multimodal & Embeddings"]
         Frontend_Worker["Dedicated Web Worker (study-sync.worker.js) + IndexedDB"]
         Mobile_Client["Flutter Client (Android KeyStore / iOS Keychain)"]
     end

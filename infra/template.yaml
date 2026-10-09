@@ -52,6 +52,11 @@ Parameters:
     Default: ""
     Description: "Chave da API do Google Gemini para avaliações dissertativas"
 
+  GeminiModel:
+    Type: String
+    Default: "gemini-3.8-flash"
+    Description: "Modelo do Google Gemini para inferência pedagógica e conselho multiagente"
+
 Conditions:
   CreateLambdaRole: !Equals [!Ref LambdaRoleArn, ""]
 
@@ -138,6 +143,7 @@ Resources:
           DYNAMODB_TABLE_STUDY_EVENTS: !Ref StudyEventsTable
           DYNAMODB_TTL_DAYS: "90"
           GEMINI_API_KEY: !Ref GeminiApiKey
+          GEMINI_MODEL: !Ref GeminiModel
       Tags:
         - Key: Project
           Value: StudyReviewer

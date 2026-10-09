@@ -36,8 +36,8 @@ flowchart TB
 
     subgraph Intelligence["Provedores de IA & Conhecimento"]
         RAG["RAG Grounding Service (Cosine Sim >= 0.70)"]
-        GeminiFlash["Gemini 1.5 Flash (Texto / Prompt Blindado)"]
-        GeminiMulti["Gemini 1.5 Flash Multimodal (Áudio Efêmero)"]
+        GeminiFlash["Gemini 3.8 Flash (Texto / Prompt Blindado)"]
+        GeminiMulti["Gemini 3.8 Flash Multimodal (Áudio Efêmero)"]
         Tribunal["Conselho Tripartite (Advogado, Crítico, Árbitro)"]
     end
 

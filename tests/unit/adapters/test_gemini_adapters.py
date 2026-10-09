@@ -66,3 +66,16 @@ def test_gemini_question_validator_unsupported_answer() -> None:
     assert res.is_grounded is False
     assert res.confidence_score <= 0.50
     assert "não corroboram" in res.reasoning
+
+
+@pytest.mark.unit
+def test_gemini_question_validator_model_configuration() -> None:
+    validator_default = GeminiQuestionValidatorAdapter()
+    assert validator_default._model == "gemini-3.8-flash"
+
+    validator_custom = GeminiQuestionValidatorAdapter(
+        api_key="key-test",
+        model="gemini-3.8-flash",
+    )
+    assert validator_custom._api_key == "key-test"
+    assert validator_custom._model == "gemini-3.8-flash"

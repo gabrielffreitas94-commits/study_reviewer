@@ -203,7 +203,8 @@ async def validate_question_grounding(
     subject_repo = SqlAlchemySubjectRepository(db)
     embedding_service = GeminiEmbeddingAdapter(api_key=getattr(settings, "GEMINI_API_KEY", None))
     validation_service = GeminiQuestionValidatorAdapter(
-        api_key=getattr(settings, "GEMINI_API_KEY", None)
+        api_key=getattr(settings, "GEMINI_API_KEY", None),
+        model=getattr(settings, "GEMINI_MODEL", "gemini-3.8-flash"),
     )
 
     use_case = ValidateQuestionWithKnowledgeUseCase(

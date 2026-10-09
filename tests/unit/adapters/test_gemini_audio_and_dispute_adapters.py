@@ -173,3 +173,25 @@ def test_multiagent_dispute_adapter_api_key_initialization() -> None:
     )
     assert result.status == "UPHELD"
     assert result.revised_score > 60
+
+
+def test_audio_and_dispute_adapters_model_configuration() -> None:
+    audio_adapter = GeminiAudioEvaluationAdapter()
+    assert audio_adapter._model == "gemini-3.8-flash"
+    assert audio_adapter._text_evaluator._model == "gemini-3.8-flash"
+
+    custom_audio_adapter = GeminiAudioEvaluationAdapter(
+        api_key="test-key",
+        model="gemini-3.8-flash",
+    )
+    assert custom_audio_adapter._model == "gemini-3.8-flash"
+    assert custom_audio_adapter._text_evaluator._model == "gemini-3.8-flash"
+
+    dispute_adapter = GeminiMultiAgentDisputeAdapter()
+    assert dispute_adapter._model == "gemini-3.8-flash"
+
+    custom_dispute = GeminiMultiAgentDisputeAdapter(
+        api_key="test-key",
+        model="gemini-3.8-flash",
+    )
+    assert custom_dispute._model == "gemini-3.8-flash"

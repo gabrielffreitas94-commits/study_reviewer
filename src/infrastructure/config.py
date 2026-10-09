@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Google Gemini AI
     GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.8-flash"
 
     # Redis Cache & Efêmero
     REDIS_URL: str = "redis://localhost:6379/0"

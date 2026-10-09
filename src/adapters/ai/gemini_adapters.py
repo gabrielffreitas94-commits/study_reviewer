@@ -17,6 +17,8 @@ from src.domain.protocols import (
     IMultiAgentDisputeService,
 )
 
+DEFAULT_GEMINI_MODEL: str = "gemini-3.8-flash"
+
 
 class GeminiEmbeddingAdapter(IEmbeddingService):
     """Adaptador para geração de embeddings vetoriais (Gemini text-embedding-004 ou fallback).
@@ -60,13 +62,19 @@ class GeminiEmbeddingAdapter(IEmbeddingService):
 class GeminiQuestionValidatorAdapter(IKnowledgeValidationService):
     """Adaptador para validação de grounding de questões contra chunks canônicos.
 
-    Conexão com Gemini 1.5 Flash:
-        Permite inicialização com `api_key` opcional. Conecta ao Gemini 1.5 Flash
-        quando configurada; caso None/vazia, opera por emulação semântica determinística offline.
+    Conexão com Gemini 3.8 Flash:
+        Permite inicialização com `api_key` opcional e `model` configurável (`gemini-3.8-flash`).
+        Conecta ao modelo quando configurada; caso None/vazia, opera por emulação semântica
+        determinística offline.
     """
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = DEFAULT_GEMINI_MODEL,
+    ) -> None:
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
+        self._model = model
 
     async def validate_question_grounding(
         self,
@@ -126,14 +134,19 @@ class GeminiQuestionValidatorAdapter(IKnowledgeValidationService):
 class GeminiAnswerEvaluationAdapter(IAnswerEvaluationService):
     """Adaptador de IA para avaliação semântica aterrada de respostas dissertativas.
 
-    Conexão com Gemini 1.5 Flash:
-        Permite inicialização com `api_key` opcional. Conecta-se à API do Gemini 1.5 Flash
-        (`gemini-1.5-flash`) com rubricas pedagógicas e isolamento em tags quando `api_key`
-        está ativa; caso contrário, executa emulação determinística em memória offline.
+    Conexão com Gemini 3.8 Flash:
+        Permite inicialização com `api_key` opcional e `model` configurável (`gemini-3.8-flash`).
+        Conecta-se à API do Gemini 3.8 Flash com rubricas pedagógicas e isolamento em tags
+        quando `api_key` está ativa; caso contrário, executa emulação determinística offline.
     """
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = DEFAULT_GEMINI_MODEL,
+    ) -> None:
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
+        self._model = model
 
     async def evaluate_answer(
         self,
@@ -242,15 +255,23 @@ class GeminiAnswerEvaluationAdapter(IAnswerEvaluationService):
 class GeminiAudioEvaluationAdapter(IAudioAnswerEvaluationService):
     """Adaptador de IA multimodal para avaliação de respostas em áudio com privacidade efêmera.
 
-    Conexão com Gemini 1.5 Flash Multimodal:
-        Permite inicialização com `api_key` opcional. Integra com Gemini 1.5 Flash para
-        transcrição e avaliação direta de áudio com purga imediata de memória.
-        Caso `api_key` seja None ou vazia, opera em emulação local determinística.
+    Conexão com Gemini 3.8 Flash Multimodal:
+        Permite inicialização com `api_key` opcional e `model` configurável (`gemini-3.8-flash`).
+        Integra com Gemini 3.8 Flash para transcrição e avaliação direta de áudio com
+        purga imediata de memória. Caso `api_key` seja None ou vazia, opera em emulação local.
     """
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = DEFAULT_GEMINI_MODEL,
+    ) -> None:
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
-        self._text_evaluator = GeminiAnswerEvaluationAdapter(api_key=self._api_key)
+        self._model = model
+        self._text_evaluator = GeminiAnswerEvaluationAdapter(
+            api_key=self._api_key,
+            model=self._model,
+        )
 
     async def evaluate_audio_answer(
         self,
@@ -297,16 +318,21 @@ class GeminiAudioEvaluationAdapter(IAudioAnswerEvaluationService):
 class GeminiMultiAgentDisputeAdapter(IMultiAgentDisputeService):
     """Adaptador que orquestra a câmara multiagente (Advocate, Critic, Arbitrator).
 
-    Conexão com Gemini 1.5 Flash:
-        Permite inicialização com `api_key` opcional. Quando fornecida e válida,
-        conecta-se à API do Google Gemini 1.5 Flash (`gemini-1.5-flash`) para orquestrar
+    Conexão com Gemini 3.8 Flash:
+        Permite inicialização com `api_key` opcional e `model` configurável (`gemini-3.8-flash`).
+        Quando fornecida e válida, conecta-se à API do Google Gemini 3.8 Flash para orquestrar
         a deliberação tripartite. Caso `api_key` seja None ou vazia, mantém emulação
         determinística em memória, garantindo que toda a suíte de testes (585 testes)
         permaneça 100% verde e offline sem dependência de rede.
     """
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = DEFAULT_GEMINI_MODEL,
+    ) -> None:
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
+        self._model = model
 
     async def dispute_evaluation(
         self,
@@ -320,7 +346,7 @@ class GeminiMultiAgentDisputeAdapter(IMultiAgentDisputeService):
     ) -> DisputeEvaluationResult:
         """Executa a deliberação dos três agentes pedagógicos com proteção anti-jailbreak.
 
-        Deliberação Multiagente (Gemini 1.5 Flash / Modo Determinístico):
+        Deliberação Multiagente (Gemini 3.8 Flash / Modo Determinístico):
             - StudentAdvocateAgent: identifica fundamentos válidos na resposta do estudante.
             - FactualCriticAgent: valida a alegação contra os chunks bibliográficos canônicos.
             - ArbitratorAgent: pondera ambos os pareceres e emite o veredito final.

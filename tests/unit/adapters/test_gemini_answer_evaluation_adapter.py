@@ -123,3 +123,15 @@ def test_gemini_answer_evaluation_empty_expected_words() -> None:
     )
 
     assert result.score >= 50
+
+
+def test_gemini_answer_evaluation_model_configuration() -> None:
+    adapter_default = GeminiAnswerEvaluationAdapter()
+    assert adapter_default._model == "gemini-3.8-flash"
+
+    adapter_custom = GeminiAnswerEvaluationAdapter(
+        api_key="custom-key",
+        model="gemini-3.8-flash",
+    )
+    assert adapter_custom._api_key == "custom-key"
+    assert adapter_custom._model == "gemini-3.8-flash"

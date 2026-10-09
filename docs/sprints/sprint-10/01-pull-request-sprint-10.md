@@ -59,7 +59,7 @@ flowchart LR
 
     subgraph AI_Layer["Inteligência e RAG"]
         RAG["RAG Grounding Service (Cosine >= 0.70)"]
-        Gemini["Gemini 1.5 Flash (Blindagem XML)"]
+        Gemini["Gemini 3.8 Flash (Blindagem XML)"]
         Council["Conselho Tripartite (Advogado, Crítico, Árbitro)"]
     end
 
