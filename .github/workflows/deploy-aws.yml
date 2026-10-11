@@ -156,7 +156,13 @@ jobs:
             aws cloudformation delete-stack --stack-name study-reviewer-$ENV_NAME --region $AWS_REGION
             aws cloudformation wait stack-delete-complete --stack-name study-reviewer-$ENV_NAME --region $AWS_REGION
             echo "==> Stack anterior excluída com sucesso."
+            aws iam delete-role-policy --role-name "study-reviewer-lambda-role-$ENV_NAME" --policy-name DynamoDBStudyEventsAccess 2>/dev/null || true
+            aws iam detach-role-policy --role-name "study-reviewer-lambda-role-$ENV_NAME" --policy-arn "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole" 2>/dev/null || true
+            aws iam delete-role --role-name "study-reviewer-lambda-role-$ENV_NAME" 2>/dev/null || true
           fi
+
+          # Limpa política inline pré-existente caso haja resquício de criação manual/parcial
+          aws iam delete-role-policy --role-name "study-reviewer-lambda-role-$ENV_NAME" --policy-name DynamoDBStudyEventsAccess 2>/dev/null || true
 
           if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_DATABASE_URL }}" ]; then
             DB_URL="${{ secrets.PROD_DATABASE_URL }}"
