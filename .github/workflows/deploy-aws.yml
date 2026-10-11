@@ -228,6 +228,7 @@ jobs:
             --region $AWS_REGION \
             --query "Stacks[0].Outputs[?OutputKey=='ProductionUrl'].OutputValue" \
             --output text)
+          PROD_URL="${PROD_URL%/}"
           echo "production_url=$PROD_URL" >> $GITHUB_OUTPUT
           echo "production_url=$PROD_URL" >> $GITHUB_ENV
 
@@ -245,14 +246,15 @@ jobs:
         env:
           PROD_URL: ${{ steps.get-url.outputs.production_url }}
         run: |
+          TARGET_URL="${PROD_URL%/}"
           echo "=========================================================="
-          echo "==> Executando Health Check (Smoke Test) em: $PROD_URL/health"
+          echo "==> Executando Health Check (Smoke Test) em: $TARGET_URL/health"
           echo "=========================================================="
 
           SUCCESS=false
           for i in {1..6}; do
-            echo "Tentativa $i/6: Testando $PROD_URL/health..."
-            HTTP_CODE=$(curl -s -o /tmp/health_response.json -w "%{http_code}" "$PROD_URL/health" || true)
+            echo "Tentativa $i/6: Testando $TARGET_URL/health..."
+            HTTP_CODE=$(curl -s -o /tmp/health_response.json -w "%{http_code}" "$TARGET_URL/health" || true)
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ Health check respondeu HTTP 200 OK!"
               cat /tmp/health_response.json
