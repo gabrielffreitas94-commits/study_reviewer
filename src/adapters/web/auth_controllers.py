@@ -74,6 +74,40 @@ def login_page(
     )
 
 
+def _get_oauth_redirect_uri(request: Request) -> str:
+    """Determina a redirect_uri canônica e segura para o fluxo OAuth2 com Google.
+
+    Garantias de compatibilidade e segurança:
+    1. Se `settings.GOOGLE_REDIRECT_URI` estiver explicitamente definido E pertencer ao mesmo host
+       da requisição atual, honra a configuração.
+    2. Caso contrário (ou se GOOGLE_REDIRECT_URI pertencer a outro domínio, como staging em prod),
+       constrói a URI dinamicamente baseando-se no host da requisição, assegurando o protocolo HTTPS
+       para ambientes remotos (Lambda Function URLs, CloudFront ou instâncias de produção).
+    """
+    host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or request.url.netloc
+    )
+    req_host_only = host.split(":")[0].strip() if host else ""
+
+    if settings.GOOGLE_REDIRECT_URI:
+        parsed = urllib.parse.urlparse(settings.GOOGLE_REDIRECT_URI)
+        conf_host_only = (parsed.netloc or "").split(":")[0].strip()
+        if conf_host_only and req_host_only and conf_host_only == req_host_only:
+            return settings.GOOGLE_REDIRECT_URI
+
+    scheme = (
+        request.headers.get("x-forwarded-proto")
+        or request.url.scheme
+        or "https"
+    )
+    if "lambda-url" in (host or "") or (req_host_only not in ("localhost", "127.0.0.1", "testserver")):
+        scheme = "https"
+
+    return f"{scheme}://{host}/auth/callback"
+
+
 @auth_router.get("/google")
 def google_login_redirect(
     request: Request,
@@ -85,16 +119,21 @@ def google_login_redirect(
     safe_next = _safe_redirect_url(next, "/study")
     state = session_service.create_oauth_state(safe_next)
 
-    redirect_uri = settings.GOOGLE_REDIRECT_URI or str(request.url_for("google_oauth_callback"))
+    redirect_uri = _get_oauth_redirect_uri(request)
     auth_url = google_client.get_authorization_url(state=state, redirect_uri=redirect_uri)
 
+    is_https = (
+        settings.ENVIRONMENT in ("production", "staging")
+        or request.url.scheme == "https"
+        or "lambda-url" in (request.headers.get("host") or "")
+    )
     response = RedirectResponse(url=auth_url, status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         key="oauth_state",
         value=state,
         httponly=True,
         samesite="lax",
-        secure=(settings.ENVIRONMENT == "production"),
+        secure=is_https,
         max_age=600,
         path="/",
     )
@@ -123,7 +162,8 @@ def google_oauth_callback(
     expected_state = request.cookies.get("oauth_state")
     clean_state = (state or "").strip().strip('"')
     clean_expected = (expected_state or "").strip().strip('"')
-    if not clean_state or not clean_expected or clean_state != clean_expected:
+
+    if not clean_state:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -131,11 +171,28 @@ def google_oauth_callback(
             ),
         )
 
-    # Recupera rota de destino original a partir do state
+    # Se o cookie estiver presente no navegador, exige correspondência exata (Double Submit Cookie)
+    if clean_expected and clean_state != clean_expected:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Parâmetro state de segurança inválido ou divergente (possível tentativa de CSRF)."
+            ),
+        )
+
+    # Recupera e valida criptograficamente o state (AES-256-GCM AEAD com expiração e integridade)
     verified_next = session_service.verify_oauth_state(clean_state)
+    if verified_next is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Parâmetro state de segurança inválido ou divergente (possível tentativa de CSRF)."
+            ),
+        )
+
     next_url = _safe_redirect_url(verified_next, "/study")
 
-    redirect_uri = settings.GOOGLE_REDIRECT_URI or str(request.url_for("google_oauth_callback"))
+    redirect_uri = _get_oauth_redirect_uri(request)
 
     try:
         user_repo = SqlAlchemyUserRepository(db)
@@ -151,6 +208,11 @@ def google_oauth_callback(
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
+    is_https = (
+        settings.ENVIRONMENT in ("production", "staging")
+        or request.url.scheme == "https"
+        or "lambda-url" in (request.headers.get("host") or "")
+    )
     response = RedirectResponse(url=next_url, status_code=status.HTTP_303_SEE_OTHER)
     # Grava cookie de sessão seguro com AES-256-GCM
     response.set_cookie(
@@ -158,7 +220,7 @@ def google_oauth_callback(
         value=result.session_token,
         httponly=True,
         samesite="lax",
-        secure=(settings.ENVIRONMENT == "production"),
+        secure=is_https,
         max_age=30 * 24 * 3600,  # 30 dias
         path="/",
     )
