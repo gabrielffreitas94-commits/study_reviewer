@@ -1,0 +1,37 @@
+name: CD — Docker Build & Container Parity
+
+on:
+  push:
+    branches: [ "main", "staging" ]
+  pull_request:
+    branches: [ "main", "staging" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-parity:
+    name: Multi-stage Docker Build & Parity Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Production Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: study-reviewer:ci
+          load: true
+
+      - name: Verify Non-root Execution and Parity Smoke Test
+        run: |
+          docker run --rm study-reviewer:ci python -c "import src; print('Python imports OK')"
+          docker run --rm study-reviewer:ci whoami | grep -q "appuser" && echo "Non-root appuser verified!"

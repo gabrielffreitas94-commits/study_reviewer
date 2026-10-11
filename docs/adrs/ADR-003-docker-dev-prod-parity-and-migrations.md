@@ -10,7 +10,7 @@
 ## 1. Contexto e Problema
 O Study Reviewer necessita de um ambiente de desenvolvimento e produção com paridade absoluta (Twelve-Factor App), garantindo que a aplicação execute com as mesmas versões de banco de dados, interpretador Python e configurações tanto no ambiente local do desenvolvedor quanto no deploy em produção na nuvem gratuita (Neon PostgreSQL + Render.com).
 
-Além disso, a evolução do modelo de dados ao longo das 8 Sprints (inclusão de flashcards na Sprint 1, perguntas abertas na Sprint 2, tabelas de auditoria imutável na Sprint 3 e RAG na Sprint 6) exige uma ferramenta formal de versionamento e migração de schema para evitar perda de dados e scripts manuais frágeis de SQL.
+Além disso, a evolução do modelo de dados ao longo das 9 Sprints (inclusão de flashcards na Sprint 1, usuários/auth na Sprint 2, perguntas abertas na Sprint 3, tabelas de auditoria imutável na Sprint 4 e RAG na Sprint 7) exige uma ferramenta formal de versionamento e migração de schema para evitar perda de dados e scripts manuais frágeis de SQL.
 
 ---
 

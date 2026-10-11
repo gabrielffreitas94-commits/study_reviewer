@@ -1,0 +1,27 @@
+<!-- Estado de Onboarding: Catálogo sem perguntas cadastradas -->
+<div id="onboarding-card" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-8 sm:p-12 text-center max-w-lg mx-auto">
+    <div class="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-5 text-2xl font-bold" aria-hidden="true">
+        🚀
+    </div>
+    <h2 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+        Comece seu Estudo Ativo
+    </h2>
+    <p class="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+        Você ainda não possui perguntas abertas cadastradas no seu catálogo. Crie tópicos e perguntas com respostas esperadas para iniciar o ciclo de repetição espaçada.
+    </p>
+
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <a href="/subjects" class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm">
+            <span>Ir para Matérias & Temas</span>
+            <span class="ml-1.5" aria-hidden="true">📚</span>
+        </a>
+    </div>
+</div>
+
+<!-- Out-of-band updates para ocultar o badge na navbar -->
+<span id="review-badge" hx-swap-oob="outerHTML" class="ml-1.5 hidden inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full">
+    0
+</span>
+<span id="review-badge-mobile" hx-swap-oob="outerHTML" class="absolute -top-1 -right-2 hidden inline-flex items-center justify-center px-1 py-0.2 text-[10px] font-bold leading-none text-white bg-indigo-600 rounded-full min-w-[16px] h-4">
+    0
+</span>

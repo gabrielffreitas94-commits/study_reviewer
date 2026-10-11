@@ -1,0 +1,288 @@
+name: CD — Deploy Serverless AWS (Always Free)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente de Deploy (production ou staging)'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      fetch_logs_only:
+        description: 'Apenas consultar logs do CloudWatch sem executar deploy (true/false)'
+        required: false
+        default: false
+        type: boolean
+      since:
+        description: 'Período retroativo de logs (ex: 30m, 1h, 3h, 24h)'
+        required: false
+        default: '3h'
+  push:
+    branches:
+      - main
+      - staging
+
+concurrency:
+  group: deploy-aws-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-aws-serverless:
+    name: Deploy to AWS Lambda & DynamoDB (R$ 0,00)
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.fork }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Resolve Target Environment
+        id: env-resolver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET_ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            TARGET_ENV="production"
+          else
+            TARGET_ENV="staging"
+          fi
+          echo "target_env=$TARGET_ENV" >> $GITHUB_OUTPUT
+          echo "TARGET_ENV=$TARGET_ENV" >> $GITHUB_ENV
+          echo "=========================================================="
+          echo "🎯 AMBIENTE DE DEPLOY ALVO: $TARGET_ENV"
+          echo "📌 GATILHO: ${{ github.event_name }} (${{ github.ref_name }})"
+          echo "=========================================================="
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'sa-east-1' }}
+
+      - name: Install uv and Python
+        if: github.event.inputs.fetch_logs_only != 'true'
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python 3.13
+        if: github.event.inputs.fetch_logs_only != 'true'
+        run: uv python install 3.13
+
+      - name: Execute Alembic Database Migrations
+        if: github.event.inputs.fetch_logs_only != 'true'
+        env:
+          TARGET_ENV: ${{ steps.env-resolver.outputs.target_env }}
+          PROD_DB_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DEFAULT_DB_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "=========================================================="
+          echo "==> Aplicando Migrações do Banco com Alembic..."
+          echo "==> Ambiente: $TARGET_ENV"
+          echo "=========================================================="
+          if [ "$TARGET_ENV" = "production" ] && [ -n "$PROD_DB_URL" ]; then
+            export DATABASE_URL="$PROD_DB_URL"
+          else
+            export DATABASE_URL="$DEFAULT_DB_URL"
+          fi
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::CRÍTICO: A variável DATABASE_URL não foi informada nos Secrets do repositório! Deploy abortado para evitar execução com schema desatualizado." >&2
+            exit 1
+          fi
+
+          echo "==> Executando 'uv run alembic upgrade head'..."
+          uv run alembic upgrade head
+
+          echo "==> Validando status atual das migrações:"
+          uv run alembic current
+          echo "✅ Todas as migrações aplicadas com sucesso no banco de dados!"
+
+      - name: Log in to Amazon ECR
+        if: github.event.inputs.fetch_logs_only != 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR Repository Exists
+        if: github.event.inputs.fetch_logs_only != 'true'
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
+        run: |
+          aws ecr describe-repositories --repository-names study-reviewer --region $AWS_REGION || \
+          aws ecr create-repository --repository-name study-reviewer --region $AWS_REGION
+
+      - name: Build, Tag and Push Container Image to ECR
+        if: github.event.inputs.fetch_logs_only != 'true'
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          TARGET_ENV: ${{ steps.env-resolver.outputs.target_env }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          echo "==> Construindo imagem Dockerfile.lambda..."
+          docker build -f Dockerfile.lambda -t $ECR_REGISTRY/study-reviewer:$TARGET_ENV .
+
+          echo "==> Aplicando tag imutável do commit SHA ($COMMIT_SHA) para rollback..."
+          docker tag $ECR_REGISTRY/study-reviewer:$TARGET_ENV $ECR_REGISTRY/study-reviewer:$COMMIT_SHA
+
+          if [ "$TARGET_ENV" = "production" ]; then
+            docker tag $ECR_REGISTRY/study-reviewer:$TARGET_ENV $ECR_REGISTRY/study-reviewer:latest
+          fi
+
+          echo "==> Enviando imagens para o Amazon ECR..."
+          docker push $ECR_REGISTRY/study-reviewer:$TARGET_ENV
+          docker push $ECR_REGISTRY/study-reviewer:$COMMIT_SHA
+          if [ "$TARGET_ENV" = "production" ]; then
+            docker push $ECR_REGISTRY/study-reviewer:latest
+          fi
+
+      - name: Deploy CloudFormation Stack (Lambda + Function URL + DynamoDB)
+        if: github.event.inputs.fetch_logs_only != 'true'
+        env:
+          ENV_NAME: ${{ steps.env-resolver.outputs.target_env }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ROLE_ARN="${{ secrets.LAMBDA_ROLE_ARN }}"
+          if [ -z "$ROLE_ARN" ]; then
+            ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/study-reviewer-lambda-role-${ENV_NAME}"
+          fi
+
+          if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_DATABASE_URL }}" ]; then
+            DB_URL="${{ secrets.PROD_DATABASE_URL }}"
+          else
+            DB_URL="${{ secrets.DATABASE_URL }}"
+          fi
+
+          if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_SECRET_KEY }}" ]; then
+            SEC_KEY="${{ secrets.PROD_SECRET_KEY }}"
+          else
+            SEC_KEY="${{ secrets.SECRET_KEY }}"
+          fi
+
+          if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_REDIS_URL }}" ]; then
+            REDIS="${{ secrets.PROD_REDIS_URL }}"
+          else
+            REDIS="${{ secrets.REDIS_URL }}"
+          fi
+
+          if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_GOOGLE_CLIENT_ID }}" ]; then
+            G_CLIENT_ID="${{ secrets.PROD_GOOGLE_CLIENT_ID }}"
+          else
+            G_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}"
+          fi
+
+          if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_GOOGLE_CLIENT_SECRET }}" ]; then
+            G_CLIENT_SECRET="${{ secrets.PROD_GOOGLE_CLIENT_SECRET }}"
+          else
+            G_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
+          fi
+
+          if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_GOOGLE_REDIRECT_URI }}" ]; then
+            G_REDIRECT_URI="${{ secrets.PROD_GOOGLE_REDIRECT_URI }}"
+          else
+            G_REDIRECT_URI="${{ secrets.GOOGLE_REDIRECT_URI }}"
+          fi
+
+          GEMINI_KEY="${{ secrets.PROD_GEMINI_API_KEY || secrets.GEMINI_API_KEY || '' }}"
+
+          aws cloudformation deploy \
+            --template-file infra/template.yaml \
+            --stack-name study-reviewer-$ENV_NAME \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+                EnvironmentName=$ENV_NAME \
+                DatabaseUrl="$DB_URL" \
+                RedisUrl="$REDIS" \
+                SecretKey="$SEC_KEY" \
+                GoogleClientId="$G_CLIENT_ID" \
+                GoogleClientSecret="$G_CLIENT_SECRET" \
+                GoogleRedirectUri="$G_REDIRECT_URI" \
+                LambdaRoleArn="$ROLE_ARN" \
+                GeminiApiKey="$GEMINI_KEY" \
+                GeminiModel="gemini-3.8-flash" \
+            --region $AWS_REGION
+
+          echo "==> Atualizando código da função Lambda com o digest mais recente do ECR..."
+          aws lambda update-function-code \
+            --function-name study-reviewer-$ENV_NAME \
+            --image-uri "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/study-reviewer:${ENV_NAME}" \
+            --region $AWS_REGION
+          aws lambda wait function-updated \
+            --function-name study-reviewer-$ENV_NAME \
+            --region $AWS_REGION
+
+      - name: Output Public Production URL
+        if: github.event.inputs.fetch_logs_only != 'true'
+        id: get-url
+        env:
+          ENV_NAME: ${{ steps.env-resolver.outputs.target_env }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
+        run: |
+          PROD_URL=$(aws cloudformation describe-stacks \
+            --stack-name study-reviewer-$ENV_NAME \
+            --region $AWS_REGION \
+            --query "Stacks[0].Outputs[?OutputKey=='ProductionUrl'].OutputValue" \
+            --output text)
+          PROD_URL="${PROD_URL%/}"
+          echo "production_url=$PROD_URL" >> $GITHUB_OUTPUT
+          echo "production_url=$PROD_URL" >> $GITHUB_ENV
+
+          echo "=========================================================="
+          echo "🎉 DEPLOY CONCLUÍDO COM SUCESSO NA AWS ($ENV_NAME)!"
+          echo "URL Pública: $PROD_URL"
+          echo "=========================================================="
+          echo "### 🚀 Deploy Realizado com Sucesso ($ENV_NAME)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ambiente:** \`$ENV_NAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL Pública:** [$PROD_URL]($PROD_URL)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit SHA:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Health Check & Smoke Test
+        if: github.event.inputs.fetch_logs_only != 'true'
+        env:
+          PROD_URL: ${{ steps.get-url.outputs.production_url }}
+        run: |
+          TARGET_URL="${PROD_URL%/}"
+          echo "=========================================================="
+          echo "==> Executando Health Check (Smoke Test) em: $TARGET_URL/health"
+          echo "=========================================================="
+
+          SUCCESS=false
+          for i in {1..6}; do
+            echo "Tentativa $i/6: Testando $TARGET_URL/health..."
+            HTTP_CODE=$(curl -s -o /tmp/health_response.json -w "%{http_code}" "$TARGET_URL/health" || true)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Health check respondeu HTTP 200 OK!"
+              cat /tmp/health_response.json
+              echo ""
+              SUCCESS=true
+              break
+            fi
+            echo "Aguardando inicialização do Lambda (HTTP $HTTP_CODE)... nova tentativa em 5s"
+            sleep 5
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "::error::Falha no Smoke Test após deploy! Endpoint retornou HTTP $HTTP_CODE" >&2
+            cat /tmp/health_response.json 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Fetch and Display CloudWatch Logs
+        if: github.event.inputs.fetch_logs_only == 'true' || failure()
+        env:
+          ENV_NAME: ${{ steps.env-resolver.outputs.target_env }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
+          SINCE: ${{ github.event.inputs.since || '30m' }}
+        run: |
+          echo "=========================================================="
+          echo ">>> CloudWatch Logs: /aws/lambda/study-reviewer-$ENV_NAME <<<"
+          echo "=========================================================="
+          aws logs tail "/aws/lambda/study-reviewer-$ENV_NAME" \
+            --since "$SINCE" \
+            --format short \
+            --region "$AWS_REGION" || true

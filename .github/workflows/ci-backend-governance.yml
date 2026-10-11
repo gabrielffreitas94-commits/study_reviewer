@@ -1,0 +1,38 @@
+name: CI — Architecture & Security Governance (AST)
+
+on:
+  push:
+    branches: [ "main", "staging" ]
+  pull_request:
+    branches: [ "main", "staging" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-governance:
+    name: Clean Architecture AST & Governance Enforcement
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Install Dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Run Architecture AST Compliance Tests (ADR-001)
+        run: uv run pytest tests/architecture/ -v
+
+      - name: Run Security & Specialists Governance AST Meta-tests
+        run: uv run pytest tests/governance/ -v

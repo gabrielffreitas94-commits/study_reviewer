@@ -13,6 +13,15 @@ dependencies = [
     "python-multipart>=0.0.12",
     "pydantic>=2.9.2",
     "pydantic-settings>=2.5.2",
+    "cryptography>=50.0.2",
+    "alembic>=1.20.0",
+    "nh3>=0.3.7",
+    "redis>=8.1.0",
+    "fakeredis>=2.39.0",
+    "asyncpg>=0.31.0",
+    "boto3>=1.43.108",
+    "mangum>=0.22.0",
+    "httpx>=0.27.2",
 ]
 
 [dependency-groups]
@@ -21,7 +30,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.7.0",
     "mypy>=1.12.0",
-    "httpx>=0.27.2",
+    "moto[dynamodb]>=5.2.3",
 ]
 
 [tool.ruff]
@@ -32,8 +41,16 @@ line-length = 100
 select = ["E", "F", "W", "I", "B", "UP", "S"]
 ignore = []
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.params.Depends",
+    "fastapi.File",
+    "fastapi.params.File",
+]
+
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]  # Permite assert nos testes
+"tests/*" = ["S101", "S105", "S106"]  # Permite assert e tokens de teste nos testes
 
 [tool.mypy]
 python_version = "3.13"
@@ -52,12 +69,17 @@ markers = [
     "integration: Testes de integração de adaptadores, banco e controllers",
     "e2e: Testes ponta a ponta",
 ]
+filterwarnings = [
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
+]
 
 [tool.coverage.run]
 source = ["src"]
 omit = [
     "*/tests/*",
     "*/__init__.py",
+    "src/main.py",
+    "*/main.py",
 ]
 
 [tool.coverage.report]
@@ -68,4 +90,5 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
     "@abstractmethod",
+    "\\.\\.\\.",
 ]
