@@ -175,6 +175,7 @@ Resources:
   # 5. Permissão Pública para Invocação da Function URL
   StudyReviewerFunctionUrlPermission:
     Type: AWS::Lambda::Permission
+    DependsOn: StudyReviewerFunctionUrl
     Properties:
       FunctionName: !Ref StudyReviewerFunction
       FunctionUrlAuthType: NONE
