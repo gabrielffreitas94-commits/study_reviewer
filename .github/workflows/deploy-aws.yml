@@ -161,9 +161,6 @@ jobs:
             aws iam delete-role --role-name "study-reviewer-lambda-role-$ENV_NAME" 2>/dev/null || true
           fi
 
-          # Limpa política inline pré-existente caso haja resquício de criação manual/parcial
-          aws iam delete-role-policy --role-name "study-reviewer-lambda-role-$ENV_NAME" --policy-name DynamoDBStudyEventsAccess 2>/dev/null || true
-
           if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_DATABASE_URL }}" ]; then
             DB_URL="${{ secrets.PROD_DATABASE_URL }}"
           else
