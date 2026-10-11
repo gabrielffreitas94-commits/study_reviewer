@@ -149,10 +149,10 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ROLE_ARN="${{ secrets.LAMBDA_ROLE_ARN || '' }}"
 
-          # Se a stack estiver em ROLLBACK_COMPLETE ou UPDATE_ROLLBACK_FAILED, remove-a para recriação limpa
+          # Se a stack estiver em qualquer estado de ROLLBACK, remove-a para recriação limpa
           STACK_STATUS=$(aws cloudformation describe-stacks --stack-name study-reviewer-$ENV_NAME --region $AWS_REGION --query "Stacks[0].StackStatus" --output text 2>/dev/null || true)
           echo "==> Status atual da stack study-reviewer-$ENV_NAME: $STACK_STATUS"
-          if [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ] || [ "$STACK_STATUS" = "UPDATE_ROLLBACK_FAILED" ]; then
+          if [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ] || [ "$STACK_STATUS" = "UPDATE_ROLLBACK_COMPLETE" ] || [ "$STACK_STATUS" = "UPDATE_ROLLBACK_FAILED" ]; then
             echo "==> Stack study-reviewer-$ENV_NAME está em $STACK_STATUS. Deletando stack para recriação limpa..."
             aws cloudformation delete-stack --stack-name study-reviewer-$ENV_NAME --region $AWS_REGION
             aws cloudformation wait stack-delete-complete --stack-name study-reviewer-$ENV_NAME --region $AWS_REGION
