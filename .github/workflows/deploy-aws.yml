@@ -231,6 +231,15 @@ jobs:
             --function-name study-reviewer-$ENV_NAME \
             --region $AWS_REGION
 
+          echo "==> Garantindo permissão pública para invocação da Function URL..."
+          aws lambda add-permission \
+            --function-name study-reviewer-$ENV_NAME \
+            --statement-id FunctionURLAllowPublicAccess \
+            --action lambda:InvokeFunctionUrl \
+            --principal "*" \
+            --function-url-auth-type NONE \
+            --region $AWS_REGION 2>/dev/null || true
+
       - name: Output Public Production URL
         if: github.event.inputs.fetch_logs_only != 'true'
         id: get-url
