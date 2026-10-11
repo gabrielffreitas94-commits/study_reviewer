@@ -102,7 +102,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: DynamoDBStudyEventsAccess
+        - PolicyName: !Sub 'DynamoDBAccess-${EnvironmentName}'
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
