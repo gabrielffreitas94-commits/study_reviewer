@@ -188,10 +188,24 @@ jobs:
             G_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
           fi
 
-          if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_GOOGLE_REDIRECT_URI }}" ]; then
+          if [ "$ENV_NAME" = "production" ]; then
             G_REDIRECT_URI="${{ secrets.PROD_GOOGLE_REDIRECT_URI }}"
           else
             G_REDIRECT_URI="${{ secrets.GOOGLE_REDIRECT_URI }}"
+          fi
+
+          # Se G_REDIRECT_URI não foi definido explicitamente nos secrets, auto-detecta a URL da stack
+          if [ -z "$G_REDIRECT_URI" ]; then
+            EXISTING_STACK_URL=$(aws cloudformation describe-stacks \
+              --stack-name study-reviewer-$ENV_NAME \
+              --region $AWS_REGION \
+              --query "Stacks[0].Outputs[?OutputKey=='ProductionUrl'].OutputValue" \
+              --output text 2>/dev/null || true)
+            if [ -n "$EXISTING_STACK_URL" ] && [ "$EXISTING_STACK_URL" != "None" ]; then
+              EXISTING_STACK_URL="${EXISTING_STACK_URL%/}"
+              G_REDIRECT_URI="${EXISTING_STACK_URL}/auth/callback"
+              echo "==> G_REDIRECT_URI auto-detectado da stack CloudFormation: $G_REDIRECT_URI"
+            fi
           fi
 
           GEMINI_KEY="${{ secrets.PROD_GEMINI_API_KEY || secrets.GEMINI_API_KEY || '' }}"

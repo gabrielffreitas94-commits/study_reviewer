@@ -362,3 +362,83 @@ def test_get_current_user_preserves_query_string(
     assert res.status_code == 303
     expected_next = urllib.parse.quote("/study?subject_id=123&mode=review", safe="")
     assert res.headers["location"] == f"/auth/login?next={expected_next}"
+
+
+@pytest.mark.security
+def test_oauth_callback_succeeds_with_valid_aead_state_when_cookie_is_missing(
+    auth_client: TestClient,
+    mock_google: MockGoogleAuthClient,
+    test_db_session: sessionmaker[Session],
+) -> None:
+    """Valida autenticação resiliente quando o navegador bloqueia cookies de redirecionamento, mas o state AEAD é íntegro.
+
+    Vulnerabilidade prevenida: Negação de serviço ou bloqueio acidental de login para usuários legítimos com navegadores restritivos (ex: Safari ITP ou particionamento de cookies cross-site).
+    Garantia de segurança: O endpoint valida o token criptográfico AEAD AES-256-GCM mesmo se o cookie transitório foi expurgado, assegurando autenticidade, integridade e expiração temporal do state.
+    """
+    # 1. Gera state AEAD legítimo
+    session_service = get_session_service()
+    valid_state = session_service.create_oauth_state("/study")
+
+    # 2. Configura mock Google
+    mock_google.code_users["code-no-cookie"] = GoogleUserInfoDTO(
+        sub="google-sub-no-cookie",
+        email="nocookie@test.com",
+        name="No Cookie User",
+        avatar_url="https://avatar.google.com/nc.png",
+    )
+
+    # 3. Callback SEM cookie oauth_state no cliente
+    auth_client.cookies.clear()
+    callback_res = auth_client.get(
+        f"/auth/callback?code=code-no-cookie&state={urllib.parse.quote(valid_state)}",
+        follow_redirects=False,
+    )
+    assert callback_res.status_code == 303
+    assert callback_res.headers["location"] == "/study"
+    assert "session_token" in callback_res.cookies
+
+
+@pytest.mark.security
+def test_oauth_redirect_uri_detects_host_mismatch_and_resolves_dynamically() -> None:
+    """Garante que se settings.GOOGLE_REDIRECT_URI pertencer a outro domínio, a URI seja derivada do host da requisição com HTTPS.
+
+    Vulnerabilidade prevenida: Vazamento de authorization code e credenciais federadas para domínios ou ambientes divergentes (ex: redirecionamento cruzado entre staging e produção).
+    Garantia de segurança: A resolução canônica detecta disparidade entre o host configurado e a requisição atual, reconstruindo dinamicamente a URI canônica sob HTTPS correspondente ao host de origem.
+    """
+    from fastapi import Request
+    from src.adapters.web.auth_controllers import _get_oauth_redirect_uri
+    from src.infrastructure.config import settings
+
+    old_redirect_uri = settings.GOOGLE_REDIRECT_URI
+    try:
+        # Simula configuração apontando para staging
+        settings.GOOGLE_REDIRECT_URI = "https://staging.lambda-url.sa-east-1.on.aws/auth/callback"
+
+        # Simula requisição chegando em produção
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/auth/google",
+            "headers": [
+                (b"host", b"prod.lambda-url.sa-east-1.on.aws"),
+                (b"x-forwarded-proto", b"https"),
+            ],
+        }
+        request = Request(scope)
+        resolved_uri = _get_oauth_redirect_uri(request)
+        assert resolved_uri == "https://prod.lambda-url.sa-east-1.on.aws/auth/callback"
+
+        # Simula requisição chegando em staging (host compatível)
+        scope_staging = {
+            "type": "http",
+            "method": "GET",
+            "path": "/auth/google",
+            "headers": [
+                (b"host", b"staging.lambda-url.sa-east-1.on.aws"),
+            ],
+        }
+        request_staging = Request(scope_staging)
+        assert _get_oauth_redirect_uri(request_staging) == "https://staging.lambda-url.sa-east-1.on.aws/auth/callback"
+    finally:
+        settings.GOOGLE_REDIRECT_URI = old_redirect_uri
+
