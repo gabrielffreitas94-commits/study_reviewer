@@ -240,6 +240,14 @@ jobs:
             --function-url-auth-type NONE \
             --region $AWS_REGION 2>/dev/null || true
 
+          aws lambda add-permission \
+            --function-name study-reviewer-$ENV_NAME \
+            --statement-id FunctionPublicInvokeBroad \
+            --action lambda:InvokeFunction \
+            --principal "*" \
+            --region $AWS_REGION 2>/dev/null || true
+
+
       - name: Output Public Production URL
         if: github.event.inputs.fetch_logs_only != 'true'
         id: get-url
