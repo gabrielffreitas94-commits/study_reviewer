@@ -91,7 +91,6 @@ Resources:
     Type: AWS::IAM::Role
     Condition: CreateLambdaRole
     Properties:
-      RoleName: !Sub 'study-reviewer-lambda-role-${EnvironmentName}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
