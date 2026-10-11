@@ -149,6 +149,15 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ROLE_ARN="${{ secrets.LAMBDA_ROLE_ARN || '' }}"
 
+          # Se ROLE_ARN não foi informado, verifica se a role já existe no IAM para reutilizá-la
+          if [ -z "$ROLE_ARN" ]; then
+            EXISTING_ROLE=$(aws iam get-role --role-name "study-reviewer-lambda-role-$ENV_NAME" --query "Role.Arn" --output text 2>/dev/null || true)
+            if [ -n "$EXISTING_ROLE" ] && [ "$EXISTING_ROLE" != "None" ]; then
+              ROLE_ARN="$EXISTING_ROLE"
+              echo "==> IAM Role existente auto-detectada no IAM: $ROLE_ARN"
+            fi
+          fi
+
           # Se a stack estiver em ROLLBACK_COMPLETE (criação inicial falhou), remove-a para recriação limpa
           STACK_STATUS=$(aws cloudformation describe-stacks --stack-name study-reviewer-$ENV_NAME --region $AWS_REGION --query "Stacks[0].StackStatus" --output text 2>/dev/null || true)
           if [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
