@@ -147,9 +147,15 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION || 'sa-east-1' }}
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          ROLE_ARN="${{ secrets.LAMBDA_ROLE_ARN }}"
-          if [ -z "$ROLE_ARN" ]; then
-            ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/study-reviewer-lambda-role-${ENV_NAME}"
+          ROLE_ARN="${{ secrets.LAMBDA_ROLE_ARN || '' }}"
+
+          # Se a stack estiver em ROLLBACK_COMPLETE (criação inicial falhou), remove-a para recriação limpa
+          STACK_STATUS=$(aws cloudformation describe-stacks --stack-name study-reviewer-$ENV_NAME --region $AWS_REGION --query "Stacks[0].StackStatus" --output text 2>/dev/null || true)
+          if [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+            echo "==> Stack study-reviewer-$ENV_NAME está em ROLLBACK_COMPLETE. Deletando stack anterior para recriação limpa..."
+            aws cloudformation delete-stack --stack-name study-reviewer-$ENV_NAME --region $AWS_REGION
+            aws cloudformation wait stack-delete-complete --stack-name study-reviewer-$ENV_NAME --region $AWS_REGION
+            echo "==> Stack anterior excluída com sucesso."
           fi
 
           if [ "$ENV_NAME" = "production" ] && [ -n "${{ secrets.PROD_DATABASE_URL }}" ]; then
@@ -190,7 +196,8 @@ jobs:
 
           GEMINI_KEY="${{ secrets.PROD_GEMINI_API_KEY || secrets.GEMINI_API_KEY || '' }}"
 
-          aws cloudformation deploy \
+          echo "==> Executando CloudFormation deploy para stack: study-reviewer-$ENV_NAME..."
+          if ! aws cloudformation deploy \
             --template-file infra/template.yaml \
             --stack-name study-reviewer-$ENV_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
@@ -205,7 +212,15 @@ jobs:
                 LambdaRoleArn="$ROLE_ARN" \
                 GeminiApiKey="$GEMINI_KEY" \
                 GeminiModel="gemini-3.8-flash" \
-            --region $AWS_REGION
+            --region $AWS_REGION; then
+            echo "::error::Falha no CloudFormation deploy. Eventos recentes do stack:"
+            aws cloudformation describe-stack-events \
+              --stack-name study-reviewer-$ENV_NAME \
+              --region $AWS_REGION \
+              --query "StackEvents[?ResourceStatus=='CREATE_FAILED'||ResourceStatus=='UPDATE_FAILED'].[LogicalResourceId,ResourceStatusReason]" \
+              --output table || true
+            exit 1
+          fi
 
           echo "==> Atualizando código da função Lambda com o digest mais recente do ECR..."
           aws lambda update-function-code \
