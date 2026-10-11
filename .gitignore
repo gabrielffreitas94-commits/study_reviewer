@@ -70,3 +70,4 @@ mobile/build/
 build/
 *.aab
 *.apk
+**/.gradle/
