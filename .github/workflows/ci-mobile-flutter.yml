@@ -84,7 +84,7 @@ jobs:
 
       - name: Build Android APK (Release for Staging)
         working-directory: ${{ steps.flutter-dir.outputs.path }}
-        run: flutter build apk --release --android-skip-build-dependency-validation --dart-define=API_BASE_URL=https://6xopxyw6z6qmqpbmcvaszuy27m0jsgzh.lambda-url.sa-east-1.on.aws/api/v1
+        run: flutter build apk --release --android-skip-build-dependency-validation --dart-define=API_BASE_URL=https://x5keiru4j4zwubk2ax2vmprdci0dmlfy.lambda-url.sa-east-1.on.aws/api/v1
 
       - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4

@@ -13,7 +13,7 @@ class ApiConstants {
 
   /// URL de Staging pública na AWS (Serverless Always Free)
   static const String stagingBaseUrl =
-      'https://6xopxyw6z6qmqpbmcvaszuy27m0jsgzh.lambda-url.sa-east-1.on.aws/api/v1';
+      'https://x5keiru4j4zwubk2ax2vmprdci0dmlfy.lambda-url.sa-east-1.on.aws/api/v1';
 
   /// Determina dinamicamente a URL base correta conforme a plataforma de execução ou flag --dart-define.
   static String get defaultBaseUrl {
