@@ -94,13 +94,29 @@ class TopicModel(Base):
         lazy="selectin",
     )
     questions: Mapped[list["QuestionModel"]] = relationship(
-        "QuestionModel", back_populates="topic", cascade="all, delete-orphan", lazy="selectin"
+        "QuestionModel",
+        secondary="question_topics",
+        back_populates="topics",
+        lazy="selectin",
     )
     knowledge_sources: Mapped[list["KnowledgeSourceModel"]] = relationship(
         "KnowledgeSourceModel",
         secondary="knowledge_source_topics",
         back_populates="topics",
         lazy="selectin",
+    )
+
+
+class QuestionTopicModel(Base):
+    """Tabela associativa N:N entre Perguntas Abertas e Temas (ADR-004 / N:N)."""
+
+    __tablename__ = "question_topics"
+
+    question_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("questions.id", ondelete="CASCADE"), primary_key=True
+    )
+    topic_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), primary_key=True, index=True
     )
 
 
@@ -202,19 +218,25 @@ class StudyEventModel(Base):
 
 
 class QuestionModel(Base):
-    """Tabela de Perguntas Abertas (Sprint 03)."""
+    """Tabela de Perguntas Abertas (Sprint 03 / N:N)."""
 
     __tablename__ = "questions"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    topic_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    topic_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
     )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     expected_answer: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
-    topic: Mapped["TopicModel"] = relationship("TopicModel", back_populates="questions")
+    topic: Mapped["TopicModel | None"] = relationship("TopicModel")
+    topics: Mapped[list["TopicModel"]] = relationship(
+        "TopicModel",
+        secondary="question_topics",
+        back_populates="questions",
+        lazy="selectin",
+    )
     progresses: Mapped[list["UserQuestionProgressModel"]] = relationship(
         "UserQuestionProgressModel", back_populates="question", cascade="all, delete-orphan"
     )

@@ -30,6 +30,7 @@ from src.adapters.persistence.models import (
     KnowledgeSourceTopicModel,
     PoolSessionModel,
     QuestionModel,
+    QuestionTopicModel,
     ReviewAuditLogModel,
     StudyEventModel,
     SubjectModel,
@@ -468,6 +469,16 @@ class SqlAlchemyQuestionRepository(IQuestionRepository):
     def save(self, question: Question) -> None:
         model = QuestionMapper.to_model(question)
         self._session.merge(model)
+        self._session.flush()
+
+        self._session.query(QuestionTopicModel).filter(
+            QuestionTopicModel.question_id == question.id
+        ).delete(synchronize_session=False)
+
+        for t_id in question.topic_ids:
+            assoc = QuestionTopicModel(question_id=question.id, topic_id=t_id)
+            self._session.add(assoc)
+
         self._session.commit()
 
     def get_by_id(self, question_id: UUID) -> Question | None:
@@ -478,7 +489,14 @@ class SqlAlchemyQuestionRepository(IQuestionRepository):
     def list_by_topic(self, topic_id: UUID) -> list[Question]:
         stmt = (
             select(QuestionModel)
-            .where(QuestionModel.topic_id == topic_id)
+            .outerjoin(QuestionTopicModel, QuestionTopicModel.question_id == QuestionModel.id)
+            .where(
+                or_(
+                    QuestionTopicModel.topic_id == topic_id,
+                    QuestionModel.topic_id == topic_id,
+                )
+            )
+            .distinct()
             .order_by(QuestionModel.created_at.asc(), QuestionModel.id.asc())
         )
         models = self._session.scalars(stmt).all()
@@ -540,15 +558,38 @@ class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
             )
         )
         if subject_id is not None:
-            stmt = stmt.where(SubjectModel.id == subject_id)
+            topic_subquery = select(TopicModel.id).where(TopicModel.subject_id == subject_id)
+            stmt = stmt.where(
+                or_(
+                    SubjectModel.id == subject_id,
+                    QuestionModel.id.in_(
+                        select(QuestionTopicModel.question_id).where(
+                            QuestionTopicModel.topic_id.in_(topic_subquery)
+                        )
+                    ),
+                )
+            )
         if topic_id is not None:
-            stmt = stmt.where(TopicModel.id == topic_id)
+            stmt = stmt.where(
+                or_(
+                    TopicModel.id == topic_id,
+                    QuestionModel.id.in_(
+                        select(QuestionTopicModel.question_id).where(
+                            QuestionTopicModel.topic_id == topic_id
+                        )
+                    ),
+                )
+            )
 
-        stmt = stmt.order_by(
-            UserQuestionProgressModel.next_review_date.asc(),
-            UserQuestionProgressModel.current_level.asc(),
-            QuestionModel.id.asc(),
-        ).limit(limit)
+        stmt = (
+            stmt.distinct()
+            .order_by(
+                UserQuestionProgressModel.next_review_date.asc(),
+                UserQuestionProgressModel.current_level.asc(),
+                QuestionModel.id.asc(),
+            )
+            .limit(limit)
+        )
 
         rows = self._session.execute(stmt).all()
         return [

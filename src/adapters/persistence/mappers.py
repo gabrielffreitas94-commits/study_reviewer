@@ -165,13 +165,16 @@ class SessionMapper:
 
 
 class QuestionMapper:
-    """Conversor para Pergunta Aberta (Sprint 03)."""
+    """Conversor para Pergunta Aberta (Sprint 03 / N:N)."""
 
     @staticmethod
     def to_domain(model: QuestionModel) -> Question:
+        topic_ids = tuple(t.id for t in model.topics) if getattr(model, "topics", None) else ()
+        if not topic_ids and model.topic_id:
+            topic_ids = (model.topic_id,)
         return Question(
             id=model.id,
-            topic_id=model.topic_id,
+            topic_ids=topic_ids,
             prompt=str(model.prompt),
             expected_answer=str(model.expected_answer),
             created_at=model.created_at,
@@ -181,7 +184,7 @@ class QuestionMapper:
     def to_model(entity: Question) -> QuestionModel:
         return QuestionModel(
             id=entity.id,
-            topic_id=entity.topic_id,
+            topic_id=entity.topic_id if entity.topic_ids else None,
             prompt=entity.prompt,
             expected_answer=entity.expected_answer,
             created_at=entity.created_at,

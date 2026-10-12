@@ -57,6 +57,8 @@ class StudioNewQuestionPayload(BaseModel):
     expected_answer: str = Field(..., min_length=1, max_length=10000)
     topic_id: UUID | None = None
     topic_index: int | None = None
+    topic_ids: list[UUID] = Field(default_factory=list)
+    topic_indices: list[int] = Field(default_factory=list)
 
 
 class BatchStudioPublishPayload(BaseModel):
@@ -124,6 +126,8 @@ async def batch_studio_publish(
                 expected_answer=MarkdownSanitizerService.sanitize(q.expected_answer),
                 topic_id=q.topic_id,
                 topic_index=q.topic_index,
+                topic_ids=q.topic_ids,
+                topic_indices=q.topic_indices,
             )
             for q in payload.questions
         ],

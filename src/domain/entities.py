@@ -245,23 +245,88 @@ class FlashcardPoolSession:
 
 @dataclass(slots=True)
 class Question:
-    """Entidade que representa uma Pergunta Aberta pertencente a um Tema."""
+    """Entidade que representa uma Pergunta Aberta pertencente a um ou mais Temas (N:N)."""
 
-    topic_id: UUID
-    prompt: str
-    expected_answer: str
+    prompt: str = ""
+    expected_answer: str = ""
+    topic_ids: tuple[UUID, ...] = field(default_factory=tuple)
     id: UUID = field(default_factory=uuid4)
     created_at: date = field(default_factory=date.today)
+
+    def __init__(
+        self,
+        prompt_or_topic_id: str | UUID = "",
+        expected_answer_or_prompt: str = "",
+        topic_ids: tuple[UUID, ...] | list[UUID] | None = None,
+        id: UUID | None = None,
+        created_at: date | None = None,
+        topic_id: UUID | None = None,
+        prompt: str | None = None,
+        expected_answer: str | None = None,
+    ) -> None:
+        actual_prompt: str = ""
+        actual_answer: str = ""
+        actual_topic_id: UUID | None = topic_id
+
+        if isinstance(prompt_or_topic_id, UUID):
+            actual_topic_id = prompt_or_topic_id
+            actual_prompt = expected_answer_or_prompt
+            if isinstance(topic_ids, str):
+                actual_answer = topic_ids
+                topic_ids = None
+            elif expected_answer is not None:
+                actual_answer = expected_answer
+        else:
+            actual_prompt = prompt if prompt is not None else str(prompt_or_topic_id)
+            actual_answer = (
+                expected_answer if expected_answer is not None else str(expected_answer_or_prompt)
+            )
+
+        self.prompt = actual_prompt.strip() if actual_prompt is not None else ""
+        self.expected_answer = actual_answer.strip() if actual_answer is not None else ""
+        self.id = id if id is not None else uuid4()
+        self.created_at = created_at if created_at is not None else date.today()
+
+        resolved_topics: tuple[UUID, ...]
+        if topic_ids is not None:
+            resolved_topics = tuple(topic_ids)
+        elif actual_topic_id is not None:
+            resolved_topics = (actual_topic_id,)
+        else:
+            resolved_topics = ()
+
+        self.topic_ids = resolved_topics
+        self.__post_init__()
 
     def __post_init__(self) -> None:
         self.prompt = self.prompt.strip() if self.prompt is not None else ""
         self.expected_answer = (
             self.expected_answer.strip() if self.expected_answer is not None else ""
         )
+
+        if not self.topic_ids or len(self.topic_ids) < 1:
+            raise DomainValidationError("Pergunta deve estar associada a pelo menos 1 tema.")
+
+        if len(self.topic_ids) > 5:
+            raise DomainValidationError("Pergunta pode estar associada a no máximo 5 temas.")
+
+        if len(set(self.topic_ids)) != len(self.topic_ids):
+            raise DomainValidationError("Pergunta não pode conter temas duplicados.")
+
         if not self.prompt or len(self.prompt) > 10_000:
             raise InvalidPromptError("Enunciado deve ter entre 1 e 10.000 caracteres.")
         if not self.expected_answer or len(self.expected_answer) > 10_000:
             raise InvalidExpectedAnswerError("Gabarito deve ter entre 1 e 10.000 caracteres.")
+
+    @property
+    def primary_topic_id(self) -> UUID:
+        """Retorna o tema principal (primeiro) da pergunta."""
+        return self.topic_ids[0]
+
+    @property
+    def topic_id(self) -> UUID:
+        """Propriedade de compatibilidade retornando o primeiro tema associado."""
+        return self.topic_ids[0]
 
 
 @dataclass(slots=True)

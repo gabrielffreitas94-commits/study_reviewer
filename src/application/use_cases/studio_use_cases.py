@@ -118,7 +118,7 @@ class BatchStudioPublishUseCase:
                 )
                 created_source_ids.append(ingested.id)
 
-            # 4. Criação das Perguntas Abertas em Lote
+            # 4. Criação das Perguntas Abertas em Lote (com vínculos N:N)
             for q_dto in dto.questions:
                 clean_prompt = q_dto.prompt.strip()
                 clean_expected = q_dto.expected_answer.strip()
@@ -128,18 +128,52 @@ class BatchStudioPublishUseCase:
                         "O enunciado e a resposta esperada da pergunta não podem ser vazios."
                     )
 
-                target_topic_id: UUID
-                if q_dto.topic_index is not None and 0 <= q_dto.topic_index < len(created_topics):
-                    target_topic_id = created_topics[q_dto.topic_index].id
-                elif q_dto.topic_id is not None and q_dto.topic_id in existing_topic_ids:
-                    target_topic_id = q_dto.topic_id
-                elif created_topics:
-                    target_topic_id = created_topics[0].id
-                else:
-                    target_topic_id = existing_topics[0].id
+                target_topic_ids = []
+
+                # Tópicos existentes por ID (incluindo matérias interdisciplinares)
+                for t_id in q_dto.topic_ids:
+                    if t_id in existing_topic_ids:
+                        target_topic_ids.append(t_id)
+                    else:
+                        other_top = self._topic_repo.get_by_id(t_id)
+                        if other_top:
+                            other_subj = self._subject_repo.get_by_id(other_top.subject_id)
+                            if other_subj and other_subj.can_be_edited_by(user_id):
+                                target_topic_ids.append(t_id)
+
+                # Novos tópicos por índice da lista de novos temas criados no lote
+                for idx in q_dto.topic_indices:
+                    if 0 <= idx < len(created_topics):
+                        target_topic_ids.append(created_topics[idx].id)
+
+                # Fallback: campos legados individuais
+                if not target_topic_ids:
+                    if q_dto.topic_index is not None and 0 <= q_dto.topic_index < len(
+                        created_topics
+                    ):
+                        target_topic_ids.append(created_topics[q_dto.topic_index].id)
+                    elif q_dto.topic_id is not None:
+                        if q_dto.topic_id in existing_topic_ids:
+                            target_topic_ids.append(q_dto.topic_id)
+                        else:
+                            leg_top = self._topic_repo.get_by_id(q_dto.topic_id)
+                            if leg_top:
+                                leg_subj = self._subject_repo.get_by_id(leg_top.subject_id)
+                                if leg_subj and leg_subj.can_be_edited_by(user_id):
+                                    target_topic_ids.append(q_dto.topic_id)
+                    elif created_topics:
+                        target_topic_ids.append(created_topics[0].id)
+                    else:
+                        target_topic_ids.append(existing_topics[0].id)
+
+                target_topic_ids = list(dict.fromkeys(target_topic_ids))
+                if not target_topic_ids:
+                    raise DomainValidationError(
+                        "A pergunta deve estar vinculada a pelo menos um tema."
+                    )
 
                 question = Question(
-                    topic_id=target_topic_id,
+                    topic_ids=target_topic_ids,
                     prompt=clean_prompt,
                     expected_answer=clean_expected,
                     created_at=today,

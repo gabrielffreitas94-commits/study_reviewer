@@ -136,3 +136,46 @@ def test_question_immutability_and_slots() -> None:
     prog = UserQuestionProgress(user_id=uuid4(), question_id=uuid4())
     with pytest.raises(AttributeError):
         prog.injected_attribute = "malicious"  # type: ignore[attr-defined]
+
+
+@pytest.mark.unit
+def test_question_with_multiple_topic_ids_and_properties() -> None:
+    """Verifica instanciação com múltiplos temas, primary_topic_id e backward compat."""
+    t1, t2, t3 = uuid4(), uuid4(), uuid4()
+    q = Question(
+        topic_ids=(t1, t2, t3),
+        prompt="Pergunta interdisciplinar",
+        expected_answer="Resposta interdisciplinar",
+    )
+    assert q.topic_ids == (t1, t2, t3)
+    assert q.primary_topic_id == t1
+    assert q.topic_id == t1
+
+
+@pytest.mark.unit
+def test_question_topic_ids_validation_errors() -> None:
+    """Verifica validações de tópicos (mínimo 1, máximo 5 e duplicados)."""
+    # 1. Sem tópicos
+    with pytest.raises(
+        DomainValidationError, match="Pergunta deve estar associada a pelo menos 1 tema."
+    ):
+        Question(topic_ids=(), prompt="Prompt", expected_answer="Gabarito")
+
+    # 2. Mais de 5 tópicos
+    with pytest.raises(
+        DomainValidationError, match="Pergunta pode estar associada a no máximo 5 temas."
+    ):
+        Question(
+            topic_ids=tuple(uuid4() for _ in range(6)),
+            prompt="Prompt",
+            expected_answer="Gabarito",
+        )
+
+    # 3. Tópicos duplicados
+    dup_id = uuid4()
+    with pytest.raises(DomainValidationError, match="Pergunta não pode conter temas duplicados."):
+        Question(
+            topic_ids=(dup_id, dup_id),
+            prompt="Prompt",
+            expected_answer="Gabarito",
+        )
