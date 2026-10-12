@@ -21,6 +21,8 @@ class StudioNewQuestionDTO:
 
     prompt: str
     expected_answer: str
+    topic_ids: list[UUID] = field(default_factory=list)
+    topic_indices: list[int] = field(default_factory=list)
     topic_id: UUID | None = None
     topic_index: int | None = None
 

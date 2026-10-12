@@ -378,3 +378,181 @@ def test_batch_studio_publish_fallback_to_existing_topics(
     assert res.created_topics_count == 0
     assert res.created_sources_count == 1
     assert res.created_questions_count == 1
+
+
+@pytest.mark.unit
+def test_batch_studio_publish_questions_with_multi_topics_and_interdisciplinary(
+    user_id: UUID,
+    subject: Subject,
+    existing_topic: Topic,
+    clock_mock: Mock,
+) -> None:
+    """Verifica resolução de múltiplos temas (existente, interdisciplinar e novos por índice)."""
+    other_subject = Subject(name="Direito Constitucional", owner_id=user_id)
+    other_topic = Topic(subject_id=other_subject.id, name="Controle de Constitucionalidade")
+    invalid_topic_id = uuid4()
+
+    def mock_get_subject(s_id: UUID) -> Subject | None:
+        if s_id == subject.id:
+            return subject
+        if s_id == other_subject.id:
+            return other_subject
+        return None
+
+    def mock_get_topic(t_id: UUID) -> Topic | None:
+        if t_id == other_topic.id:
+            return other_topic
+        return None
+
+    subject_repo = Mock()
+    subject_repo.get_by_id.side_effect = mock_get_subject
+
+    topic_repo = Mock()
+    topic_repo.list_by_subject.return_value = [existing_topic]
+    topic_repo.get_by_id.side_effect = mock_get_topic
+    topic_repo.save.side_effect = lambda t: t
+
+    saved_questions = []
+    question_repo = Mock()
+    question_repo.save.side_effect = lambda q: saved_questions.append(q)
+
+    progress_repo = Mock()
+    ingest_use_case = AsyncMock()
+
+    use_case = BatchStudioPublishUseCase(
+        subject_repo=subject_repo,
+        topic_repo=topic_repo,
+        question_repo=question_repo,
+        progress_repo=progress_repo,
+        ingest_knowledge_use_case=ingest_use_case,
+        clock=clock_mock,
+    )
+
+    dto = BatchStudioPublishInputDTO(
+        subject_id=subject.id,
+        new_topics=["Novo Tema A"],
+        new_sources=[],
+        questions=[
+            StudioNewQuestionDTO(
+                prompt="Pergunta Interdisciplinar?",
+                expected_answer="Resposta correta.",
+                topic_ids=[existing_topic.id, other_topic.id, invalid_topic_id],
+                topic_indices=[0, 99],  # 0 é válido, 99 é fora do limite
+            )
+        ],
+    )
+
+    res = asyncio.run(use_case.execute(user_id=user_id, dto=dto))
+    assert res.created_questions_count == 1
+    assert len(saved_questions) == 1
+    q = saved_questions[0]
+    # Deve conter existing_topic, other_topic e o novo tema criado no índice 0
+    assert existing_topic.id in q.topic_ids
+    assert other_topic.id in q.topic_ids
+    assert len(q.topic_ids) == 3
+
+
+@pytest.mark.unit
+def test_batch_studio_publish_question_legacy_fallback_other_subject(
+    user_id: UUID,
+    subject: Subject,
+    existing_topic: Topic,
+    clock_mock: Mock,
+) -> None:
+    """Verifica fallback legado de topic_id para tema interdisciplinar de outra matéria."""
+    other_subject = Subject(name="Direito Penal", owner_id=user_id)
+    other_topic = Topic(subject_id=other_subject.id, name="Crimes contra a Administração")
+
+    def mock_get_subject(s_id: UUID) -> Subject | None:
+        if s_id == subject.id:
+            return subject
+        if s_id == other_subject.id:
+            return other_subject
+        return None
+
+    subject_repo = Mock()
+    subject_repo.get_by_id.side_effect = mock_get_subject
+
+    topic_repo = Mock()
+    topic_repo.list_by_subject.return_value = [existing_topic]
+    topic_repo.get_by_id.side_effect = lambda t_id: other_topic if t_id == other_topic.id else None
+
+    saved_questions = []
+    question_repo = Mock()
+    question_repo.save.side_effect = lambda q: saved_questions.append(q)
+
+    progress_repo = Mock()
+    ingest_use_case = AsyncMock()
+
+    use_case = BatchStudioPublishUseCase(
+        subject_repo=subject_repo,
+        topic_repo=topic_repo,
+        question_repo=question_repo,
+        progress_repo=progress_repo,
+        ingest_knowledge_use_case=ingest_use_case,
+        clock=clock_mock,
+    )
+
+    dto = BatchStudioPublishInputDTO(
+        subject_id=subject.id,
+        new_topics=[],
+        new_sources=[],
+        questions=[
+            StudioNewQuestionDTO(
+                prompt="Pergunta Penal?",
+                expected_answer="Resposta penal.",
+                topic_id=other_topic.id,
+            )
+        ],
+    )
+
+    res = asyncio.run(use_case.execute(user_id=user_id, dto=dto))
+    assert res.created_questions_count == 1
+    assert saved_questions[0].topic_ids == (other_topic.id,)
+
+
+@pytest.mark.unit
+def test_batch_studio_publish_question_without_resolvable_topics_raises_error(
+    user_id: UUID,
+    subject: Subject,
+    existing_topic: Topic,
+    clock_mock: Mock,
+) -> None:
+    """Verifica erro quando a pergunta não consegue ser vinculada a nenhum tema existente ou novo."""
+    subject_repo = Mock(get_by_id=Mock(return_value=subject))
+    topic_repo = Mock(
+        list_by_subject=Mock(return_value=[existing_topic]),
+        get_by_id=Mock(return_value=None),
+    )
+    question_repo = Mock()
+    progress_repo = Mock()
+    ingest_use_case = AsyncMock()
+
+    use_case = BatchStudioPublishUseCase(
+        subject_repo=subject_repo,
+        topic_repo=topic_repo,
+        question_repo=question_repo,
+        progress_repo=progress_repo,
+        ingest_knowledge_use_case=ingest_use_case,
+        clock=clock_mock,
+    )
+
+    dto = BatchStudioPublishInputDTO(
+        subject_id=subject.id,
+        new_topics=[],
+        new_sources=[],
+        questions=[
+            StudioNewQuestionDTO(
+                prompt="Pergunta Sem Tema?",
+                expected_answer="Resposta.",
+                topic_id=uuid4(),  # Não existe nem no lote nem no repo
+                topic_ids=[],
+                topic_indices=[],
+            )
+        ],
+    )
+
+    with pytest.raises(
+        DomainValidationError, match="A pergunta deve estar vinculada a pelo menos um tema."
+    ):
+        asyncio.run(use_case.execute(user_id=user_id, dto=dto))

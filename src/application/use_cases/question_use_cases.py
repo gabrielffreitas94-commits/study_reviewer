@@ -20,6 +20,7 @@ from src.application.ports.repositories import (
 )
 from src.domain.entities import Question, ReviewAuditLog, UserQuestionProgress
 from src.domain.exceptions import (
+    DomainValidationError,
     EntityNotFoundError,
     QuestionNotDueError,
     QuestionNotFoundError,
@@ -50,16 +51,23 @@ class CreateQuestionUseCase:
         self._uow = uow
 
     def execute(self, dto: CreateQuestionDTO, user_id: UUID) -> QuestionDTO:
-        topic = self._topic_repo.get_by_id(dto.topic_id)
-        if not topic:
-            raise EntityNotFoundError("Tema não encontrado.")
+        resolved_topics = dto.topic_ids or ((dto.topic_id,) if dto.topic_id else ())
+        if not resolved_topics:
+            raise DomainValidationError("Pergunta deve estar associada a pelo menos 1 tema.")
 
-        subject = self._subject_repo.get_by_id(topic.subject_id)
-        if not subject or not subject.can_be_edited_by(user_id):
-            raise ResourceOwnershipError("Apenas o proprietário da matéria pode criar perguntas.")
+        for t_id in resolved_topics:
+            topic = self._topic_repo.get_by_id(t_id)
+            if not topic:
+                raise EntityNotFoundError("Tema não encontrado.")
+
+            subject = self._subject_repo.get_by_id(topic.subject_id)
+            if not subject or not subject.can_be_edited_by(user_id):
+                raise ResourceOwnershipError(
+                    "Apenas o proprietário da matéria pode criar perguntas."
+                )
 
         question = Question(
-            topic_id=dto.topic_id,
+            topic_ids=resolved_topics,
             prompt=dto.prompt,
             expected_answer=dto.expected_answer,
             created_at=self._clock.today(),
@@ -83,13 +91,7 @@ class CreateQuestionUseCase:
                 self._uow.rollback()
             raise
 
-        return QuestionDTO(
-            id=question.id,
-            topic_id=question.topic_id,
-            prompt=question.prompt,
-            expected_answer=question.expected_answer,
-            created_at=question.created_at,
-        )
+        return QuestionDTO.from_entity(question)
 
 
 class UpdateQuestionUseCase:

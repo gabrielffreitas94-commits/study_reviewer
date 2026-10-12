@@ -349,3 +349,63 @@ def test_question_progress_repository_initialize_postgresql_dialect() -> None:
 
     mock_session.execute.assert_called_once()
     mock_session.commit.assert_called_once()
+
+
+@pytest.mark.unit
+def test_question_mapper_fallback_to_model_topic_id() -> None:
+    """Verifica fallback do QuestionMapper quando topics está vazio e topic_id está definido."""
+    from src.adapters.persistence.mappers import QuestionMapper
+    from src.adapters.persistence.models import QuestionModel
+
+    tid = uuid4()
+    model = QuestionModel(
+        id=uuid4(),
+        topic_id=tid,
+        prompt="Pergunta de teste",
+        expected_answer="Gabarito de teste",
+        created_at=date(2026, 10, 12),
+    )
+    # model.topics não populado / vazio
+    model.topics = []
+    entity = QuestionMapper.to_domain(model)
+    assert entity.topic_ids == (tid,)
+    assert entity.topic_id == tid
+
+
+@pytest.mark.integration
+def test_question_repository_multi_topic_persistence_and_queries(db_session: Session) -> None:
+    """Verifica persistência de Pergunta com múltiplos temas e recuperação por qualquer tema."""
+    user_repo = SqlAlchemyUserRepository(db_session)
+    subj_repo = SqlAlchemySubjectRepository(db_session)
+    top_repo = SqlAlchemyTopicRepository(db_session)
+    q_repo = SqlAlchemyQuestionRepository(db_session)
+
+    user = User(google_sub="sub-multi-q", email="multi@test.com", name="Multi User")
+    user_repo.save(user)
+    subj1 = Subject(name="Direito Constitucional", owner_id=user.id)
+    subj2 = Subject(name="Direito Processual", owner_id=user.id)
+    subj_repo.save(subj1)
+    subj_repo.save(subj2)
+
+    top1 = Topic(subject_id=subj1.id, name="Controle Difuso")
+    top2 = Topic(subject_id=subj2.id, name="Recurso Extraordinário")
+    top_repo.save(top1)
+    top_repo.save(top2)
+
+    q = Question(
+        topic_ids=(top1.id, top2.id),
+        prompt="O que é a repercussão geral no RE?",
+        expected_answer="Requisito de admissibilidade constitucional...",
+    )
+    q_repo.save(q)
+
+    # Recupera por ID
+    found = q_repo.get_by_id(q.id)
+    assert found is not None
+    assert set(found.topic_ids) == {top1.id, top2.id}
+
+    # Deve aparecer na listagem de ambos os temas
+    list_top1 = q_repo.list_by_topic(top1.id)
+    list_top2 = q_repo.list_by_topic(top2.id)
+    assert any(item.id == q.id for item in list_top1)
+    assert any(item.id == q.id for item in list_top2)
