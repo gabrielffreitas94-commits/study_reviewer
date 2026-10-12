@@ -52,7 +52,7 @@ void main() {
     intervalDays: 2,
   );
 
-  final tEvaluationResult = TextEvaluationResultEntity(
+  final tEvaluationResult = const TextEvaluationResultEntity(
     questionId: 'q-10',
     score: 90,
     feedback: 'Excelente definição do princípio OCP.',

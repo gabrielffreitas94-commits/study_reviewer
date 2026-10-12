@@ -480,5 +480,3 @@ def test_ingest_knowledge_source_no_topics_error(user_id: UUID) -> None:
     )
     with pytest.raises(DomainValidationError, match="associado a pelo menos 1 tema"):
         asyncio.run(use_case.execute(user_id=user_id, topic_id=None, request=req))
-
-

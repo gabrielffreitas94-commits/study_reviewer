@@ -57,7 +57,9 @@ class IngestKnowledgeSourceUseCase:
             target_topic_ids = [topic_id]
 
         if not target_topic_ids:
-            raise DomainValidationError("O material didático deve estar associado a pelo menos 1 tema.")
+            raise DomainValidationError(
+                "O material didático deve estar associado a pelo menos 1 tema."
+            )
 
         for t_id in target_topic_ids:
             topic = self._topic_repo.get_by_id(t_id)

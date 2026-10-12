@@ -239,7 +239,9 @@ def test_document_text_extractor_empty_text_file_error() -> None:
 @pytest.mark.unit
 def test_document_text_extractor_docx_success() -> None:
     import io
+
     import docx
+
     from src.domain.services import DocumentTextExtractorService
 
     doc = docx.Document()
@@ -277,9 +279,11 @@ def test_document_text_extractor_pdf_corrupted_error() -> None:
 @pytest.mark.unit
 def test_document_text_extractor_pdf_encrypted_error(monkeypatch: pytest.MonkeyPatch) -> None:
     from unittest.mock import Mock
+
+    import pypdf
+
     from src.domain.exceptions import DomainValidationError
     from src.domain.services import DocumentTextExtractorService
-    import pypdf
 
     mock_reader = Mock()
     mock_reader.is_encrypted = True
@@ -293,8 +297,10 @@ def test_document_text_extractor_pdf_encrypted_error(monkeypatch: pytest.MonkeyP
 @pytest.mark.unit
 def test_document_text_extractor_pdf_extract_pages_success(monkeypatch: pytest.MonkeyPatch) -> None:
     from unittest.mock import Mock
-    from src.domain.services import DocumentTextExtractorService
+
     import pypdf
+
+    from src.domain.services import DocumentTextExtractorService
 
     page1 = Mock()
     page1.extract_text.return_value = "Página 1: Introdução aos conceitos fundamentais de direito."
@@ -315,9 +321,11 @@ def test_document_text_extractor_pdf_extract_pages_success(monkeypatch: pytest.M
 @pytest.mark.unit
 def test_document_text_extractor_pdf_no_text_layer_error(monkeypatch: pytest.MonkeyPatch) -> None:
     from unittest.mock import Mock
+
+    import pypdf
+
     from src.domain.exceptions import DomainValidationError
     from src.domain.services import DocumentTextExtractorService
-    import pypdf
 
     blank_page = Mock()
     blank_page.extract_text.return_value = "   "
@@ -334,7 +342,9 @@ def test_document_text_extractor_pdf_no_text_layer_error(monkeypatch: pytest.Mon
 @pytest.mark.unit
 def test_document_text_extractor_docx_empty_paragraphs_error() -> None:
     import io
+
     import docx
+
     from src.domain.exceptions import DomainValidationError
     from src.domain.services import DocumentTextExtractorService
 
@@ -351,6 +361,7 @@ def test_document_text_extractor_docx_empty_paragraphs_error() -> None:
 @pytest.mark.unit
 def test_document_text_extractor_plain_text_decode_error(monkeypatch: pytest.MonkeyPatch) -> None:
     from unittest.mock import Mock
+
     from src.domain.exceptions import DomainValidationError
     from src.domain.services import DocumentTextExtractorService
 
@@ -364,5 +375,3 @@ def test_document_text_extractor_plain_text_decode_error(monkeypatch: pytest.Mon
 
     with pytest.raises(DomainValidationError, match="Falha na decodificação de texto"):
         DocumentTextExtractorService.extract_text(bad_bytes, "ruim.txt")
-
-

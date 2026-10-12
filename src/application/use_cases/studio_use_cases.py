@@ -76,7 +76,8 @@ class BatchStudioPublishUseCase:
 
             if not created_topics and not existing_topics:
                 raise DomainValidationError(
-                    "A matéria selecionada não possui temas cadastrados. Crie ao menos um tema no lote."
+                    "A matéria selecionada não possui temas cadastrados. "
+                    "Crie ao menos um tema no lote."
                 )
 
             if not dto.questions:
@@ -96,7 +97,7 @@ class BatchStudioPublishUseCase:
                     if 0 <= idx < len(created_topics):
                         target_topic_ids.append(created_topics[idx].id)
 
-                # Fallback: se nenhum especificado, vincula a todos os novos ou ao primeiro existente
+                # Fallback: se nenhum especificado, vincula aos novos ou ao primeiro existente
                 if not target_topic_ids:
                     if created_topics:
                         target_topic_ids = [t.id for t in created_topics]

@@ -42,7 +42,7 @@ void main() {
     intervalDays: 2,
   );
 
-  final tEvaluationModel = TextEvaluationResultModel(
+  final tEvaluationModel = const TextEvaluationResultModel(
     questionId: 'q-1',
     score: 92,
     feedback: 'Excelente resposta',

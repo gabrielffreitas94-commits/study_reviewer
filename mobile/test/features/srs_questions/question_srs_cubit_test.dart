@@ -79,7 +79,7 @@ void main() {
     isMaintained: false,
   );
 
-  final tEvaluationResult = TextEvaluationResultEntity(
+  final tEvaluationResult = const TextEvaluationResultEntity(
     questionId: 'q-1',
     score: 85,
     feedback: 'Excelente domínio!',
@@ -167,7 +167,7 @@ void main() {
         isEvaluatingText: true,
       ),
       act: (c) => c.setAnswerMode(1),
-      expect: () => [],
+      expect: () => <QuestionSrsState>[],
     );
   });
 

@@ -173,4 +173,3 @@ def test_knowledge_source_mapper_legacy_fallback() -> None:
     legacy_model.topics = []
     domain = KnowledgeSourceMapper.to_domain(legacy_model)
     assert domain.topic_ids == (tid,)
-

@@ -13,7 +13,6 @@ from sqlalchemy.pool import StaticPool
 
 from src.adapters.ai.gemini_adapters import GeminiEmbeddingAdapter
 from src.adapters.persistence.repositories import (
-    SqlAlchemyQuestionRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
     SqlAlchemyUserRepository,
@@ -148,7 +147,6 @@ def test_studio_batch_publish_success(
     assert len(data["question_ids"]) == 2
 
     # Verifica persistência no banco
-    q_repo = SqlAlchemyQuestionRepository(db_session)
     all_q = top_repo.list_by_subject(subj.id)
     assert len(all_q) == 3  # 1 existente + 2 novos
 

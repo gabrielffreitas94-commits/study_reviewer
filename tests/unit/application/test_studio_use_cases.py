@@ -14,7 +14,7 @@ from src.application.dto.studio_dto import (
     StudioNewSourceDTO,
 )
 from src.application.use_cases.studio_use_cases import BatchStudioPublishUseCase
-from src.domain.entities import Question, Subject, Topic, UserQuestionProgress
+from src.domain.entities import Subject, Topic
 from src.domain.exceptions import (
     DomainValidationError,
     EntityNotFoundError,
@@ -288,7 +288,9 @@ def test_batch_studio_publish_rollback_on_error(
         subject_id=subject.id,
         new_topics=[],
         new_sources=[],
-        questions=[StudioNewQuestionDTO(prompt="Pergunta válida", expected_answer="Resposta válida")],
+        questions=[
+            StudioNewQuestionDTO(prompt="Pergunta válida", expected_answer="Resposta válida")
+        ],
     )
     with pytest.raises(RuntimeError, match="Falha de disco simulada"):
         asyncio.run(use_case.execute(user_id=user_id, dto=dto))
@@ -376,4 +378,3 @@ def test_batch_studio_publish_fallback_to_existing_topics(
     assert res.created_topics_count == 0
     assert res.created_sources_count == 1
     assert res.created_questions_count == 1
-

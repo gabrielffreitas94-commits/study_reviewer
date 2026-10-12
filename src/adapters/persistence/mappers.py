@@ -293,7 +293,7 @@ class KnowledgeChunkMapper:
         return KnowledgeChunk(
             id=model.id,
             source_id=model.source_id,
-            topic_id=model.topic_id,
+            topic_id=model.topic_id or model.source_id,
             chunk_index=model.chunk_index,
             content=model.content,
             embedding=tuple(model.embedding),

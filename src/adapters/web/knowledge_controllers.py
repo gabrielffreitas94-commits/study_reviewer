@@ -4,8 +4,18 @@ from pathlib import Path
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -93,7 +103,7 @@ async def create_knowledge_source_web(
     request: Request,
     title: Annotated[str, Form()],
     content_text: Annotated[str, Form()] = "",
-    topic_ids: Annotated[list[str], Form()] = [],
+    topic_ids: Annotated[list[str] | None, Form()] = None,
     document_file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -122,7 +132,7 @@ async def create_knowledge_source_web(
             )
 
     parsed_topic_ids: list[UUID] = []
-    for tid_str in topic_ids:
+    for tid_str in topic_ids or []:
         try:
             parsed_topic_ids.append(UUID(tid_str))
         except (ValueError, TypeError):
@@ -162,7 +172,12 @@ async def create_knowledge_source_web(
             url="/knowledge/manage?success=Base+de+conhecimento+cadastrada+com+sucesso!",
             status_code=status.HTTP_303_SEE_OTHER,
         )
-    except (DomainValidationError, EmptyKnowledgeContentError, EntityNotFoundError, ResourceOwnershipError) as exc:
+    except (
+        DomainValidationError,
+        EmptyKnowledgeContentError,
+        EntityNotFoundError,
+        ResourceOwnershipError,
+    ) as exc:
         db.rollback()
         return RedirectResponse(
             url=f"/knowledge/manage?error={exc}",

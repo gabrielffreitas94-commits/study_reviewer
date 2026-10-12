@@ -380,4 +380,3 @@ def test_knowledge_api_link_topics_endpoint(
     )
     assert resp_dup_400.status_code == 400
     assert "duplicados" in resp_dup_400.json()["detail"]
-

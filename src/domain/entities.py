@@ -388,7 +388,9 @@ class KnowledgeSource:
         if len(self.title) < 2 or len(self.title) > 200:
             raise DomainValidationError("Título do material deve ter entre 2 e 200 caracteres.")
         if not self.topic_ids:
-            raise DomainValidationError("Fonte de conhecimento deve estar associada a pelo menos 1 tema.")
+            raise DomainValidationError(
+                "Fonte de conhecimento deve estar associada a pelo menos 1 tema."
+            )
         if len(set(self.topic_ids)) != len(self.topic_ids):
             raise DomainValidationError("Fonte de conhecimento não pode conter temas duplicados.")
         if self.total_chunks < 0:
