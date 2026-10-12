@@ -366,3 +366,109 @@ class KnowledgeGroundingService:
         ]
         scored.sort(key=lambda item: item[1], reverse=True)
         return scored[:top_k]
+
+
+class DocumentTextExtractorService:
+    """Serviço de domínio para extração textual a partir de arquivos em múltiplos formatos."""
+
+    MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024
+
+    @classmethod
+    def extract_text(
+        cls,
+        file_bytes: bytes,
+        filename: str,
+        mime_type: str | None = None,
+    ) -> str:
+        """Extrai texto normalizado de arquivos PDF, DOCX, TXT ou MD."""
+        if not file_bytes:
+            raise DomainValidationError("O arquivo enviado está vazio (0 bytes).")
+
+        if len(file_bytes) > cls.MAX_FILE_SIZE_BYTES:
+            raise DomainValidationError("Arquivo excede o limite máximo de 15MB.")
+
+        lower_name = filename.lower().strip()
+        if lower_name.endswith(".pdf") or mime_type == "application/pdf":
+            return cls._extract_from_pdf(file_bytes)
+        if lower_name.endswith(".docx") or (
+            mime_type
+            and mime_type
+            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ):
+            return cls._extract_from_docx(file_bytes)
+        if lower_name.endswith((".txt", ".md", ".markdown", ".csv", ".json")) or (
+            mime_type and mime_type.startswith("text/")
+        ):
+            return cls._extract_from_plain_text(file_bytes)
+
+        raise DomainValidationError(
+            f"Formato de arquivo não suportado: '{filename}'. "
+            "Formatos permitidos: PDF (.pdf), Word (.docx), Texto (.txt, .md)."
+        )
+
+    @classmethod
+    def _extract_from_pdf(cls, file_bytes: bytes) -> str:
+        try:
+            import io
+
+            from pypdf import PdfReader
+
+            reader = PdfReader(io.BytesIO(file_bytes))
+            if reader.is_encrypted:
+                raise DomainValidationError(
+                    "Não é possível processar PDFs protegidos por senha ou criptografados."
+                )
+
+            extracted_pages: list[str] = []
+            for page in reader.pages:
+                text = page.extract_text()
+                if text and text.strip():
+                    extracted_pages.append(text.strip())
+
+            full_text = "\n\n".join(extracted_pages).strip()
+            if not full_text:
+                raise DomainValidationError(
+                    "O arquivo PDF não contém camada de texto selecionável "
+                    "(pode ser um documento escaneado/imagem)."
+                )
+            return full_text
+        except DomainValidationError:
+            raise
+        except Exception as exc:
+            raise DomainValidationError(f"Falha ao processar o arquivo PDF: {exc}") from exc
+
+    @classmethod
+    def _extract_from_docx(cls, file_bytes: bytes) -> str:
+        try:
+            import io
+
+            import docx
+
+            doc = docx.Document(io.BytesIO(file_bytes))
+            paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+            full_text = "\n\n".join(paragraphs).strip()
+            if not full_text:
+                raise DomainValidationError("O documento Word (.docx) não contém texto.")
+            return full_text
+        except DomainValidationError:
+            raise
+        except Exception as exc:
+            raise DomainValidationError(
+                f"Falha ao processar o arquivo Word (.docx): {exc}"
+            ) from exc
+
+    @classmethod
+    def _extract_from_plain_text(cls, file_bytes: bytes) -> str:
+        try:
+            try:
+                text = file_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                text = file_bytes.decode("latin-1")
+        except Exception as exc:
+            raise DomainValidationError(
+                f"Falha na decodificação de texto do arquivo: {exc}"
+            ) from exc
+        clean = text.strip()
+        if not clean:
+            raise DomainValidationError("O arquivo de texto está vazio.")
+        return clean

@@ -161,7 +161,7 @@ class EvaluationFeedbackCard extends StatelessWidget {
               spacing: 8.0,
               runSpacing: 4.0,
               alignment: WrapAlignment.spaceBetween,
-              crossWrap: WrapCrossAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Row(
                   mainAxisSize: MainAxisSize.min,

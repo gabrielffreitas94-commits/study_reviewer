@@ -27,6 +27,7 @@ from src.adapters.persistence.models import (
     FlashcardTopicModel,
     KnowledgeChunkModel,
     KnowledgeSourceModel,
+    KnowledgeSourceTopicModel,
     PoolSessionModel,
     QuestionModel,
     ReviewAuditLogModel,
@@ -732,22 +733,51 @@ class SqlAlchemyKnowledgeSourceRepository(IKnowledgeSourceRepository):
             existing.content_type = source.content_type
             existing.total_chunks = source.total_chunks
             existing.char_count = source.char_count
-            self._session.flush()
-            return KnowledgeSourceMapper.to_domain(existing)
-
-        model = KnowledgeSourceMapper.to_model(source)
-        self._session.add(model)
+            if source.topic_ids:
+                existing.topic_id = source.topic_ids[0]
+            model = existing
+        else:
+            model = KnowledgeSourceMapper.to_model(source)
+            self._session.add(model)
         self._session.flush()
+
+        # Atualiza a tabela associativa N:N (knowledge_source_topics)
+        self._session.query(KnowledgeSourceTopicModel).filter(
+            KnowledgeSourceTopicModel.source_id == source.id
+        ).delete()
+
+        for t_id in source.topic_ids:
+            assoc = KnowledgeSourceTopicModel(source_id=source.id, topic_id=t_id)
+            self._session.add(assoc)
+
+        self._session.flush()
+        self._session.refresh(model)
         return KnowledgeSourceMapper.to_domain(model)
 
     def get_by_id(self, source_id: UUID) -> KnowledgeSource | None:
-        model = self._session.get(KnowledgeSourceModel, source_id)
+        stmt = (
+            select(KnowledgeSourceModel)
+            .options(selectinload(KnowledgeSourceModel.topics))
+            .where(KnowledgeSourceModel.id == source_id)
+        )
+        model = self._session.scalar(stmt)
         return KnowledgeSourceMapper.to_domain(model) if model else None
 
     def list_by_topic(self, topic_id: UUID) -> list[KnowledgeSource]:
         stmt = (
             select(KnowledgeSourceModel)
-            .where(KnowledgeSourceModel.topic_id == topic_id)
+            .options(selectinload(KnowledgeSourceModel.topics))
+            .outerjoin(
+                KnowledgeSourceTopicModel,
+                KnowledgeSourceTopicModel.source_id == KnowledgeSourceModel.id,
+            )
+            .where(
+                or_(
+                    KnowledgeSourceTopicModel.topic_id == topic_id,
+                    KnowledgeSourceModel.topic_id == topic_id,
+                )
+            )
+            .distinct()
             .order_by(KnowledgeSourceModel.created_at.desc(), KnowledgeSourceModel.id.desc())
         )
         return [KnowledgeSourceMapper.to_domain(m) for m in self._session.scalars(stmt)]
@@ -776,7 +806,17 @@ class SqlAlchemyKnowledgeChunkRepository(IKnowledgeChunkRepository):
     def list_by_topic(self, topic_id: UUID) -> list[KnowledgeChunk]:
         stmt = (
             select(KnowledgeChunkModel)
-            .where(KnowledgeChunkModel.topic_id == topic_id)
+            .outerjoin(
+                KnowledgeSourceTopicModel,
+                KnowledgeSourceTopicModel.source_id == KnowledgeChunkModel.source_id,
+            )
+            .where(
+                or_(
+                    KnowledgeSourceTopicModel.topic_id == topic_id,
+                    KnowledgeChunkModel.topic_id == topic_id,
+                )
+            )
+            .distinct()
             .order_by(KnowledgeChunkModel.chunk_index.asc())
         )
         return [KnowledgeChunkMapper.to_domain(m) for m in self._session.scalars(stmt)]

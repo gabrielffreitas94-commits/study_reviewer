@@ -296,3 +296,88 @@ def test_security_knowledge_content_sanitization(
         assert "<script>" not in chunk.content
         assert "onerror" not in chunk.content
         assert "alert(" not in chunk.content
+
+
+@pytest.mark.integration
+def test_knowledge_api_extract_file_endpoint(client: TestClient) -> None:
+    sample_text = "Texto de teste para validação de extração via upload multipart."
+    files = {"file": ("documento.txt", sample_text.encode("utf-8"), "text/plain")}
+    resp = client.post("/api/v1/knowledge/extract-file", files=files)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["filename"] == "documento.txt"
+    assert data["char_count"] == len(sample_text)
+    assert "Texto de teste" in data["text_preview"]
+
+    # Arquivo vazio -> 400
+    files_empty = {"file": ("vazio.txt", b"", "text/plain")}
+    resp_empty = client.post("/api/v1/knowledge/extract-file", files=files_empty)
+    assert resp_empty.status_code == 400
+
+
+@pytest.mark.integration
+def test_knowledge_api_link_topics_endpoint(
+    client: TestClient,
+    db_session: Session,
+    test_user: User,
+) -> None:
+    user_repo = SqlAlchemyUserRepository(db_session)
+    subj_repo = SqlAlchemySubjectRepository(db_session)
+    top_repo = SqlAlchemyTopicRepository(db_session)
+    source_repo = SqlAlchemyKnowledgeSourceRepository(db_session)
+
+    user_repo.save(test_user)
+    subj = Subject(name="Direito Penal", owner_id=test_user.id)
+    subj_repo.save(subj)
+    t1 = Topic(subject_id=subj.id, name="Teoria do Crime")
+    t2 = Topic(subject_id=subj.id, name="Penas")
+    top_repo.save(t1)
+    top_repo.save(t2)
+
+    source = KnowledgeSource(
+        title="Manual de Penal",
+        content_type="TEXT",
+        topic_ids=(t1.id,),
+    )
+    source_repo.save(source)
+    db_session.commit()
+
+    # Atualiza tópicos para vincular a t1 e t2
+    payload = {"topic_ids": [str(t1.id), str(t2.id)]}
+    resp = client.put(f"/api/v1/knowledge/{source.id}/topics", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert str(t1.id) in data["topic_ids"]
+    assert str(t2.id) in data["topic_ids"]
+
+    # Fonte inexistente -> 404
+    resp_404 = client.put(f"/api/v1/knowledge/{uuid4()}/topics", json=payload)
+    assert resp_404.status_code == 404
+
+    # Lista vazia de tópicos -> 422 ou 400
+    resp_400 = client.put(f"/api/v1/knowledge/{source.id}/topics", json={"topic_ids": []})
+    assert resp_400.status_code == 422 or resp_400.status_code == 400
+
+    # Tópico pertencente a outro usuário -> 403 Forbidden
+    other_user_id = uuid4()
+    other_subj = Subject(name="Direito Militar", owner_id=other_user_id)
+    subj_repo.save(other_subj)
+    other_topic = Topic(subject_id=other_subj.id, name="CPM")
+    top_repo.save(other_topic)
+    db_session.commit()
+
+    resp_403 = client.put(
+        f"/api/v1/knowledge/{source.id}/topics",
+        json={"topic_ids": [str(other_topic.id)]},
+    )
+    assert resp_403.status_code == 403
+    assert "proprietário" in resp_403.json()["detail"]
+
+    # Tópicos duplicados -> 400 Bad Request (DomainValidationError)
+    resp_dup_400 = client.put(
+        f"/api/v1/knowledge/{source.id}/topics",
+        json={"topic_ids": [str(t1.id), str(t1.id)]},
+    )
+    assert resp_dup_400.status_code == 400
+    assert "duplicados" in resp_dup_400.json()["detail"]
+

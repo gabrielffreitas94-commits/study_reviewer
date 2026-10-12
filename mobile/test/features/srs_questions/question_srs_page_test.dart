@@ -81,7 +81,8 @@ void main() {
     );
 
     await tester.pumpWidget(buildTestableWidget());
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Perguntas Abertas SRS'), findsOneWidget);
     expect(find.text('Explique o princípio Open-Closed da SOLID.'), findsOneWidget);
@@ -139,7 +140,8 @@ void main() {
         )).thenAnswer((_) async {});
 
     await tester.pumpWidget(buildTestableWidget());
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.enterText(
       find.byType(TextField),
@@ -249,7 +251,8 @@ void main() {
     when(() => mockCubit.nextQuestion()).thenReturn(null);
 
     await tester.pumpWidget(buildTestableWidget());
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Atualização SRS Processada'), findsOneWidget);
     expect(find.text('↑ Nível Superior (Nível 2)'), findsOneWidget);

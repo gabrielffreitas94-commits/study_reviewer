@@ -166,3 +166,203 @@ def test_knowledge_grounding_rank_chunks_with_threshold() -> None:
         [0.0, 0.0, 1.0], [c1, c2, c3], threshold=0.70, top_k=5
     )
     assert len(ranked_none) == 0
+
+
+@pytest.mark.unit
+def test_document_text_extractor_empty_file_error() -> None:
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+
+    with pytest.raises(DomainValidationError, match="vazio"):
+        DocumentTextExtractorService.extract_text(b"", "documento.pdf")
+
+
+@pytest.mark.unit
+def test_document_text_extractor_oversized_file_error() -> None:
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+
+    large_bytes = b"x" * (16 * 1024 * 1024)
+    with pytest.raises(DomainValidationError, match="Arquivo excede o limite máximo de 15MB."):
+        DocumentTextExtractorService.extract_text(large_bytes, "grande.pdf")
+
+
+@pytest.mark.unit
+def test_document_text_extractor_unsupported_extension_error() -> None:
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+
+    with pytest.raises(DomainValidationError, match="Formato de arquivo não suportado"):
+        DocumentTextExtractorService.extract_text(b"some binary code", "malware.exe")
+
+
+@pytest.mark.unit
+def test_document_text_extractor_txt_utf8_success() -> None:
+    from src.domain.services import DocumentTextExtractorService
+
+    sample_text = "Este é um texto de estudo válido para processamento de RAG e avaliação."
+    raw_bytes = sample_text.encode("utf-8")
+    extracted = DocumentTextExtractorService.extract_text(raw_bytes, "resumo.txt")
+    assert extracted == sample_text
+
+
+@pytest.mark.unit
+def test_document_text_extractor_txt_latin1_fallback_success() -> None:
+    from src.domain.services import DocumentTextExtractorService
+
+    sample_text = "Ato administrativo com eficácia e validade perante o ordenamento jurídico."
+    raw_bytes = sample_text.encode("latin-1")
+    extracted = DocumentTextExtractorService.extract_text(raw_bytes, "anotacoes.txt")
+    assert "Ato administrativo" in extracted
+
+
+@pytest.mark.unit
+def test_document_text_extractor_md_success() -> None:
+    from src.domain.services import DocumentTextExtractorService
+
+    sample_md = "# Capítulo 1\n\nConteúdo essencial com **destaques** e diretrizes gerais."
+    raw_bytes = sample_md.encode("utf-8")
+    extracted = DocumentTextExtractorService.extract_text(raw_bytes, "capitulo.md")
+    assert extracted == sample_md
+
+
+@pytest.mark.unit
+def test_document_text_extractor_empty_text_file_error() -> None:
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+
+    short_bytes = b"   \n\t  "
+    with pytest.raises(DomainValidationError, match="arquivo de texto está vazio"):
+        DocumentTextExtractorService.extract_text(short_bytes, "vazio.txt")
+
+
+@pytest.mark.unit
+def test_document_text_extractor_docx_success() -> None:
+    import io
+    import docx
+    from src.domain.services import DocumentTextExtractorService
+
+    doc = docx.Document()
+    doc.add_paragraph("Parágrafo 1 sobre direitos fundamentais e garantias individuais.")
+    doc.add_paragraph("Parágrafo 2 com cláusulas pétreas na constituição federal.")
+    buf = io.BytesIO()
+    doc.save(buf)
+    docx_bytes = buf.getvalue()
+
+    extracted = DocumentTextExtractorService.extract_text(docx_bytes, "constituicao.docx")
+    assert "Parágrafo 1 sobre direitos fundamentais" in extracted
+    assert "Parágrafo 2 com cláusulas pétreas" in extracted
+
+
+@pytest.mark.unit
+def test_document_text_extractor_docx_corrupted_error() -> None:
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+
+    corrupted_bytes = b"PK\x03\x04corrupted-docx-data-not-a-valid-zip-file"
+    with pytest.raises(DomainValidationError, match="Falha ao processar o arquivo Word"):
+        DocumentTextExtractorService.extract_text(corrupted_bytes, "corrupted.docx")
+
+
+@pytest.mark.unit
+def test_document_text_extractor_pdf_corrupted_error() -> None:
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+
+    corrupted_pdf = b"%PDF-1.4\ncorrupted-pdf-stream-without-objects"
+    with pytest.raises(DomainValidationError, match="Falha ao processar o arquivo PDF"):
+        DocumentTextExtractorService.extract_text(corrupted_pdf, "corrupted.pdf")
+
+
+@pytest.mark.unit
+def test_document_text_extractor_pdf_encrypted_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from unittest.mock import Mock
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+    import pypdf
+
+    mock_reader = Mock()
+    mock_reader.is_encrypted = True
+    monkeypatch.setattr(pypdf, "PdfReader", Mock(return_value=mock_reader))
+
+    fake_pdf = b"%PDF-1.4\n..."
+    with pytest.raises(DomainValidationError, match="protegidos por senha"):
+        DocumentTextExtractorService.extract_text(fake_pdf, "segredo.pdf")
+
+
+@pytest.mark.unit
+def test_document_text_extractor_pdf_extract_pages_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    from unittest.mock import Mock
+    from src.domain.services import DocumentTextExtractorService
+    import pypdf
+
+    page1 = Mock()
+    page1.extract_text.return_value = "Página 1: Introdução aos conceitos fundamentais de direito."
+    page2 = Mock()
+    page2.extract_text.return_value = "Página 2: Da aplicabilidade das normas constitucionais."
+
+    mock_reader = Mock()
+    mock_reader.is_encrypted = False
+    mock_reader.pages = [page1, page2]
+    monkeypatch.setattr(pypdf, "PdfReader", Mock(return_value=mock_reader))
+
+    fake_pdf = b"%PDF-1.4\nvalid-pdf-bytes"
+    extracted = DocumentTextExtractorService.extract_text(fake_pdf, "livro.pdf")
+    assert "Página 1: Introdução" in extracted
+    assert "Página 2: Da aplicabilidade" in extracted
+
+
+@pytest.mark.unit
+def test_document_text_extractor_pdf_no_text_layer_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from unittest.mock import Mock
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+    import pypdf
+
+    blank_page = Mock()
+    blank_page.extract_text.return_value = "   "
+    mock_reader = Mock()
+    mock_reader.is_encrypted = False
+    mock_reader.pages = [blank_page]
+    monkeypatch.setattr(pypdf, "PdfReader", Mock(return_value=mock_reader))
+
+    fake_pdf = b"%PDF-1.4\nscanned-image-pdf"
+    with pytest.raises(DomainValidationError, match="não contém camada de texto"):
+        DocumentTextExtractorService.extract_text(fake_pdf, "escaner.pdf")
+
+
+@pytest.mark.unit
+def test_document_text_extractor_docx_empty_paragraphs_error() -> None:
+    import io
+    import docx
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+
+    doc = docx.Document()
+    doc.add_paragraph("   ")
+    buf = io.BytesIO()
+    doc.save(buf)
+    docx_bytes = buf.getvalue()
+
+    with pytest.raises(DomainValidationError, match="não contém texto"):
+        DocumentTextExtractorService.extract_text(docx_bytes, "vazio.docx")
+
+
+@pytest.mark.unit
+def test_document_text_extractor_plain_text_decode_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from unittest.mock import Mock
+    from src.domain.exceptions import DomainValidationError
+    from src.domain.services import DocumentTextExtractorService
+
+    bad_bytes = Mock(spec=bytes)
+    bad_bytes.__len__ = Mock(return_value=100)
+
+    def decode_mock(encoding: str) -> str:
+        raise UnicodeDecodeError(encoding, b"", 0, 1, "invalid")
+
+    bad_bytes.decode = Mock(side_effect=decode_mock)
+
+    with pytest.raises(DomainValidationError, match="Falha na decodificação de texto"):
+        DocumentTextExtractorService.extract_text(bad_bytes, "ruim.txt")
+
+

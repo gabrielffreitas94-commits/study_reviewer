@@ -336,3 +336,149 @@ def test_validate_question_permission_denied(
     req = ValidateQuestionWithKnowledgeRequest(prompt="P", expected_answer="R")
     with pytest.raises(ResourceOwnershipError, match="Sem permissão para consultar o tema"):
         asyncio.run(use_case.execute(user_id=other_user_id, topic_id=topic.id, request=req))
+
+
+@pytest.mark.unit
+def test_link_knowledge_source_to_topics_success(
+    user_id: UUID,
+    subject: Subject,
+    topic: Topic,
+) -> None:
+    from src.application.dto.knowledge_dto import LinkKnowledgeSourceRequest
+    from src.application.use_cases.knowledge_use_cases import LinkKnowledgeSourceToTopicsUseCase
+    from src.domain.entities import KnowledgeSource
+
+    topic2 = Topic(subject_id=subject.id, name="Direitos Sociais")
+    source = KnowledgeSource(
+        title="Doutrina Geral",
+        content_type="TEXT",
+        topic_ids=(topic.id,),
+    )
+
+    source_repo = Mock(get_by_id=Mock(return_value=source))
+    source_repo.save.side_effect = lambda s: s
+    topic_repo = Mock()
+    topic_repo.get_by_id.side_effect = lambda tid: topic if tid == topic.id else topic2
+    subject_repo = Mock(get_by_id=Mock(return_value=subject))
+
+    use_case = LinkKnowledgeSourceToTopicsUseCase(
+        source_repo=source_repo,
+        topic_repo=topic_repo,
+        subject_repo=subject_repo,
+    )
+
+    req = LinkKnowledgeSourceRequest(
+        source_id=source.id,
+        topic_ids=[topic.id, topic2.id],
+    )
+    res = asyncio.run(use_case.execute(user_id=user_id, request=req))
+
+    assert res.id == source.id
+    assert set(res.topic_ids) == {topic.id, topic2.id}
+    source_repo.save.assert_called_once()
+
+
+@pytest.mark.unit
+def test_link_knowledge_source_empty_topics_error(user_id: UUID) -> None:
+    from src.application.dto.knowledge_dto import LinkKnowledgeSourceRequest
+    from src.application.use_cases.knowledge_use_cases import LinkKnowledgeSourceToTopicsUseCase
+    from src.domain.entities import KnowledgeSource
+    from src.domain.exceptions import DomainValidationError
+
+    source = KnowledgeSource(title="Doutrina", content_type="TEXT", topic_ids=(uuid4(),))
+    use_case = LinkKnowledgeSourceToTopicsUseCase(
+        source_repo=Mock(get_by_id=Mock(return_value=source)),
+        topic_repo=Mock(),
+        subject_repo=Mock(),
+    )
+    req = LinkKnowledgeSourceRequest(source_id=source.id, topic_ids=[])
+    with pytest.raises(DomainValidationError, match="pelo menos 1 tema"):
+        asyncio.run(use_case.execute(user_id=user_id, request=req))
+
+
+@pytest.mark.unit
+def test_link_knowledge_source_not_found_error(user_id: UUID) -> None:
+    from src.application.dto.knowledge_dto import LinkKnowledgeSourceRequest
+    from src.application.use_cases.knowledge_use_cases import LinkKnowledgeSourceToTopicsUseCase
+
+    use_case = LinkKnowledgeSourceToTopicsUseCase(
+        source_repo=Mock(get_by_id=Mock(return_value=None)),
+        topic_repo=Mock(),
+        subject_repo=Mock(),
+    )
+    req = LinkKnowledgeSourceRequest(source_id=uuid4(), topic_ids=[uuid4()])
+    with pytest.raises(EntityNotFoundError, match="Fonte de conhecimento não encontrada"):
+        asyncio.run(use_case.execute(user_id=user_id, request=req))
+
+
+@pytest.mark.unit
+def test_link_knowledge_source_topic_not_found_error(
+    user_id: UUID,
+    topic: Topic,
+) -> None:
+    from src.application.dto.knowledge_dto import LinkKnowledgeSourceRequest
+    from src.application.use_cases.knowledge_use_cases import LinkKnowledgeSourceToTopicsUseCase
+    from src.domain.entities import KnowledgeSource
+
+    source = KnowledgeSource(
+        title="Doutrina Geral",
+        content_type="TEXT",
+        topic_ids=(topic.id,),
+    )
+    use_case = LinkKnowledgeSourceToTopicsUseCase(
+        source_repo=Mock(get_by_id=Mock(return_value=source)),
+        topic_repo=Mock(get_by_id=Mock(return_value=None)),
+        subject_repo=Mock(),
+    )
+    missing_tid = uuid4()
+    req = LinkKnowledgeSourceRequest(source_id=source.id, topic_ids=[missing_tid])
+    with pytest.raises(EntityNotFoundError, match="Tema não encontrado"):
+        asyncio.run(use_case.execute(user_id=user_id, request=req))
+
+
+@pytest.mark.unit
+def test_link_knowledge_source_ownership_error(
+    other_user_id: UUID,
+    subject: Subject,
+    topic: Topic,
+) -> None:
+    from src.application.dto.knowledge_dto import LinkKnowledgeSourceRequest
+    from src.application.use_cases.knowledge_use_cases import LinkKnowledgeSourceToTopicsUseCase
+    from src.domain.entities import KnowledgeSource
+
+    source = KnowledgeSource(
+        title="Doutrina Geral",
+        content_type="TEXT",
+        topic_ids=(topic.id,),
+    )
+    use_case = LinkKnowledgeSourceToTopicsUseCase(
+        source_repo=Mock(get_by_id=Mock(return_value=source)),
+        topic_repo=Mock(get_by_id=Mock(return_value=topic)),
+        subject_repo=Mock(get_by_id=Mock(return_value=subject)),
+    )
+    req = LinkKnowledgeSourceRequest(source_id=source.id, topic_ids=[topic.id])
+    with pytest.raises(ResourceOwnershipError, match="Apenas o proprietário da matéria"):
+        asyncio.run(use_case.execute(user_id=other_user_id, request=req))
+
+
+@pytest.mark.unit
+def test_ingest_knowledge_source_no_topics_error(user_id: UUID) -> None:
+    from src.application.dto.knowledge_dto import CreateKnowledgeSourceRequest
+    from src.domain.exceptions import DomainValidationError
+
+    use_case = IngestKnowledgeSourceUseCase(
+        source_repo=Mock(),
+        chunk_repo=Mock(),
+        topic_repo=Mock(),
+        subject_repo=Mock(),
+        embedding_service=AsyncMock(),
+    )
+    req = CreateKnowledgeSourceRequest(
+        title="Material",
+        content="Texto com mais de vinte caracteres para passar na validação de tamanho.",
+        topic_ids=[],
+    )
+    with pytest.raises(DomainValidationError, match="associado a pelo menos 1 tema"):
+        asyncio.run(use_case.execute(user_id=user_id, topic_id=None, request=req))
+
+
