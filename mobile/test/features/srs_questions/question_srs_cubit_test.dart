@@ -79,7 +79,7 @@ void main() {
     isMaintained: false,
   );
 
-  final tEvaluationResult = const TextEvaluationResultEntity(
+  const tEvaluationResult = TextEvaluationResultEntity(
     questionId: 'q-1',
     score: 85,
     feedback: 'Excelente domínio!',

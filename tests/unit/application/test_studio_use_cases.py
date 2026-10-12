@@ -74,12 +74,12 @@ def test_batch_studio_publish_success(
     ingest_use_case.execute.return_value = KnowledgeSourceResponse(
         id=mock_src_id,
         topic_id=existing_topic.id,
-        topic_ids=(existing_topic.id,),
+        topic_ids=[existing_topic.id],
         title="Doutrina Maria Sylvia",
         content_type="TEXT",
         total_chunks=3,
         char_count=1500,
-        created_at=date(2026, 10, 12),
+        created_at="2026-10-12",
     )
 
     uow = Mock()

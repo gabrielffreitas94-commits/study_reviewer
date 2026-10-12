@@ -45,7 +45,7 @@ void main() {
     isMaintained: false,
   );
 
-  final tEvaluationResult = const TextEvaluationResultEntity(
+  const tEvaluationResult = TextEvaluationResultEntity(
     questionId: 'q-10',
     score: 88,
     feedback: 'Boa explicação da memória.',

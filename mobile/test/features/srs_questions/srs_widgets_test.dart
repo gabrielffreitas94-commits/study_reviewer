@@ -157,7 +157,7 @@ void main() {
   });
 
   group('EvaluationFeedbackCard Widget', () {
-    final tEvaluation = const TextEvaluationResultEntity(
+    const tEvaluation = TextEvaluationResultEntity(
       questionId: 'q-10',
       score: 85,
       feedback: 'Excelente menção à eficácia horizontal e vertical dos direitos.',
