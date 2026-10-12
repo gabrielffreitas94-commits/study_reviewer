@@ -96,6 +96,12 @@ class TopicModel(Base):
     questions: Mapped[list["QuestionModel"]] = relationship(
         "QuestionModel", back_populates="topic", cascade="all, delete-orphan", lazy="selectin"
     )
+    knowledge_sources: Mapped[list["KnowledgeSourceModel"]] = relationship(
+        "KnowledgeSourceModel",
+        secondary="knowledge_source_topics",
+        back_populates="topics",
+        lazy="selectin",
+    )
 
 
 class FlashcardTopicModel(Base):
@@ -301,15 +307,28 @@ class ReviewAuditLogModel(Base):
     topic: Mapped["TopicModel | None"] = relationship("TopicModel")
 
 
+class KnowledgeSourceTopicModel(Base):
+    """Tabela associativa N:N entre Fontes de Conhecimento e Temas."""
+
+    __tablename__ = "knowledge_source_topics"
+
+    source_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("knowledge_sources.id", ondelete="CASCADE"), primary_key=True
+    )
+    topic_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+
+
 class KnowledgeSourceModel(Base):
-    """Tabela de Fontes/Materiais de Conhecimento vinculados a um Tema."""
+    """Tabela de Fontes/Materiais de Conhecimento vinculados a um ou mais Temas."""
 
     __tablename__ = "knowledge_sources"
     __table_args__ = (Index("ix_knowledge_sources_topic_created", "topic_id", "created_at"),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    topic_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    topic_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content_type: Mapped[str] = mapped_column(String(50), nullable=False, default="TEXT")
@@ -317,7 +336,13 @@ class KnowledgeSourceModel(Base):
     char_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
-    topic: Mapped["TopicModel"] = relationship("TopicModel")
+    topic: Mapped["TopicModel | None"] = relationship("TopicModel", foreign_keys=[topic_id])
+    topics: Mapped[list["TopicModel"]] = relationship(
+        "TopicModel",
+        secondary="knowledge_source_topics",
+        back_populates="knowledge_sources",
+        lazy="selectin",
+    )
     chunks: Mapped[list["KnowledgeChunkModel"]] = relationship(
         "KnowledgeChunkModel",
         back_populates="source",
@@ -339,8 +364,8 @@ class KnowledgeChunkModel(Base):
     source_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("knowledge_sources.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    topic_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    topic_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -351,7 +376,7 @@ class KnowledgeChunkModel(Base):
     source: Mapped["KnowledgeSourceModel"] = relationship(
         "KnowledgeSourceModel", back_populates="chunks"
     )
-    topic: Mapped["TopicModel"] = relationship("TopicModel")
+    topic: Mapped["TopicModel | None"] = relationship("TopicModel", foreign_keys=[topic_id])
 
 
 class TokenLedgerModel(Base):

@@ -255,14 +255,17 @@ class ReviewAuditLogMapper:
 
 
 class KnowledgeSourceMapper:
-    """Conversor para Fonte de Conhecimento (Sprint 07)."""
+    """Conversor para Fonte de Conhecimento (Sprint 07/N:N)."""
 
     @staticmethod
     def to_domain(model: KnowledgeSourceModel) -> KnowledgeSource:
+        topic_ids = tuple(t.id for t in model.topics) if getattr(model, "topics", None) else ()
+        if not topic_ids and model.topic_id:
+            topic_ids = (model.topic_id,)
         return KnowledgeSource(
             id=model.id,
-            topic_id=model.topic_id,
             title=model.title,
+            topic_ids=topic_ids,
             content_type=model.content_type,
             total_chunks=model.total_chunks,
             char_count=model.char_count,
@@ -273,7 +276,7 @@ class KnowledgeSourceMapper:
     def to_model(entity: KnowledgeSource) -> KnowledgeSourceModel:
         return KnowledgeSourceModel(
             id=entity.id,
-            topic_id=entity.topic_id,
+            topic_id=entity.topic_id if entity.topic_ids else None,
             title=entity.title,
             content_type=entity.content_type,
             total_chunks=entity.total_chunks,
@@ -290,7 +293,7 @@ class KnowledgeChunkMapper:
         return KnowledgeChunk(
             id=model.id,
             source_id=model.source_id,
-            topic_id=model.topic_id,
+            topic_id=model.topic_id or model.source_id,
             chunk_index=model.chunk_index,
             content=model.content,
             embedding=tuple(model.embedding),

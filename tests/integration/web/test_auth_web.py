@@ -406,6 +406,7 @@ def test_oauth_redirect_uri_detects_host_mismatch_and_resolves_dynamically() -> 
     Garantia de segurança: A resolução canônica detecta disparidade entre o host configurado e a requisição atual, reconstruindo dinamicamente a URI canônica sob HTTPS correspondente ao host de origem.
     """
     from fastapi import Request
+
     from src.adapters.web.auth_controllers import _get_oauth_redirect_uri
     from src.infrastructure.config import settings
 
@@ -438,7 +439,24 @@ def test_oauth_redirect_uri_detects_host_mismatch_and_resolves_dynamically() -> 
             ],
         }
         request_staging = Request(scope_staging)
-        assert _get_oauth_redirect_uri(request_staging) == "https://staging.lambda-url.sa-east-1.on.aws/auth/callback"
+        assert (
+            _get_oauth_redirect_uri(request_staging)
+            == "https://staging.lambda-url.sa-east-1.on.aws/auth/callback"
+        )
     finally:
         settings.GOOGLE_REDIRECT_URI = old_redirect_uri
 
+
+@pytest.mark.security
+def test_oauth_callback_fails_with_forged_or_invalid_aead_state(
+    auth_client: TestClient,
+) -> None:
+    """Valida rejeição com HTTP 400 quando o parâmetro state forjado não decodifica via AEAD.
+
+    Vulnerabilidade prevenida: Ataques de Cross-Site Request Forgery (CSRF) e sequestro de sessão OAuth.
+    Garantia de segurança: O endpoint valida criptograficamente o token AEAD do state e rejeita com HTTP 400 qualquer token inválido ou ausente.
+    """
+    auth_client.cookies.clear()
+    res = auth_client.get("/auth/callback?code=some-code&state=invalid-forged-state-12345")
+    assert res.status_code == 400
+    assert "Parâmetro state de segurança inválido ou divergente" in res.text

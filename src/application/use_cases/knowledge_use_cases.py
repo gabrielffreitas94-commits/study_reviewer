@@ -7,6 +7,7 @@ import nh3
 from src.application.dto.knowledge_dto import (
     CreateKnowledgeSourceRequest,
     KnowledgeSourceResponse,
+    LinkKnowledgeSourceRequest,
     ValidateQuestionWithKnowledgeRequest,
     ValidationResultResponse,
 )
@@ -18,6 +19,7 @@ from src.application.ports.repositories import (
 )
 from src.domain.entities import KnowledgeChunk, KnowledgeSource, ValidationResult
 from src.domain.exceptions import (
+    DomainValidationError,
     EmptyKnowledgeContentError,
     EntityNotFoundError,
     KnowledgeSourceNotFoundError,
@@ -47,18 +49,28 @@ class IngestKnowledgeSourceUseCase:
     async def execute(
         self,
         user_id: UUID,
-        topic_id: UUID,
+        topic_id: UUID | None,
         request: CreateKnowledgeSourceRequest,
     ) -> KnowledgeSourceResponse:
-        topic = self._topic_repo.get_by_id(topic_id)
-        if not topic:
-            raise EntityNotFoundError("Tema não encontrado.")
+        target_topic_ids: list[UUID] = list(request.topic_ids) if request.topic_ids else []
+        if not target_topic_ids and topic_id is not None:
+            target_topic_ids = [topic_id]
 
-        subject = self._subject_repo.get_by_id(topic.subject_id)
-        if not subject or not subject.can_be_edited_by(user_id):
-            raise ResourceOwnershipError(
-                "Apenas o proprietário da matéria pode cadastrar materiais didáticos."
+        if not target_topic_ids:
+            raise DomainValidationError(
+                "O material didático deve estar associado a pelo menos 1 tema."
             )
+
+        for t_id in target_topic_ids:
+            topic = self._topic_repo.get_by_id(t_id)
+            if not topic:
+                raise EntityNotFoundError("Tema não encontrado.")
+
+            subject = self._subject_repo.get_by_id(topic.subject_id)
+            if not subject or not subject.can_be_edited_by(user_id):
+                raise ResourceOwnershipError(
+                    "Apenas o proprietário da matéria pode cadastrar materiais didáticos."
+                )
 
         # Sanitização defensiva do conteúdo
         cleaned_content = nh3.clean(request.content.strip(), tags=set()).strip()
@@ -73,10 +85,10 @@ class IngestKnowledgeSourceUseCase:
         # Vetorização em lote via serviço de embedding
         embeddings = await self._embedding_service.generate_embeddings_batch(chunk_texts)
 
-        # Criação da entidade fonte
+        # Criação da entidade fonte com suporte a múltiplos temas
         source = KnowledgeSource(
-            topic_id=topic_id,
             title=request.title,
+            topic_ids=tuple(target_topic_ids),
             content_type=request.content_type,
             total_chunks=len(chunk_texts),
             char_count=len(cleaned_content),
@@ -84,10 +96,11 @@ class IngestKnowledgeSourceUseCase:
         saved_source = self._source_repo.save(source)
 
         # Criação e persistência dos chunks
+        primary_topic = target_topic_ids[0]
         chunks = [
             KnowledgeChunk(
                 source_id=saved_source.id,
-                topic_id=topic_id,
+                topic_id=primary_topic,
                 chunk_index=idx,
                 content=txt,
                 embedding=tuple(emb),
@@ -105,6 +118,64 @@ class IngestKnowledgeSourceUseCase:
             total_chunks=saved_source.total_chunks,
             char_count=saved_source.char_count,
             created_at=saved_source.created_at.isoformat(),
+            topic_ids=list(saved_source.topic_ids),
+        )
+
+
+class LinkKnowledgeSourceToTopicsUseCase:
+    """Caso de uso para atualizar a associação N:N de temas de uma fonte de conhecimento."""
+
+    def __init__(
+        self,
+        source_repo: IKnowledgeSourceRepository,
+        topic_repo: ITopicRepository,
+        subject_repo: ISubjectRepository,
+    ) -> None:
+        self._source_repo = source_repo
+        self._topic_repo = topic_repo
+        self._subject_repo = subject_repo
+
+    async def execute(
+        self,
+        user_id: UUID,
+        request: LinkKnowledgeSourceRequest,
+    ) -> KnowledgeSourceResponse:
+        source = self._source_repo.get_by_id(request.source_id)
+        if not source:
+            raise KnowledgeSourceNotFoundError("Fonte de conhecimento não encontrada.")
+
+        if not request.topic_ids:
+            raise DomainValidationError("A fonte deve estar associada a pelo menos 1 tema.")
+
+        for t_id in request.topic_ids:
+            topic = self._topic_repo.get_by_id(t_id)
+            if not topic:
+                raise EntityNotFoundError("Tema não encontrado.")
+            subject = self._subject_repo.get_by_id(topic.subject_id)
+            if not subject or not subject.can_be_edited_by(user_id):
+                raise ResourceOwnershipError(
+                    "Apenas o proprietário da matéria pode gerenciar fontes de conhecimento."
+                )
+
+        updated_source = KnowledgeSource(
+            id=source.id,
+            title=source.title,
+            topic_ids=tuple(request.topic_ids),
+            content_type=source.content_type,
+            total_chunks=source.total_chunks,
+            char_count=source.char_count,
+            created_at=source.created_at,
+        )
+        saved = self._source_repo.save(updated_source)
+        return KnowledgeSourceResponse(
+            id=saved.id,
+            topic_id=saved.topic_id,
+            title=saved.title,
+            content_type=saved.content_type,
+            total_chunks=saved.total_chunks,
+            char_count=saved.char_count,
+            created_at=saved.created_at.isoformat(),
+            topic_ids=list(saved.topic_ids),
         )
 
 

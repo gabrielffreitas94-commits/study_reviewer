@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 
 /// Constantes de rede e endpoints da API REST do Study Reviewer.
 class ApiConstants {
@@ -20,6 +20,10 @@ class ApiConstants {
     const envUrl = String.fromEnvironment('API_BASE_URL');
     if (envUrl.isNotEmpty) {
       return envUrl;
+    }
+    // Em compilações de release (APK para celular / Google Play), aponta para o backend na nuvem
+    if (kReleaseMode) {
+      return stagingBaseUrl;
     }
     if (kIsWeb) {
       return localhostBaseUrl;
