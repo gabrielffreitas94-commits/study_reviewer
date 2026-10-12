@@ -172,7 +172,7 @@ void main() {
     testWidgets('renderiza nota de domínio, métricas analíticas e feedback pedagógico',
         (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
             body: SingleChildScrollView(
               child: EvaluationFeedbackCard(evaluation: tEvaluation),
