@@ -27,8 +27,10 @@ from src.adapters.persistence.models import (
     FlashcardTopicModel,
     KnowledgeChunkModel,
     KnowledgeSourceModel,
+    KnowledgeSourceTopicModel,
     PoolSessionModel,
     QuestionModel,
+    QuestionTopicModel,
     ReviewAuditLogModel,
     StudyEventModel,
     SubjectModel,
@@ -467,6 +469,16 @@ class SqlAlchemyQuestionRepository(IQuestionRepository):
     def save(self, question: Question) -> None:
         model = QuestionMapper.to_model(question)
         self._session.merge(model)
+        self._session.flush()
+
+        self._session.query(QuestionTopicModel).filter(
+            QuestionTopicModel.question_id == question.id
+        ).delete(synchronize_session=False)
+
+        for t_id in question.topic_ids:
+            assoc = QuestionTopicModel(question_id=question.id, topic_id=t_id)
+            self._session.add(assoc)
+
         self._session.commit()
 
     def get_by_id(self, question_id: UUID) -> Question | None:
@@ -477,7 +489,14 @@ class SqlAlchemyQuestionRepository(IQuestionRepository):
     def list_by_topic(self, topic_id: UUID) -> list[Question]:
         stmt = (
             select(QuestionModel)
-            .where(QuestionModel.topic_id == topic_id)
+            .outerjoin(QuestionTopicModel, QuestionTopicModel.question_id == QuestionModel.id)
+            .where(
+                or_(
+                    QuestionTopicModel.topic_id == topic_id,
+                    QuestionModel.topic_id == topic_id,
+                )
+            )
+            .distinct()
             .order_by(QuestionModel.created_at.asc(), QuestionModel.id.asc())
         )
         models = self._session.scalars(stmt).all()
@@ -539,15 +558,38 @@ class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
             )
         )
         if subject_id is not None:
-            stmt = stmt.where(SubjectModel.id == subject_id)
+            topic_subquery = select(TopicModel.id).where(TopicModel.subject_id == subject_id)
+            stmt = stmt.where(
+                or_(
+                    SubjectModel.id == subject_id,
+                    QuestionModel.id.in_(
+                        select(QuestionTopicModel.question_id).where(
+                            QuestionTopicModel.topic_id.in_(topic_subquery)
+                        )
+                    ),
+                )
+            )
         if topic_id is not None:
-            stmt = stmt.where(TopicModel.id == topic_id)
+            stmt = stmt.where(
+                or_(
+                    TopicModel.id == topic_id,
+                    QuestionModel.id.in_(
+                        select(QuestionTopicModel.question_id).where(
+                            QuestionTopicModel.topic_id == topic_id
+                        )
+                    ),
+                )
+            )
 
-        stmt = stmt.order_by(
-            UserQuestionProgressModel.next_review_date.asc(),
-            UserQuestionProgressModel.current_level.asc(),
-            QuestionModel.id.asc(),
-        ).limit(limit)
+        stmt = (
+            stmt.distinct()
+            .order_by(
+                UserQuestionProgressModel.next_review_date.asc(),
+                UserQuestionProgressModel.current_level.asc(),
+                QuestionModel.id.asc(),
+            )
+            .limit(limit)
+        )
 
         rows = self._session.execute(stmt).all()
         return [
@@ -732,22 +774,51 @@ class SqlAlchemyKnowledgeSourceRepository(IKnowledgeSourceRepository):
             existing.content_type = source.content_type
             existing.total_chunks = source.total_chunks
             existing.char_count = source.char_count
-            self._session.flush()
-            return KnowledgeSourceMapper.to_domain(existing)
-
-        model = KnowledgeSourceMapper.to_model(source)
-        self._session.add(model)
+            if source.topic_ids:
+                existing.topic_id = source.topic_ids[0]
+            model = existing
+        else:
+            model = KnowledgeSourceMapper.to_model(source)
+            self._session.add(model)
         self._session.flush()
+
+        # Atualiza a tabela associativa N:N (knowledge_source_topics)
+        self._session.query(KnowledgeSourceTopicModel).filter(
+            KnowledgeSourceTopicModel.source_id == source.id
+        ).delete()
+
+        for t_id in source.topic_ids:
+            assoc = KnowledgeSourceTopicModel(source_id=source.id, topic_id=t_id)
+            self._session.add(assoc)
+
+        self._session.flush()
+        self._session.refresh(model)
         return KnowledgeSourceMapper.to_domain(model)
 
     def get_by_id(self, source_id: UUID) -> KnowledgeSource | None:
-        model = self._session.get(KnowledgeSourceModel, source_id)
+        stmt = (
+            select(KnowledgeSourceModel)
+            .options(selectinload(KnowledgeSourceModel.topics))
+            .where(KnowledgeSourceModel.id == source_id)
+        )
+        model = self._session.scalar(stmt)
         return KnowledgeSourceMapper.to_domain(model) if model else None
 
     def list_by_topic(self, topic_id: UUID) -> list[KnowledgeSource]:
         stmt = (
             select(KnowledgeSourceModel)
-            .where(KnowledgeSourceModel.topic_id == topic_id)
+            .options(selectinload(KnowledgeSourceModel.topics))
+            .outerjoin(
+                KnowledgeSourceTopicModel,
+                KnowledgeSourceTopicModel.source_id == KnowledgeSourceModel.id,
+            )
+            .where(
+                or_(
+                    KnowledgeSourceTopicModel.topic_id == topic_id,
+                    KnowledgeSourceModel.topic_id == topic_id,
+                )
+            )
+            .distinct()
             .order_by(KnowledgeSourceModel.created_at.desc(), KnowledgeSourceModel.id.desc())
         )
         return [KnowledgeSourceMapper.to_domain(m) for m in self._session.scalars(stmt)]
@@ -776,7 +847,17 @@ class SqlAlchemyKnowledgeChunkRepository(IKnowledgeChunkRepository):
     def list_by_topic(self, topic_id: UUID) -> list[KnowledgeChunk]:
         stmt = (
             select(KnowledgeChunkModel)
-            .where(KnowledgeChunkModel.topic_id == topic_id)
+            .outerjoin(
+                KnowledgeSourceTopicModel,
+                KnowledgeSourceTopicModel.source_id == KnowledgeChunkModel.source_id,
+            )
+            .where(
+                or_(
+                    KnowledgeSourceTopicModel.topic_id == topic_id,
+                    KnowledgeChunkModel.topic_id == topic_id,
+                )
+            )
+            .distinct()
             .order_by(KnowledgeChunkModel.chunk_index.asc())
         )
         return [KnowledgeChunkMapper.to_domain(m) for m in self._session.scalars(stmt)]

@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 
 /// Constantes de rede e endpoints da API REST do Study Reviewer.
 class ApiConstants {
@@ -13,13 +13,17 @@ class ApiConstants {
 
   /// URL de Staging pública na AWS (Serverless Always Free)
   static const String stagingBaseUrl =
-      'https://6xopxyw6z6qmqpbmcvaszuy27m0jsgzh.lambda-url.sa-east-1.on.aws/api/v1';
+      'https://x5keiru4j4zwubk2ax2vmprdci0dmlfy.lambda-url.sa-east-1.on.aws/api/v1';
 
   /// Determina dinamicamente a URL base correta conforme a plataforma de execução ou flag --dart-define.
   static String get defaultBaseUrl {
     const envUrl = String.fromEnvironment('API_BASE_URL');
     if (envUrl.isNotEmpty) {
       return envUrl;
+    }
+    // Em compilações de release (APK para celular / Google Play), aponta para o backend na nuvem
+    if (kReleaseMode) {
+      return stagingBaseUrl;
     }
     if (kIsWeb) {
       return localhostBaseUrl;

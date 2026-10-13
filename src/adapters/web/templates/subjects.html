@@ -196,6 +196,9 @@
                                             <a href="/topics/{{ t.id }}/questions" class="px-2 py-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border-l border-slate-200 dark:border-slate-600" title="Gerenciar perguntas de {{ t.name }}" aria-label="Gerenciar perguntas de {{ t.name }}">
                                                 ❓
                                             </a>
+                                            <a href="/knowledge/manage?subject_id={{ sub.id }}&topic_id={{ t.id }}" class="px-2 py-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border-l border-slate-200 dark:border-slate-600" title="Bases de conhecimento de {{ t.name }}" aria-label="Bases de conhecimento de {{ t.name }}">
+                                                📚
+                                            </a>
                                         </span>
                                     {% endfor %}
                                     {% if sub_topics|length > 5 %}
@@ -335,8 +338,16 @@
         aQuestions.setAttribute('aria-label', `Gerenciar perguntas de ${topic.name}`);
         aQuestions.textContent = '❓';
 
+        const aKnowledge = document.createElement('a');
+        aKnowledge.href = `/knowledge/manage?topic_id=${topic.id}`;
+        aKnowledge.className = 'px-2 py-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border-l border-slate-200 dark:border-slate-600';
+        aKnowledge.title = `Bases de conhecimento de ${topic.name}`;
+        aKnowledge.setAttribute('aria-label', `Bases de conhecimento de ${topic.name}`);
+        aKnowledge.textContent = '📚';
+
         span.appendChild(aStudy);
         span.appendChild(aQuestions);
+        span.appendChild(aKnowledge);
         return span;
     }
 

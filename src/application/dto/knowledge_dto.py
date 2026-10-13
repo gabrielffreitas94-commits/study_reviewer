@@ -11,6 +11,15 @@ class CreateKnowledgeSourceRequest:
     title: str
     content: str
     content_type: str = "TEXT"
+    topic_ids: list[UUID] = field(default_factory=list)
+
+
+@dataclass(slots=True, frozen=True)
+class LinkKnowledgeSourceRequest:
+    """Dados para vincular/desvincular temas de uma fonte de conhecimento existente."""
+
+    source_id: UUID
+    topic_ids: list[UUID]
 
 
 @dataclass(slots=True, frozen=True)
@@ -24,6 +33,7 @@ class KnowledgeSourceResponse:
     total_chunks: int
     char_count: int
     created_at: str
+    topic_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass(slots=True, frozen=True)
