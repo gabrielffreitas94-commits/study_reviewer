@@ -95,11 +95,10 @@
     </div>
     {% else %}
 
-    <!-- Seletor de Matéria Base e Configuração do Tema Padrão do Lote -->
-    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Matéria Principal -->
-        <div class="flex items-center space-x-3">
-            <span class="text-2xl" aria-hidden="true">📁</span>
+    <!-- Seletor de Matéria Principal do Lote -->
+    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center space-x-3 flex-1 max-w-xl">
+            <span class="text-3xl" aria-hidden="true">📁</span>
             <div class="flex-1">
                 <label for="select_subject" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1">
                     Matéria Principal do Lote <span class="text-rose-500">*</span>
@@ -108,7 +107,7 @@
                     id="select_subject"
                     name="subject_id"
                     onchange="onSubjectChanged(this.value)"
-                    class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-sm"
+                    class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm cursor-pointer"
                 >
                     {% for sub in subjects %}
                     <option value="{{ sub.id }}" {% if selected_subject and sub.id == selected_subject.id %}selected{% endif %}>
@@ -118,55 +117,49 @@
                 </select>
             </div>
         </div>
-
-        <!-- Tema Padrão Ativo (Auto-Preenchimento) -->
-        <div class="flex items-center space-x-3 bg-indigo-50/70 dark:bg-indigo-950/40 p-3 rounded-xl border border-indigo-100 dark:border-indigo-900/60">
-            <span class="text-2xl" aria-hidden="true">🎯</span>
-            <div class="flex-1">
-                <label for="select_default_topic" class="block text-xs font-semibold text-indigo-900 dark:text-indigo-200 uppercase tracking-wider mb-1 flex items-center justify-between">
-                    <span>Tema Padrão do Lote</span>
-                    <span class="text-[10px] text-indigo-600 dark:text-indigo-400 font-normal lowercase">auto-preenchido em novas perguntas</span>
-                </label>
-                <select
-                    id="select_default_topic"
-                    onchange="onDefaultTopicSelectChanged(this.value)"
-                    class="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-lg px-3 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-semibold"
-                >
-                    <!-- Preenchido dinamicamente pelo JavaScript -->
-                </select>
-            </div>
+        <div class="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 self-stretch sm:self-auto flex items-center space-x-2">
+            <span>💡</span>
+            <span>Selecione a matéria acima e marque os temas na Seção 1 para aplicar a todas as perguntas.</span>
         </div>
     </div>
 
-    <!-- SEÇÃO 1: Vitrine de Temas da Matéria (Existentes & Novos) -->
+    <!-- SEÇÃO 1: Temas das Perguntas (Seleção Múltipla para o Lote) -->
     <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
-        <div>
-            <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                <span aria-hidden="true">🏷️</span>
-                <span>1. Temas Disponíveis & Novos Temas</span>
-            </h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Clique em qualquer tema existente para defini-lo como o <strong>Tema Padrão</strong> das suas perguntas, ou adicione novos temas abaixo.
-            </p>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+                <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                    <span aria-hidden="true">🏷️</span>
+                    <span>1. Temas das Perguntas (Aplicados a Todas as Perguntas)</span>
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Marque um ou mais temas desta matéria. Eles serão vinculados automaticamente a <strong>todas as perguntas</strong> criadas nesta tela.
+                </p>
+            </div>
+            <div id="batch-topics-counter" class="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 self-start sm:self-auto">
+                0 temas selecionados
+            </div>
         </div>
 
-        <!-- Vitrine de Temas Existentes (Chips Interativos) -->
+        <!-- Vitrine de Temas Existentes (Seleção Múltipla com Checkboxes Estilizados) -->
         <div class="space-y-2">
             <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Temas Já Cadastrados nesta Matéria:
+                Temas desta Matéria (clique para marcar ou desmarcar):
             </label>
             <div id="existing-topics-chips" class="flex flex-wrap gap-2 text-xs">
                 <!-- Injetado dinamicamente via renderExistingTopicsChips -->
             </div>
         </div>
 
-        <!-- Criar Novos Temas On-the-Fly -->
+        <!-- Criar Novos Temas On-the-Fly (já entram marcados automaticamente) -->
         <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-3">
+            <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Precisa de um novo tema? Crie aqui (já será marcado para o lote):
+            </label>
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <input
                     type="text"
                     id="new-topic-input-field"
-                    placeholder="Digitar novo tema (ex: Teoria Geral do Delito)..."
+                    placeholder="Digitar nome do novo tema (ex: Teoria Geral do Delito)..."
                     onkeydown="if(event.key === 'Enter'){ event.preventDefault(); submitNewTopicFromInput(); }"
                     class="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
@@ -175,13 +168,21 @@
                     onclick="submitNewTopicFromInput()"
                     class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5 shrink-0 cursor-pointer"
                 >
-                    <span>➕ Criar Novo Tema</span>
+                    <span>➕ Adicionar Tema ao Lote</span>
                 </button>
             </div>
 
-            <!-- Lista de Novos Temas Criados no Rascunho -->
+            <!-- Novos Temas Criados no Rascunho -->
             <div id="new-topics-container" class="flex flex-wrap gap-2">
-                <!-- Injetado dinamicamente -->
+                <!-- Injetado dinamicamente via renderNewTopics -->
+            </div>
+        </div>
+
+        <!-- Resumo dos temas aplicados -->
+        <div id="batch-topics-summary-banner" class="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl border border-indigo-100 dark:border-indigo-900/50 text-xs text-indigo-900 dark:text-indigo-200 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <span class="text-base" aria-hidden="true">📌</span>
+                <span id="batch-topics-summary-text">Carregando temas...</span>
             </div>
         </div>
     </div>
@@ -382,7 +383,7 @@
     // Estado reativo do estúdio
     let studioState = {
         subject_id: document.getElementById('select_subject')?.value || '',
-        default_topic_key: '', // 'EXISTING:uuid' ou 'NEW:index'
+        batch_topic_keys: [], // ['EXISTING:uuid', 'NEW:index']
         new_topics: [],
         new_sources: [],
         questions: []
@@ -422,6 +423,14 @@
             if (parsed && typeof parsed === 'object') {
                 studioState = parsed;
 
+                // Compatibilidade com rascunhos anteriores
+                if (!Array.isArray(studioState.batch_topic_keys)) {
+                    studioState.batch_topic_keys = [];
+                    if (parsed.default_topic_key) {
+                        studioState.batch_topic_keys.push(parsed.default_topic_key);
+                    }
+                }
+
                 const subSelect = document.getElementById('select_subject');
                 if (subSelect && studioState.subject_id) {
                     subSelect.value = studioState.subject_id;
@@ -430,7 +439,7 @@
                 // Renderizações
                 renderExistingTopicsChips();
                 renderNewTopics();
-                updateDefaultTopicDropdown();
+                updateBatchTopicsSummary();
                 renderNewSources();
                 renderQuestions();
 
@@ -456,11 +465,14 @@
         const curSub = document.getElementById('select_subject')?.value || '';
         studioState.subject_id = curSub;
         const currentTopics = topicsMap[curSub]?.topics || [];
+        studioState.batch_topic_keys = [];
         if (currentTopics.length > 0) {
-            studioState.default_topic_key = `EXISTING:${currentTopics[0].id}`;
+            studioState.batch_topic_keys.push(`EXISTING:${currentTopics[0].id}`);
         }
         renderExistingTopicsChips();
-        updateDefaultTopicDropdown();
+        renderNewTopics();
+        updateBatchTopicsSummary();
+        renderNewSources();
         addQuestionCard();
     }
 
@@ -471,24 +483,39 @@
     function onSubjectChanged(newSubjectId) {
         studioState.subject_id = newSubjectId;
         const currentTopics = topicsMap[newSubjectId]?.topics || [];
+        studioState.batch_topic_keys = [];
         if (currentTopics.length > 0) {
-            studioState.default_topic_key = `EXISTING:${currentTopics[0].id}`;
+            studioState.batch_topic_keys.push(`EXISTING:${currentTopics[0].id}`);
         } else if (studioState.new_topics.length > 0) {
-            studioState.default_topic_key = 'NEW:0';
-        } else {
-            studioState.default_topic_key = '';
+            studioState.batch_topic_keys.push('NEW:0');
         }
 
         renderExistingTopicsChips();
-        updateDefaultTopicDropdown();
+        renderNewTopics();
+        updateBatchTopicsSummary();
         updateAllSourceTopicCheckboxes();
         renderQuestions();
         debounceSave();
     }
 
     // ==========================================
-    // 1. GERENCIAMENTO DE TEMAS (EXISTENTES & NOVOS)
+    // 1. GERENCIAMENTO DE TEMAS (SELEÇÃO MÚLTIPLA)
     // ==========================================
+    function toggleBatchTopic(key) {
+        const idx = studioState.batch_topic_keys.indexOf(key);
+        if (idx >= 0) {
+            studioState.batch_topic_keys.splice(idx, 1);
+        } else {
+            studioState.batch_topic_keys.push(key);
+        }
+        renderExistingTopicsChips();
+        renderNewTopics();
+        updateBatchTopicsSummary();
+        renderQuestions();
+        updateAllSourceTopicCheckboxes();
+        debounceSave();
+    }
+
     function renderExistingTopicsChips() {
         const container = document.getElementById('existing-topics-chips');
         if (!container) return;
@@ -501,20 +528,21 @@
 
         let html = '';
         currentTopics.forEach(t => {
-            const isDefault = studioState.default_topic_key === `EXISTING:${t.id}`;
-            const activeClasses = isDefault
+            const key = `EXISTING:${t.id}`;
+            const isChecked = studioState.batch_topic_keys.includes(key);
+            const activeClasses = isChecked
                 ? 'bg-indigo-600 text-white font-semibold shadow-sm border-indigo-600'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border-slate-200 dark:border-slate-700';
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-indigo-400';
 
             html += `
                 <button
                     type="button"
-                    onclick="setDefaultTopic('EXISTING:${t.id}')"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs transition cursor-pointer ${activeClasses}"
-                    title="${isDefault ? 'Este é o tema padrão do lote' : 'Clique para tornar o tema padrão para novas perguntas'}"
+                    onclick="toggleBatchTopic('${key}')"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs transition cursor-pointer ${activeClasses}"
+                    title="${isChecked ? 'Clique para desmarcar este tema das perguntas' : 'Clique para marcar este tema para todas as perguntas'}"
                 >
+                    <span class="${isChecked ? 'text-white' : 'text-slate-400'}">${isChecked ? '☑️' : '◻️'}</span>
                     <span>🏷️ ${escapeHtml(t.name)}</span>
-                    ${isDefault ? '<span class="text-[10px] bg-indigo-500/80 px-1.5 py-0.5 rounded-md text-white font-bold ml-1">⭐ Padrão</span>' : ''}
                 </button>
             `;
         });
@@ -528,46 +556,50 @@
         if (!val) return;
 
         studioState.new_topics.push(val);
-        input.value = '';
-
-        // Se não havia tema padrão, define este novo como padrão
-        if (!studioState.default_topic_key) {
-            studioState.default_topic_key = `NEW:${studioState.new_topics.length - 1}`;
+        const newIdx = studioState.new_topics.length - 1;
+        const key = `NEW:${newIdx}`;
+        if (!studioState.batch_topic_keys.includes(key)) {
+            studioState.batch_topic_keys.push(key);
         }
 
+        input.value = '';
         renderNewTopics();
-        updateDefaultTopicDropdown();
-        updateAllSourceTopicCheckboxes();
+        updateBatchTopicsSummary();
         renderQuestions();
+        updateAllSourceTopicCheckboxes();
         debounceSave();
     }
 
     function removeNewTopic(index) {
+        const targetKey = `NEW:${index}`;
         studioState.new_topics.splice(index, 1);
-        // Corrige referências de índice
-        if (studioState.default_topic_key === `NEW:${index}`) {
-            studioState.default_topic_key = '';
-        } else if (studioState.default_topic_key.startsWith('NEW:')) {
-            const curIdx = parseInt(studioState.default_topic_key.replace('NEW:', ''), 10);
-            if (curIdx > index) studioState.default_topic_key = `NEW:${curIdx - 1}`;
-        }
+        
+        studioState.batch_topic_keys = studioState.batch_topic_keys
+            .filter(k => k !== targetKey)
+            .map(k => {
+                if (k.startsWith('NEW:')) {
+                    const curIdx = parseInt(k.replace('NEW:', ''), 10);
+                    if (curIdx > index) return `NEW:${curIdx - 1}`;
+                }
+                return k;
+            });
 
-        // Corrige índices nas fontes e perguntas
+        studioState.questions.forEach(q => {
+            q.extra_topic_indices = (q.extra_topic_indices || [])
+                .filter(i => i !== index)
+                .map(i => i > index ? i - 1 : i);
+        });
+
         studioState.new_sources.forEach(s => {
             s.topic_indices = (s.topic_indices || [])
                 .filter(i => i !== index)
                 .map(i => i > index ? i - 1 : i);
         });
-        studioState.questions.forEach(q => {
-            q.topic_indices = (q.topic_indices || [])
-                .filter(i => i !== index)
-                .map(i => i > index ? i - 1 : i);
-        });
 
         renderNewTopics();
-        updateDefaultTopicDropdown();
-        updateAllSourceTopicCheckboxes();
+        updateBatchTopicsSummary();
         renderQuestions();
+        updateAllSourceTopicCheckboxes();
         debounceSave();
     }
 
@@ -582,27 +614,28 @@
 
         let html = '';
         studioState.new_topics.forEach((topicName, idx) => {
-            const isDefault = studioState.default_topic_key === `NEW:${idx}`;
-            const activeClasses = isDefault
-                ? 'bg-indigo-600 text-white font-semibold border-indigo-600'
+            const key = `NEW:${idx}`;
+            const isChecked = studioState.batch_topic_keys.includes(key);
+            const activeClasses = isChecked
+                ? 'bg-emerald-600 text-white font-semibold border-emerald-600 shadow-sm'
                 : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
 
             html += `
-                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs ${activeClasses}">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs ${activeClasses}">
                     <button
                         type="button"
-                        onclick="setDefaultTopic('NEW:${idx}')"
-                        class="hover:underline flex items-center gap-1 cursor-pointer"
-                        title="Tornar tema padrão"
+                        onclick="toggleBatchTopic('${key}')"
+                        class="hover:underline flex items-center gap-1.5 cursor-pointer"
+                        title="${isChecked ? 'Clique para desmarcar este novo tema' : 'Clique para marcar este novo tema para as perguntas'}"
                     >
+                        <span>${isChecked ? '☑️' : '◻️'}</span>
                         <span>✨ [Novo] ${escapeHtml(topicName)}</span>
-                        ${isDefault ? '<span class="text-[10px] bg-indigo-500 px-1 py-0.5 rounded text-white font-bold">⭐ Padrão</span>' : ''}
                     </button>
                     <button
                         type="button"
                         onclick="removeNewTopic(${idx})"
-                        class="text-rose-500 hover:text-rose-700 ml-1 font-bold cursor-pointer"
-                        title="Remover este novo tema"
+                        class="text-rose-300 hover:text-white ml-1 font-bold cursor-pointer"
+                        title="Excluir este novo tema"
                     >
                         ✕
                     </button>
@@ -612,60 +645,21 @@
         container.innerHTML = html;
     }
 
-    function setDefaultTopic(key) {
-        studioState.default_topic_key = key;
-        renderExistingTopicsChips();
-        renderNewTopics();
-        updateDefaultTopicDropdown();
-        debounceSave();
-    }
+    function updateBatchTopicsSummary() {
+        const badge = document.getElementById('batch-topics-counter');
+        const textEl = document.getElementById('batch-topics-summary-text');
+        const banner = document.getElementById('batch-topics-summary-banner');
 
-    function onDefaultTopicSelectChanged(val) {
-        setDefaultTopic(val);
-    }
+        const totalSelected = studioState.batch_topic_keys.length;
+        if (badge) badge.textContent = `${totalSelected} tema${totalSelected !== 1 ? 's' : ''} selecionado${totalSelected !== 1 ? 's' : ''}`;
 
-    function updateDefaultTopicDropdown() {
-        const select = document.getElementById('select_default_topic');
-        if (!select) return;
-
-        select.innerHTML = '';
-
-        const currentTopics = topicsMap[studioState.subject_id]?.topics || [];
-
-        if (currentTopics.length === 0 && studioState.new_topics.length === 0) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = 'Nenhum tema disponível. Crie um tema acima.';
-            select.appendChild(opt);
-            return;
-        }
-
-        // Temas existentes da matéria
-        if (currentTopics.length > 0) {
-            const group = document.createElement('optgroup');
-            group.label = `📁 Matéria: ${topicsMap[studioState.subject_id]?.name || 'Atual'}`;
-            currentTopics.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = `EXISTING:${t.id}`;
-                opt.textContent = `🏷️ ${t.name}`;
-                if (studioState.default_topic_key === `EXISTING:${t.id}`) opt.selected = true;
-                group.appendChild(opt);
-            });
-            select.appendChild(group);
-        }
-
-        // Novos temas
-        if (studioState.new_topics.length > 0) {
-            const group = document.createElement('optgroup');
-            group.label = '✨ Novos Temas do Lote';
-            studioState.new_topics.forEach((name, idx) => {
-                const opt = document.createElement('option');
-                opt.value = `NEW:${idx}`;
-                opt.textContent = `✨ [Novo] ${name || `Tema #${idx + 1}`}`;
-                if (studioState.default_topic_key === `NEW:${idx}`) opt.selected = true;
-                group.appendChild(opt);
-            });
-            select.appendChild(group);
+        if (totalSelected === 0) {
+            if (textEl) textEl.innerHTML = '<span class="text-amber-600 dark:text-amber-400 font-semibold">⚠️ Nenhum tema selecionado acima. Marque ao menos 1 tema para vincular às perguntas.</span>';
+            if (banner) banner.className = 'p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-900/40 text-xs flex items-center justify-between';
+        } else {
+            const names = studioState.batch_topic_keys.map(k => getTopicDisplayName(k));
+            if (textEl) textEl.innerHTML = `<strong>${totalSelected} tema(s) aplicados a todas as perguntas:</strong> ${escapeHtml(names.join(', '))}`;
+            if (banner) banner.className = 'p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl border border-indigo-100 dark:border-indigo-900/50 text-xs text-indigo-900 dark:text-indigo-200 flex items-center justify-between';
         }
     }
 
@@ -697,13 +691,13 @@
     function addNewSourceCard() {
         const initialTopics = [];
         const initialIndices = [];
-        if (studioState.default_topic_key) {
-            if (studioState.default_topic_key.startsWith('NEW:')) {
-                initialIndices.push(parseInt(studioState.default_topic_key.replace('NEW:', ''), 10));
-            } else if (studioState.default_topic_key.startsWith('EXISTING:')) {
-                initialTopics.push(studioState.default_topic_key.replace('EXISTING:', ''));
+        studioState.batch_topic_keys.forEach(k => {
+            if (k.startsWith('NEW:')) {
+                initialIndices.push(parseInt(k.replace('NEW:', ''), 10));
+            } else if (k.startsWith('EXISTING:')) {
+                initialTopics.push(k.replace('EXISTING:', ''));
             }
-        }
+        });
 
         studioState.new_sources.push({
             title: '',
@@ -908,27 +902,11 @@
     // 3. GERENCIAMENTO DE PERGUNTAS (MULTITEMA N:N)
     // ==========================================
     function addQuestionCard(prompt = '', answer = '') {
-        const initialTopics = [];
-        const initialIndices = [];
-
-        if (studioState.default_topic_key) {
-            if (studioState.default_topic_key.startsWith('NEW:')) {
-                initialIndices.push(parseInt(studioState.default_topic_key.replace('NEW:', ''), 10));
-            } else if (studioState.default_topic_key.startsWith('EXISTING:')) {
-                initialTopics.push(studioState.default_topic_key.replace('EXISTING:', ''));
-            }
-        } else {
-            const curTopics = topicsMap[studioState.subject_id]?.topics || [];
-            if (curTopics.length > 0) {
-                initialTopics.push(curTopics[0].id);
-            }
-        }
-
         studioState.questions.push({
             prompt: prompt,
             expected_answer: answer,
-            topic_ids: initialTopics,
-            topic_indices: initialIndices
+            extra_topic_ids: [],
+            extra_topic_indices: []
         });
         renderQuestions();
         debounceSave();
@@ -936,26 +914,11 @@
 
     function addMultipleQuestions(count) {
         for (let i = 0; i < count; i++) {
-            const initialTopics = [];
-            const initialIndices = [];
-            if (studioState.default_topic_key) {
-                if (studioState.default_topic_key.startsWith('NEW:')) {
-                    initialIndices.push(parseInt(studioState.default_topic_key.replace('NEW:', ''), 10));
-                } else if (studioState.default_topic_key.startsWith('EXISTING:')) {
-                    initialTopics.push(studioState.default_topic_key.replace('EXISTING:', ''));
-                }
-            } else {
-                const curTopics = topicsMap[studioState.subject_id]?.topics || [];
-                if (curTopics.length > 0) {
-                    initialTopics.push(curTopics[0].id);
-                }
-            }
-
             studioState.questions.push({
                 prompt: '',
                 expected_answer: '',
-                topic_ids: initialTopics,
-                topic_indices: initialIndices
+                extra_topic_ids: [],
+                extra_topic_indices: []
             });
         }
         renderQuestions();
@@ -975,43 +938,43 @@
         }
     }
 
-    function removeTopicFromQuestion(qIdx, isNew, idOrIndex) {
+    function removeExtraTopicFromQuestion(qIdx, isNew, idOrIndex) {
         const q = studioState.questions[qIdx];
         if (!q) return;
 
         if (isNew) {
             const idx = parseInt(idOrIndex, 10);
-            q.topic_indices = (q.topic_indices || []).filter(i => i !== idx);
+            q.extra_topic_indices = (q.extra_topic_indices || []).filter(i => i !== idx);
         } else {
-            q.topic_ids = (q.topic_ids || []).filter(id => id !== idOrIndex);
+            q.extra_topic_ids = (q.extra_topic_ids || []).filter(id => id !== idOrIndex);
         }
 
         renderQuestions();
         debounceSave();
     }
 
-    function addTopicToQuestion(qIdx, selectEl) {
+    function addExtraTopicToQuestion(qIdx, selectEl) {
         const val = selectEl.value;
         if (!val) return;
         const q = studioState.questions[qIdx];
         if (!q) return;
 
-        if (!q.topic_ids) q.topic_ids = [];
-        if (!q.topic_indices) q.topic_indices = [];
+        if (!q.extra_topic_ids) q.extra_topic_ids = [];
+        if (!q.extra_topic_indices) q.extra_topic_indices = [];
 
-        const totalSelected = q.topic_ids.length + q.topic_indices.length;
+        const totalSelected = studioState.batch_topic_keys.length + q.extra_topic_ids.length + q.extra_topic_indices.length;
         if (totalSelected >= 5) {
-            alert('Uma pergunta pode estar vinculada a no máximo 5 temas simultâneos.');
+            alert('Uma pergunta pode estar vinculada a no máximo 5 temas no total.');
             selectEl.value = '';
             return;
         }
 
         if (val.startsWith('NEW:')) {
             const idx = parseInt(val.replace('NEW:', ''), 10);
-            if (!q.topic_indices.includes(idx)) q.topic_indices.push(idx);
+            if (!q.extra_topic_indices.includes(idx)) q.extra_topic_indices.push(idx);
         } else if (val.startsWith('EXISTING:')) {
             const id = val.replace('EXISTING:', '');
-            if (!q.topic_ids.includes(id)) q.topic_ids.push(id);
+            if (!q.extra_topic_ids.includes(id)) q.extra_topic_ids.push(id);
         }
 
         selectEl.value = '';
@@ -1038,75 +1001,75 @@
             const card = document.createElement('div');
             card.className = 'bg-slate-50 dark:bg-slate-900/80 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3';
 
-            // Monta chips de tópicos vinculados a esta pergunta
-            let topicChipsHtml = '';
-            const qTopicIds = q.topic_ids || [];
-            const qTopicIndices = q.topic_indices || [];
+            // Chips dos temas herdados do lote (Seção 1)
+            let batchChipsHtml = '';
+            studioState.batch_topic_keys.forEach(k => {
+                const isNew = k.startsWith('NEW:');
+                const name = getTopicDisplayName(k);
+                batchChipsHtml += `
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold">
+                        <span>${isNew ? '✨' : '🏷️'} ${escapeHtml(name)}</span>
+                        <span class="text-[9px] bg-indigo-200/80 dark:bg-indigo-900 px-1 py-0.5 rounded text-indigo-800 dark:text-indigo-200 font-normal">lote</span>
+                    </span>
+                `;
+            });
 
-            qTopicIndices.forEach(tIdx => {
+            // Chips dos temas extras interdisciplinares
+            let extraChipsHtml = '';
+            (q.extra_topic_indices || []).forEach(tIdx => {
                 const name = studioState.new_topics[tIdx] || `Tema #${tIdx + 1}`;
-                topicChipsHtml += `
+                extraChipsHtml += `
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold">
                         <span>✨ [Novo] ${escapeHtml(name)}</span>
-                        <button type="button" onclick="removeTopicFromQuestion(${idx}, true, ${tIdx})" class="hover:text-rose-600 ml-1 font-bold cursor-pointer" title="Remover este tema">✕</button>
+                        <button type="button" onclick="removeExtraTopicFromQuestion(${idx}, true, ${tIdx})" class="hover:text-rose-600 font-bold ml-0.5 cursor-pointer" title="Remover tema extra">✕</button>
+                    </span>
+                `;
+            });
+            (q.extra_topic_ids || []).forEach(tId => {
+                const name = getTopicDisplayName(`EXISTING:${tId}`);
+                extraChipsHtml += `
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-semibold">
+                        <span>🌐 ${escapeHtml(name)}</span>
+                        <button type="button" onclick="removeExtraTopicFromQuestion(${idx}, false, '${tId}')" class="hover:text-rose-600 font-bold ml-0.5 cursor-pointer" title="Remover tema extra">✕</button>
                     </span>
                 `;
             });
 
-            qTopicIds.forEach(tId => {
-                const displayName = getTopicDisplayName(`EXISTING:${tId}`);
-                topicChipsHtml += `
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold">
-                        <span>🏷️ ${escapeHtml(displayName)}</span>
-                        <button type="button" onclick="removeTopicFromQuestion(${idx}, false, '${tId}')" class="hover:text-rose-600 ml-1 font-bold cursor-pointer" title="Remover este tema">✕</button>
-                    </span>
-                `;
-            });
+            // Opções do seletor para adicionar temas interdisciplinares extras
+            let addTopicOptionsHtml = '<option value="">➕ Adicionar tema interdisciplinar...</option>';
 
-            if (!topicChipsHtml) {
-                topicChipsHtml = '<span class="text-rose-500 text-xs italic font-medium">⚠️ Nenhum tema vinculado. Selecione ao menos um tema no seletor ao lado.</span>';
-            }
-
-            // Opções do seletor para adicionar mais temas (incluindo outras matérias)
-            let addTopicOptionsHtml = '<option value="">➕ Vincular a outro tema / matéria...</option>';
-
-            // Novos temas do lote
-            if (studioState.new_topics.length > 0) {
-                addTopicOptionsHtml += '<optgroup label="✨ Novos Temas do Lote">';
-                studioState.new_topics.forEach((tName, tIdx) => {
-                    if (!qTopicIndices.includes(tIdx)) {
-                        addTopicOptionsHtml += `<option value="NEW:${tIdx}">✨ [Novo] ${escapeHtml(tName || `Tema #${tIdx + 1}`)}</option>`;
-                    }
-                });
-                addTopicOptionsHtml += '</optgroup>';
-            }
-
-            // Temas da matéria atual
-            const currentSubTopics = topicsMap[studioState.subject_id]?.topics || [];
-            if (currentSubTopics.length > 0) {
-                addTopicOptionsHtml += `<optgroup label="📁 Matéria Atual: ${escapeHtml(topicsMap[studioState.subject_id]?.name || '')}">`;
-                currentSubTopics.forEach(t => {
-                    if (!qTopicIds.includes(t.id)) {
-                        addTopicOptionsHtml += `<option value="EXISTING:${t.id}">🏷️ ${escapeHtml(t.name)}</option>`;
-                    }
-                });
-                addTopicOptionsHtml += '</optgroup>';
-            }
-
-            // Temas de outras matérias cadastradas pelo usuário (Interdisciplinar)
             for (const subId in topicsMap) {
-                if (subId !== studioState.subject_id) {
-                    const otherTopics = topicsMap[subId].topics || [];
-                    if (otherTopics.length > 0) {
-                        addTopicOptionsHtml += `<optgroup label="🌐 ${escapeHtml(topicsMap[subId].name)}">`;
-                        otherTopics.forEach(t => {
-                            if (!qTopicIds.includes(t.id)) {
-                                addTopicOptionsHtml += `<option value="EXISTING:${t.id}">🏷️ ${escapeHtml(t.name)}</option>`;
-                            }
-                        });
-                        addTopicOptionsHtml += '</optgroup>';
+                const isCurrentSub = subId === studioState.subject_id;
+                const subTopics = topicsMap[subId].topics || [];
+                let subOptions = '';
+                subTopics.forEach(t => {
+                    const key = `EXISTING:${t.id}`;
+                    const inBatch = studioState.batch_topic_keys.includes(key);
+                    const inExtra = (q.extra_topic_ids || []).includes(t.id);
+                    if (!inBatch && !inExtra) {
+                        subOptions += `<option value="${key}">${isCurrentSub ? '🏷️' : '🌐'} ${escapeHtml(t.name)}</option>`;
                     }
+                });
+                if (subOptions) {
+                    const groupLabel = isCurrentSub
+                        ? `📁 Outros Temas de ${escapeHtml(topicsMap[subId].name)}`
+                        : `🌐 Matéria: ${escapeHtml(topicsMap[subId].name)}`;
+                    addTopicOptionsHtml += `<optgroup label="${groupLabel}">${subOptions}</optgroup>`;
                 }
+            }
+
+            // Novos temas criados no lote que não estejam marcados no batch
+            let newTopicOptions = '';
+            studioState.new_topics.forEach((tName, tIdx) => {
+                const key = `NEW:${tIdx}`;
+                const inBatch = studioState.batch_topic_keys.includes(key);
+                const inExtra = (q.extra_topic_indices || []).includes(tIdx);
+                if (!inBatch && !inExtra) {
+                    newTopicOptions += `<option value="${key}">✨ [Novo] ${escapeHtml(tName || `Tema #${tIdx + 1}`)}</option>`;
+                }
+            });
+            if (newTopicOptions) {
+                addTopicOptionsHtml += `<optgroup label="✨ Novos Temas do Lote">${newTopicOptions}</optgroup>`;
             }
 
             card.innerHTML = `
@@ -1126,23 +1089,22 @@
                     </button>
                 </div>
 
-                <!-- Barra de Temas da Pergunta (Multitema / Multimatéria) -->
-                <div class="bg-white dark:bg-slate-900/90 p-3 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                            Temas Associados a esta Pergunta (até 5 temas):
-                        </label>
-                        <div class="sm:max-w-xs w-full">
-                            <select
-                                onchange="addTopicToQuestion(${idx}, this)"
-                                class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium"
-                            >
-                                ${addTopicOptionsHtml}
-                            </select>
-                        </div>
+                <!-- Barra de Temas da Pergunta (Herança do Lote + Extra Interdisciplinar) -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mr-1">
+                            Temas:
+                        </span>
+                        ${batchChipsHtml || '<span class="text-amber-500 text-xs italic font-medium">⚠️ Nenhum tema selecionado no lote acima</span>'}
+                        ${extraChipsHtml}
                     </div>
-                    <div class="flex flex-wrap items-center gap-1.5 pt-1">
-                        ${topicChipsHtml}
+                    <div class="sm:max-w-[270px] w-full">
+                        <select
+                            onchange="addExtraTopicToQuestion(${idx}, this)"
+                            class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium"
+                        >
+                            ${addTopicOptionsHtml}
+                        </select>
                     </div>
                 </div>
 
@@ -1197,7 +1159,7 @@
 
         studioState = {
             subject_id: curSub,
-            default_topic_key: currentTopics.length > 0 ? `EXISTING:${currentTopics[0].id}` : '',
+            batch_topic_keys: currentTopics.length > 0 ? [`EXISTING:${currentTopics[0].id}`] : [],
             new_topics: [],
             new_sources: [],
             questions: []
@@ -1205,9 +1167,10 @@
 
         renderExistingTopicsChips();
         renderNewTopics();
-        updateDefaultTopicDropdown();
+        updateBatchTopicsSummary();
         renderNewSources();
         renderQuestions();
+        updateAllSourceTopicCheckboxes();
 
         closeCleanAllModal();
         addQuestionCard();
@@ -1231,13 +1194,24 @@
             return;
         }
 
+        if (studioState.batch_topic_keys.length === 0) {
+            const hasOrphan = studioState.questions.some(q => 
+                (!q.extra_topic_ids || q.extra_topic_ids.length === 0) &&
+                (!q.extra_topic_indices || q.extra_topic_indices.length === 0)
+            );
+            if (hasOrphan) {
+                alert('Por favor, marque pelo menos 1 tema na Seção 1 (Temas das Perguntas).');
+                return;
+            }
+        }
+
         for (let i = 0; i < studioState.questions.length; i++) {
             const q = studioState.questions[i];
             if (!q.prompt.trim() || !q.expected_answer.trim()) {
                 alert(`A Pergunta #${i + 1} está com enunciado ou gabarito em branco.`);
                 return;
             }
-            const totalThemes = (q.topic_ids || []).length + (q.topic_indices || []).length;
+            const totalThemes = studioState.batch_topic_keys.length + (q.extra_topic_ids || []).length + (q.extra_topic_indices || []).length;
             if (totalThemes === 0) {
                 alert(`A Pergunta #${i + 1} precisa estar associada a pelo menos um tema.`);
                 return;
@@ -1266,14 +1240,31 @@
                 topic_indices: s.topic_indices || [],
                 content_type: s.content_type || 'TEXT'
             })),
-            questions: studioState.questions.map(q => ({
-                prompt: q.prompt.trim(),
-                expected_answer: q.expected_answer.trim(),
-                topic_ids: q.topic_ids || [],
-                topic_indices: q.topic_indices || [],
-                topic_id: (q.topic_ids && q.topic_ids.length > 0) ? q.topic_ids[0] : null,
-                topic_index: (q.topic_indices && q.topic_indices.length > 0) ? q.topic_indices[0] : null
-            }))
+            questions: studioState.questions.map(q => {
+                const finalTopicIds = [];
+                const finalTopicIndices = [];
+
+                studioState.batch_topic_keys.forEach(k => {
+                    if (k.startsWith('EXISTING:')) finalTopicIds.push(k.replace('EXISTING:', ''));
+                    if (k.startsWith('NEW:')) finalTopicIndices.push(parseInt(k.replace('NEW:', ''), 10));
+                });
+
+                (q.extra_topic_ids || []).forEach(id => {
+                    if (!finalTopicIds.includes(id)) finalTopicIds.push(id);
+                });
+                (q.extra_topic_indices || []).forEach(idx => {
+                    if (!finalTopicIndices.includes(idx)) finalTopicIndices.push(idx);
+                });
+
+                return {
+                    prompt: q.prompt.trim(),
+                    expected_answer: q.expected_answer.trim(),
+                    topic_ids: finalTopicIds,
+                    topic_indices: finalTopicIndices,
+                    topic_id: finalTopicIds.length > 0 ? finalTopicIds[0] : null,
+                    topic_index: finalTopicIndices.length > 0 ? finalTopicIndices[0] : null
+                };
+            })
         };
 
         const progressModal = document.getElementById('publish-progress-modal');
