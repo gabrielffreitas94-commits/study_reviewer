@@ -98,3 +98,30 @@ class InsufficientTokensError(DomainException):
 
 class EvaluationServiceError(DomainException):
     """Falha ou indisponibilidade temporária no serviço de avaliação de respostas por IA."""
+
+
+# --- Árvore de Estudos RPG & Grafo de Aprendizado ---
+
+
+class StudyMapNotFoundError(EntityNotFoundError):
+    """Mapa de estudos não encontrado para o identificador fornecido."""
+
+
+class StudyNodeNotFoundError(EntityNotFoundError):
+    """Nó da árvore de estudos não encontrado para o identificador fornecido."""
+
+
+class StudyEdgeNotFoundError(EntityNotFoundError):
+    """Aresta da árvore de estudos não encontrada para o identificador fornecido."""
+
+
+class CyclicDependencyError(DomainValidationError):
+    """Tentativa de criar dependência que geraria ciclo no grafo acíclico dirigido (DAG)."""
+
+
+class SelfReferencingEdgeError(DomainValidationError):
+    """Tentativa de criar aresta onde a origem e o destino são o mesmo nó."""
+
+
+class CrossMapEdgeError(DomainValidationError):
+    """Tentativa de conectar nós pertencentes a mapas de estudo distintos."""

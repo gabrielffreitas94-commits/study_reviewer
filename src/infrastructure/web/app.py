@@ -90,10 +90,12 @@ def create_app() -> FastAPI:
     from src.adapters.api.performance_controllers import api_performance_router
     from src.adapters.api.question_controllers import api_question_router
     from src.adapters.api.studio_controllers import api_studio_router
+    from src.adapters.api.study_tree_controllers import api_study_tree_router
     from src.adapters.web.auth_controllers import auth_router, privacy_router
     from src.adapters.web.knowledge_controllers import web_knowledge_router
     from src.adapters.web.performance_controllers import web_performance_router
     from src.adapters.web.question_controllers import web_question_router
+    from src.adapters.web.study_tree_web_controllers import web_study_tree_router
     from src.domain.exceptions import (
         QuestionNotDueError,
         QuestionNotFoundError,
@@ -173,6 +175,8 @@ def create_app() -> FastAPI:
     app.include_router(web_performance_router)
     app.include_router(api_performance_router)
     app.include_router(api_studio_router)
+    app.include_router(api_study_tree_router)
+    app.include_router(web_study_tree_router)
 
     @app.get("/health", tags=["Health"])
     async def health_check() -> dict[str, str]:

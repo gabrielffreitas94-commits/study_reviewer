@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+
+{% block title %}{{ map.title }} — Árvore de Conhecimento RPG{% endblock %}
+
+{% block content %}
+<div class="relative w-full h-[calc(100vh-4rem)] bg-slate-950 overflow-hidden flex flex-col select-none text-slate-100">
+
+    <!-- Topbar do Canvas RPG -->
+    <div class="h-14 bg-slate-900/90 border-b border-slate-800/80 backdrop-blur px-4 flex items-center justify-between z-20 shadow-md">
+        <div class="flex items-center space-x-4">
+            {% if map.is_submap and map.parent_map_id %}
+            <a
+                href="/study-maps/{{ map.parent_map_id }}/canvas"
+                class="inline-flex items-center text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                title="Voltar ao mapa superior"
+            >
+                <span class="mr-1">←</span> Voltar para: {{ map.parent_node_title or 'Mapa Superior' }}
+            </a>
+            {% else %}
+            <a
+                href="/study-maps"
+                class="inline-flex items-center text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            >
+                <span class="mr-1">←</span> Meus Mapas
+            </a>
+            {% endif %}
+
+            <div class="flex items-center space-x-2 border-l border-slate-700/60 pl-4">
+                <span class="text-xl">🌌</span>
+                <div>
+                    <h1 class="text-sm font-bold tracking-tight text-white flex items-center space-x-2">
+                        <span>{{ map.title }}</span>
+                        {% if map.is_submap %}
+                        <span class="px-2 py-0.5 text-[10px] uppercase font-black bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-md">
+                            Sub-mapa
+                        </span>
+                        {% endif %}
+                    </h1>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ferramentas e Modos -->
+        <div class="flex items-center space-x-2">
+            <!-- Modo Estudo vs Modo Edição -->
+            <div class="flex items-center bg-slate-800/90 p-1 rounded-xl border border-slate-700/60 text-xs">
+                <button
+                    type="button"
+                    id="btn-mode-study"
+                    onclick="setInteractionMode('study')"
+                    class="px-3 py-1 font-bold rounded-lg transition-all bg-indigo-600 text-white shadow-sm"
+                >
+                    🎮 Estudo
+                </button>
+                <button
+                    type="button"
+                    id="btn-mode-edit"
+                    onclick="setInteractionMode('edit')"
+                    class="px-3 py-1 font-medium rounded-lg text-slate-400 hover:text-white transition-all"
+                >
+                    🛠️ Editor
+                </button>
+            </div>
+
+            <!-- Botões de Ação do Editor (visíveis apenas no modo edit) -->
+            <div id="editor-actions" class="hidden flex items-center space-x-2 border-l border-slate-700/60 pl-2">
+                <button
+                    type="button"
+                    onclick="openCreateNodeModal()"
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 flex items-center space-x-1 transition-all"
+                >
+                    <span>+ Nó</span>
+                </button>
+                <button
+                    type="button"
+                    id="btn-connect-mode"
+                    onclick="toggleConnectMode()"
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center space-x-1 transition-all"
+                    title="Conectar dois nós"
+                >
+                    <span>🔗 Conectar</span>
+                </button>
+            </div>
+
+            <!-- Controles de Zoom -->
+            <div class="flex items-center bg-slate-800/90 rounded-xl border border-slate-700/60 text-xs">
+                <button
+                    type="button"
+                    onclick="zoomOut()"
+                    class="px-2.5 py-1.5 hover:bg-slate-700 rounded-l-xl transition-colors font-bold text-slate-300"
+                    title="Zoom Out"
+                >
+                    −
+                </button>
+                <button
+                    type="button"
+                    onclick="resetView()"
+                    class="px-2.5 py-1.5 hover:bg-slate-700 transition-colors text-[11px] font-mono text-slate-400"
+                    id="zoom-label"
+                >
+                    100%
+                </button>
+                <button
+                    type="button"
+                    onclick="zoomIn()"
+                    class="px-2.5 py-1.5 hover:bg-slate-700 rounded-r-xl transition-colors font-bold text-slate-300"
+                    title="Zoom In"
+                >
+                    +
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Área do Canvas Infinito -->
+    <div id="canvas-viewport" class="relative flex-1 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing bg-slate-950">
+        <!-- Grid de Fundo RPG Cósmico -->
+        <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none opacity-40"></div>
+
+        <!-- Container Transformável (Pan & Zoom) -->
+        <div id="canvas-container" class="absolute inset-0 origin-top-left">
+            <!-- Camada de Conexões (SVG) -->
+            <svg id="canvas-svg" class="absolute inset-0 w-[5000px] h-[5000px] pointer-events-none overflow-visible">
+                <defs>
+                    <linearGradient id="edge-unlocked-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#10b981"/>
+                        <stop offset="100%" stop-color="#06b6d4"/>
+                    </linearGradient>
+                    <linearGradient id="edge-locked-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#475569"/>
+                        <stop offset="100%" stop-color="#334155"/>
+                    </linearGradient>
+                    <marker id="arrow-unlocked" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                        <polygon points="0 0, 8 4, 0 8" fill="#10b981"/>
+                    </marker>
+                    <marker id="arrow-locked" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                        <polygon points="0 0, 8 4, 0 8" fill="#475569"/>
+                    </marker>
+                </defs>
+                <g id="edges-group"></g>
+            </svg>
+
+            <!-- Camada de Nós (DOM interativo) -->
+            <div id="nodes-layer" class="absolute inset-0 w-[5000px] h-[5000px] pointer-events-auto"></div>
+        </div>
+    </div>
+
+    <!-- Banner Informativo de Conexão Ativa -->
+    <div id="connect-banner" class="hidden absolute top-16 left-1/2 -translate-x-1/2 bg-amber-500/90 text-slate-950 px-4 py-2 rounded-2xl shadow-xl font-bold text-xs flex items-center space-x-2 z-30 animate-bounce">
+        <span>⚡ MODO CONEXÃO: Clique no nó de pré-requisito e depois no nó dependente</span>
+        <button type="button" onclick="toggleConnectMode()" class="ml-2 text-xs bg-slate-950/20 px-2 py-0.5 rounded">Cancelar</button>
+    </div>
+
+    <!-- Slide-Over Drawer de Inspeção do Nó -->
+    <div id="node-drawer" class="hidden fixed inset-y-0 right-0 max-w-md w-full bg-slate-900 border-l border-slate-800 shadow-2xl z-40 flex flex-col transition-transform duration-300">
+        <!-- Cabeçalho do Drawer -->
+        <div class="p-6 border-b border-slate-800 flex items-start justify-between bg-slate-950/50">
+            <div class="flex items-center space-x-4">
+                <div id="drawer-node-icon" class="w-14 h-14 rounded-2xl bg-indigo-950/60 border border-indigo-500/40 flex items-center justify-center text-3xl shadow-inner">
+                    🧠
+                </div>
+                <div>
+                    <h2 id="drawer-node-title" class="text-lg font-extrabold text-white">Nó de Aprendizado</h2>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <span id="drawer-level-badge" class="px-2 py-0.5 text-xs font-black rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                            NÍVEL 1
+                        </span>
+                        <span id="drawer-unlock-status" class="text-xs text-slate-400 font-medium">Desbloqueado</span>
+                    </div>
+                </div>
+            </div>
+            <button
+                type="button"
+                onclick="closeNodeDrawer()"
+                class="text-slate-400 hover:text-white p-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+            >
+                ✕
+            </button>
+        </div>
+
+        <!-- Corpo do Drawer: Ações de Estudo & Sub-mapa -->
+        <div class="p-6 border-b border-slate-800/80 bg-slate-900/60 space-y-3">
+            <p id="drawer-node-desc" class="text-xs text-slate-400 line-clamp-3">
+                Descrição do conceito.
+            </p>
+
+            <!-- Botão de Revisão Direta SRS -->
+            <div id="drawer-study-action" class="pt-2">
+                <button
+                    type="button"
+                    id="btn-study-node"
+                    onclick="startNodeStudySession()"
+                    class="w-full py-2.5 px-4 rounded-xl text-sm font-extrabold bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-all cursor-pointer"
+                >
+                    <span>⚔️ Revisar Nó no SRS</span>
+                    <span id="drawer-due-badge" class="px-2 py-0.5 text-xs rounded-full bg-black/30 font-mono">0 pendentes</span>
+                </button>
+            </div>
+
+            <!-- Ação de Sub-mapa Fractal -->
+            <div class="pt-2" id="drawer-submap-action">
+                <!-- Preenchido dinamicamente via JS -->
+            </div>
+        </div>
+
+        <!-- Abas de Conteúdo (Perguntas, Materiais, Flashcards) -->
+        <div class="border-b border-slate-800 flex text-xs font-bold text-slate-400 px-6 pt-3 bg-slate-950/30">
+            <button
+                type="button"
+                id="tab-btn-questions"
+                onclick="switchDrawerTab('questions')"
+                class="pb-3 border-b-2 border-indigo-500 text-indigo-400 px-3 transition-colors"
+            >
+                ❓ Perguntas (<span id="count-tab-questions">0</span>)
+            </button>
+            <button
+                type="button"
+                id="tab-btn-materials"
+                onclick="switchDrawerTab('materials')"
+                class="pb-3 border-b-2 border-transparent hover:text-slate-200 px-3 transition-colors"
+            >
+                📚 Materiais (<span id="count-tab-materials">0</span>)
+            </button>
+            <button
+                type="button"
+                id="tab-btn-flashcards"
+                onclick="switchDrawerTab('flashcards')"
+                class="pb-3 border-b-2 border-transparent hover:text-slate-200 px-3 transition-colors"
+            >
+                🗂️ Flashcards (<span id="count-tab-flashcards">0</span>)
+            </button>
+        </div>
+
+        <!-- Conteúdo das Abas (Scrollável) -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-4">
+            <!-- Aba Perguntas -->
+            <div id="tab-content-questions" class="space-y-3">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs text-slate-400">Perguntas vinculadas ao SRS deste nó:</span>
+                    <button
+                        type="button"
+                        onclick="openAttachModal('question')"
+                        class="text-xs font-bold text-indigo-400 hover:text-indigo-300"
+                    >
+                        + Vincular
+                    </button>
+                </div>
+                <div id="drawer-questions-list" class="space-y-2">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+
+            <!-- Aba Materiais -->
+            <div id="tab-content-materials" class="hidden space-y-3">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs text-slate-400">Materiais didáticos / RAG anexados:</span>
+                    <button
+                        type="button"
+                        onclick="openAttachModal('material')"
+                        class="text-xs font-bold text-indigo-400 hover:text-indigo-300"
+                    >
+                        + Vincular
+                    </button>
+                </div>
+                <div id="drawer-materials-list" class="space-y-2">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+
+            <!-- Aba Flashcards -->
+            <div id="tab-content-flashcards" class="hidden space-y-3">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs text-slate-400">Flashcards associados:</span>
+                    <button
+                        type="button"
+                        onclick="openAttachModal('flashcard')"
+                        class="text-xs font-bold text-indigo-400 hover:text-indigo-300"
+                    >
+                        + Vincular
+                    </button>
+                </div>
+                <div id="drawer-flashcards-list" class="space-y-2">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Rodapé do Drawer: Ações de Edição do Nó -->
+        <div id="drawer-editor-footer" class="p-4 border-t border-slate-800 bg-slate-950 flex justify-between items-center">
+            <button
+                type="button"
+                onclick="deleteCurrentNode()"
+                class="text-xs text-rose-500 hover:text-rose-400 font-bold px-3 py-1.5 rounded-lg hover:bg-rose-950/30 transition-colors"
+            >
+                Excluir Nó
+            </button>
+            <button
+                type="button"
+                onclick="openEditNodeModal()"
+                class="text-xs text-slate-300 hover:text-white font-bold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+            >
+                Editar Nó
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Criação / Edição de Nó -->
+<div id="node-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" onclick="closeNodeModal()"></div>
+    <div class="min-h-full flex items-center justify-center p-4">
+        <div class="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-slate-100">
+            <h3 id="node-modal-title" class="text-lg font-bold text-white mb-4">Adicionar Nó</h3>
+            <form onsubmit="handleSaveNode(event)" class="space-y-4">
+                <input type="hidden" id="modal-node-id"/>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Título do Nó</label>
+                    <input
+                        type="text"
+                        id="modal-node-title-input"
+                        required
+                        maxlength="150"
+                        placeholder="Ex: Domain Services"
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white focus:ring-2 focus:ring-indigo-500 text-sm"
+                    />
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Ícone</label>
+                    <select
+                        id="modal-node-icon-select"
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white focus:ring-2 focus:ring-indigo-500 text-sm"
+                    >
+                        <option value="brain">🧠 Cérebro / Mente</option>
+                        <option value="sword">⚔️ Espada / Prática</option>
+                        <option value="shield">🛡️ Escudo / Regra</option>
+                        <option value="book">📖 Livro / Teoria</option>
+                        <option value="code">💻 Código / Dev</option>
+                        <option value="fire">🔥 Fogo / Desafio</option>
+                        <option value="scroll">📜 Pergaminho / Arquivo</option>
+                        <option value="flask">🧪 Poção / Laboratório</option>
+                        <option value="gem">💎 Gema / Maestria</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Descrição</label>
+                    <textarea
+                        id="modal-node-desc-input"
+                        rows="3"
+                        maxlength="2000"
+                        placeholder="Breve descrição do nó..."
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white focus:ring-2 focus:ring-indigo-500 text-sm"
+                    ></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4 border-t border-slate-800">
+                    <button type="button" onclick="closeNodeModal()" class="px-4 py-2 text-sm text-slate-400 hover:text-white">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-lg shadow-indigo-600/30">Salvar Nó</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Vinculação de Conteúdos da Biblioteca -->
+<div id="attach-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" onclick="closeAttachModal()"></div>
+    <div class="min-h-full flex items-center justify-center p-4">
+        <div class="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-slate-100">
+            <h3 id="attach-modal-title" class="text-lg font-bold text-white mb-2">Vincular Conteúdo</h3>
+            <p class="text-xs text-slate-400 mb-4">Selecione um item da sua biblioteca pessoal para associar a este nó:</p>
+            <div id="attach-modal-items" class="max-h-80 overflow-y-auto space-y-2 pr-1">
+                <!-- Preenchido dinamicamente via JS -->
+            </div>
+            <div class="flex justify-end pt-4 mt-4 border-t border-slate-800">
+                <button type="button" onclick="closeAttachModal()" class="px-4 py-2 text-sm text-slate-400 hover:text-white">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.CURRENT_MAP_ID = "{{ map.id }}";
+    window.CURRENT_MAP_IS_OWNER = {{ "true" if map.is_owner else "false" }};
+</script>
+<script src="/static/js/study_canvas.js"></script>
+{% endblock %}

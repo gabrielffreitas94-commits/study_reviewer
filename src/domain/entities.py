@@ -14,6 +14,7 @@ from src.domain.exceptions import (
     InvalidExpectedAnswerError,
     InvalidGoogleSubError,
     InvalidPromptError,
+    SelfReferencingEdgeError,
 )
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
@@ -609,6 +610,7 @@ class AnswerEvaluationResult:
             raise DomainValidationError("O depth_score deve estar entre 0 e 100.")
         if self.tokens_used < 0:
             raise DomainValidationError("Tokens consumidos não podem ser negativos.")
+
         if not self.feedback or not self.feedback.strip():
             raise DomainValidationError("Feedback de avaliação não pode ser vazio.")
         if self.evaluation_mode not in ("AI_TEXT", "AI_AUDIO", "MULTIAGENT_DISPUTE"):
@@ -640,3 +642,102 @@ class DisputeEvaluationResult:
             raise DomainValidationError("O veredito do árbitro não pode ser vazio.")
         if self.tokens_used < 0:
             raise DomainValidationError("Tokens consumidos não podem ser negativos.")
+
+
+# --- Árvore de Estudos RPG & Grafo de Aprendizado ---
+
+
+@dataclass(slots=True)
+class StudyMap:
+    """Entidade que representa um Mapa de Estudos (Árvore de Talentos RPG)."""
+
+    owner_id: UUID
+    title: str
+    description: str | None = None
+    is_public: bool = False
+    parent_node_id: UUID | None = None
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        self.title = self.title.strip() if self.title is not None else ""
+        if self.description is not None:
+            cleaned = self.description.strip()
+            self.description = cleaned if cleaned else None
+
+        if not self.title:
+            raise DomainValidationError("Título do mapa de estudo não pode ser vazio.")
+        if len(self.title) > 200:
+            raise DomainValidationError(
+                "Título do mapa de estudo deve ter entre 1 e 200 caracteres."
+            )
+
+    @property
+    def is_submap(self) -> bool:
+        return self.parent_node_id is not None
+
+
+@dataclass(slots=True)
+class StudyNode:
+    """Entidade que representa um Nó individual da Árvore de Estudos."""
+
+    map_id: UUID
+    title: str
+    description: str | None = None
+    pos_x: float = 0.0
+    pos_y: float = 0.0
+    icon: str = "brain"
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        self.title = self.title.strip() if self.title is not None else ""
+        if self.description is not None:
+            cleaned = self.description.strip()
+            self.description = cleaned if cleaned else None
+        self.icon = self.icon.strip() if self.icon else "brain"
+
+        if not self.title:
+            raise DomainValidationError("Título do nó de estudo não pode ser vazio.")
+        if len(self.title) > 150:
+            raise DomainValidationError("Título do nó de estudo deve ter entre 1 e 150 caracteres.")
+
+    def update_position(self, x: float, y: float) -> None:
+        self.pos_x = float(x)
+        self.pos_y = float(y)
+        self.updated_at = datetime.now(UTC)
+
+
+@dataclass(slots=True)
+class StudyEdge:
+    """Entidade que representa uma Aresta de Pré-requisito (Grafo Dirigido)."""
+
+    map_id: UUID
+    source_node_id: UUID
+    target_node_id: UUID
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        if self.source_node_id == self.target_node_id:
+            raise SelfReferencingEdgeError("Um nó não pode ter dependência de si mesmo.")
+
+
+@dataclass(slots=True)
+class UserNodeProgress:
+    """Value Object / Estado de Progresso do Estudante em um Nó da Árvore."""
+
+    user_id: UUID
+    node_id: UUID
+    effective_level: int = 0
+    is_unlocked: bool = False
+    overdue_questions_count: int = 0
+    last_evaluated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        if not (0 <= self.effective_level <= 6):
+            raise DomainValidationError("Nível efetivo deve estar entre 0 e 6.")
+        if self.overdue_questions_count < 0:
+            raise DomainValidationError("Contagem de perguntas vencidas não pode ser negativa.")
