@@ -520,9 +520,7 @@ class DAGValidatorService:
         while queue:
             curr = queue.pop()
             if curr == source_node_id:
-                raise CyclicDependencyError(
-                    "Aresta gera dependência cíclica no grafo de estudos."
-                )
+                raise CyclicDependencyError("Aresta gera dependência cíclica no grafo de estudos.")
             if curr not in visited:
                 visited.add(curr)
                 queue.extend(adj.get(curr, []))
@@ -571,4 +569,3 @@ class StudyTreeProgressionService:
                 return False
 
         return True
-

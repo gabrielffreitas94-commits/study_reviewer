@@ -250,7 +250,11 @@ def test_attach_and_detach_content_and_study_hub(
 def test_idor_protection_rejects_unauthorized_user(
     client: TestClient, db_session: Session, test_user: User, other_user: User
 ) -> None:
-    """Garante que Usuário B não consiga ler nem alterar mapas privados do Usuário A (Anti-IDOR)."""
+    """Vulnerabilidade prevenida: Manipulação direta de referências inseguras (IDOR) na Árvore de Estudos RPG.
+
+    Garantia de segurança: Assegura que um usuário não possa ler, alterar ou deletar
+    mapas, nós ou arestas privadas pertencentes a outros estudantes.
+    """
     user_repo = SqlAlchemyUserRepository(db_session)
     map_repo = SqlAlchemyStudyMapRepository(db_session)
     user_repo.save(test_user)

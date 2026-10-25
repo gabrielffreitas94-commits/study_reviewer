@@ -75,3 +75,4 @@ build/
 mobile/android/gradlew*
 mobile/android/gradle/wrapper/gradle-wrapper.jar
 mobile/pubspec.lock
+.superpowers/

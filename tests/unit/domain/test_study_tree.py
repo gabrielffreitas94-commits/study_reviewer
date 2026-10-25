@@ -54,12 +54,17 @@ class TestStudyMapEntity:
         assert s_map.is_submap is True
 
     def test_empty_or_whitespace_title_raises_error(self) -> None:
-        with pytest.raises(DomainValidationError, match="Título do mapa de estudo não pode ser vazio."):
+        with pytest.raises(
+            DomainValidationError, match="Título do mapa de estudo não pode ser vazio."
+        ):
             StudyMap(owner_id=uuid4(), title="   ")
 
     def test_title_longer_than_200_chars_raises_error(self) -> None:
         long_title = "A" * 201
-        with pytest.raises(DomainValidationError, match="Título do mapa de estudo deve ter entre 1 e 200 caracteres."):
+        with pytest.raises(
+            DomainValidationError,
+            match="Título do mapa de estudo deve ter entre 1 e 200 caracteres.",
+        ):
             StudyMap(owner_id=uuid4(), title=long_title)
 
 
@@ -85,12 +90,16 @@ class TestStudyNodeEntity:
         assert isinstance(node.created_at, datetime)
 
     def test_empty_node_title_raises_error(self) -> None:
-        with pytest.raises(DomainValidationError, match="Título do nó de estudo não pode ser vazio."):
+        with pytest.raises(
+            DomainValidationError, match="Título do nó de estudo não pode ser vazio."
+        ):
             StudyNode(map_id=uuid4(), title=" ")
 
     def test_node_title_longer_than_150_chars_raises_error(self) -> None:
         long_title = "B" * 151
-        with pytest.raises(DomainValidationError, match="Título do nó de estudo deve ter entre 1 e 150 caracteres."):
+        with pytest.raises(
+            DomainValidationError, match="Título do nó de estudo deve ter entre 1 e 150 caracteres."
+        ):
             StudyNode(map_id=uuid4(), title=long_title)
 
     def test_update_position(self) -> None:
@@ -117,7 +126,9 @@ class TestStudyEdgeEntity:
 
     def test_self_referencing_edge_raises_error(self) -> None:
         node_id = uuid4()
-        with pytest.raises(SelfReferencingEdgeError, match="Um nó não pode ter dependência de si mesmo."):
+        with pytest.raises(
+            SelfReferencingEdgeError, match="Um nó não pode ter dependência de si mesmo."
+        ):
             StudyEdge(map_id=uuid4(), source_node_id=node_id, target_node_id=node_id)
 
 
@@ -145,7 +156,9 @@ class TestUserNodeProgressEntity:
             UserNodeProgress(user_id=uuid4(), node_id=uuid4(), effective_level=7, is_unlocked=True)
 
         with pytest.raises(DomainValidationError, match="Nível efetivo deve estar entre 0 e 6."):
-            UserNodeProgress(user_id=uuid4(), node_id=uuid4(), effective_level=-1, is_unlocked=False)
+            UserNodeProgress(
+                user_id=uuid4(), node_id=uuid4(), effective_level=-1, is_unlocked=False
+            )
 
 
 class TestDAGValidatorService:
@@ -170,7 +183,9 @@ class TestDAGValidatorService:
         node_a = uuid4()
         node_b = uuid4()
         edge = StudyEdge(map_id=map_a, source_node_id=node_a, target_node_id=node_b)
-        with pytest.raises(CrossMapEdgeError, match="Arestas só podem conectar nós pertencentes ao mesmo mapa."):
+        with pytest.raises(
+            CrossMapEdgeError, match="Arestas só podem conectar nós pertencentes ao mesmo mapa."
+        ):
             validator.validate_new_edge(
                 existing_edges=[edge],
                 map_id=map_b,
@@ -186,7 +201,9 @@ class TestDAGValidatorService:
         node_b = uuid4()
         existing = [StudyEdge(map_id=map_id, source_node_id=node_a, target_node_id=node_b)]
 
-        with pytest.raises(CyclicDependencyError, match="Aresta gera dependência cíclica no grafo de estudos."):
+        with pytest.raises(
+            CyclicDependencyError, match="Aresta gera dependência cíclica no grafo de estudos."
+        ):
             validator.validate_new_edge(
                 existing_edges=existing,
                 map_id=map_id,
@@ -205,7 +222,9 @@ class TestDAGValidatorService:
             StudyEdge(map_id=map_id, source_node_id=c, target_node_id=d),
         ]
 
-        with pytest.raises(CyclicDependencyError, match="Aresta gera dependência cíclica no grafo de estudos."):
+        with pytest.raises(
+            CyclicDependencyError, match="Aresta gera dependência cíclica no grafo de estudos."
+        ):
             validator.validate_new_edge(
                 existing_edges=existing,
                 map_id=map_id,
@@ -224,12 +243,15 @@ class TestDAGValidatorService:
             StudyEdge(map_id=map_id, source_node_id=b, target_node_id=d),
         ]
         # Adding C -> D
-        assert validator.validate_new_edge(
-            existing_edges=existing,
-            map_id=map_id,
-            source_node_id=c,
-            target_node_id=d,
-        ) is True
+        assert (
+            validator.validate_new_edge(
+                existing_edges=existing,
+                map_id=map_id,
+                source_node_id=c,
+                target_node_id=d,
+            )
+            is True
+        )
 
 
 class TestStudyTreeProgressionService:
@@ -254,7 +276,9 @@ class TestStudyTreeProgressionService:
         assert level == 1
 
         # Se algum sub-nó for 0 -> Macro-nó permanece 0
-        level_zero = service.calculate_node_level(question_srs_levels=[], sub_nodes_levels=[2, 0, 3])
+        level_zero = service.calculate_node_level(
+            question_srs_levels=[], sub_nodes_levels=[2, 0, 3]
+        )
         assert level_zero == 0
 
     def test_node_without_questions_and_submap_is_level_zero(self) -> None:
@@ -278,13 +302,19 @@ class TestStudyTreeProgressionService:
         ]
 
         # Ambos os pais em nível >= 1 -> Desbloqueado
-        assert service.evaluate_unlock_status(
-            incoming_edges=edges,
-            prerequisites_levels={parent_1: 1, parent_2: 3},
-        ) is True
+        assert (
+            service.evaluate_unlock_status(
+                incoming_edges=edges,
+                prerequisites_levels={parent_1: 1, parent_2: 3},
+            )
+            is True
+        )
 
         # Um dos pais em nível 0 -> Bloqueado
-        assert service.evaluate_unlock_status(
-            incoming_edges=edges,
-            prerequisites_levels={parent_1: 1, parent_2: 0},
-        ) is False
+        assert (
+            service.evaluate_unlock_status(
+                incoming_edges=edges,
+                prerequisites_levels={parent_1: 1, parent_2: 0},
+            )
+            is False
+        )

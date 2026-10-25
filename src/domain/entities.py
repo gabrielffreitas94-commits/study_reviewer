@@ -741,4 +741,3 @@ class UserNodeProgress:
             raise DomainValidationError("Nível efetivo deve estar entre 0 e 6.")
         if self.overdue_questions_count < 0:
             raise DomainValidationError("Contagem de perguntas vencidas não pode ser negativa.")
-

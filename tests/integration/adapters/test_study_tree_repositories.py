@@ -1,7 +1,6 @@
 """Testes de integração para os repositórios SQLAlchemy da Árvore de Estudos RPG."""
 
 from collections.abc import Generator
-from uuid import uuid4
 
 import pytest
 from sqlalchemy import create_engine
