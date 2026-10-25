@@ -1,6 +1,7 @@
 """Testes de integração para os repositórios SQLAlchemy da Árvore de Estudos RPG."""
 
 from collections.abc import Generator
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import create_engine
@@ -10,6 +11,7 @@ from src.adapters.persistence.repositories import (
     SqlAlchemyFlashcardRepository,
     SqlAlchemyKnowledgeSourceRepository,
     SqlAlchemyNodeContentRepository,
+    SqlAlchemyQuestionProgressRepository,
     SqlAlchemyQuestionRepository,
     SqlAlchemyStudyEdgeRepository,
     SqlAlchemyStudyMapRepository,
@@ -175,7 +177,30 @@ def test_node_content_attachment(db_session: Session) -> None:
     assert q.id in ques
     assert fc.id in flashs
 
-    # Desvincula pergunta
+    # Desvincula pergunta, material e flashcard
     content_repo.detach_question(node.id, q.id)
-    _, ques_after, _ = content_repo.get_attached_ids(node.id)
+    content_repo.detach_knowledge_source(node.id, mat.id)
+    content_repo.detach_flashcard(node.id, fc.id)
+    mats_after, ques_after, flashs_after = content_repo.get_attached_ids(node.id)
     assert q.id not in ques_after
+    assert mat.id not in mats_after
+    assert fc.id not in flashs_after
+
+    # Atualiza nó existente
+    node.title = "Indexação Avançada"
+    node.description = "B-Tree e Hash"
+    updated_node = node_repo.save(node)
+    assert updated_node.title == "Indexação Avançada"
+
+    # Deleta nó
+    node_repo.delete(node.id)
+    assert node_repo.get_by_id(node.id) is None
+
+    # Deleta aresta inexistente e busca inexistente
+    edge_repo = SqlAlchemyStudyEdgeRepository(db_session)
+    edge_repo.delete(uuid4())
+    assert edge_repo.get_by_id(uuid4()) is None
+
+    # Testa get_by_questions vazio
+    prog_repo = SqlAlchemyQuestionProgressRepository(db_session)
+    assert prog_repo.get_by_questions(user.id, []) == {}

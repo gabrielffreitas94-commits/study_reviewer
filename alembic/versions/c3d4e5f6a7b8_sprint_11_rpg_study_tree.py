@@ -135,16 +135,16 @@ def upgrade() -> None:
     for table_name in ("questions", "flashcards", "knowledge_sources"):
         columns = {c["name"] for c in insp.get_columns(table_name)}
         if "owner_id" not in columns:
-            op.add_column(table_name, sa.Column("owner_id", sa.Uuid(), nullable=True))
-            op.create_foreign_key(
-                f"fk_{table_name}_owner_id_users",
-                table_name,
-                "users",
-                ["owner_id"],
-                ["id"],
-                ondelete="CASCADE",
-            )
-            op.create_index(f"ix_{table_name}_owner_id", table_name, ["owner_id"])
+            with op.batch_alter_table(table_name) as batch_op:
+                batch_op.add_column(sa.Column("owner_id", sa.Uuid(), nullable=True))
+                batch_op.create_foreign_key(
+                    f"fk_{table_name}_owner_id_users",
+                    "users",
+                    ["owner_id"],
+                    ["id"],
+                    ondelete="CASCADE",
+                )
+                batch_op.create_index(f"ix_{table_name}_owner_id", ["owner_id"])
 
 
 def downgrade() -> None:
@@ -157,8 +157,7 @@ def downgrade() -> None:
     op.drop_table("study_maps")
 
     for table_name in ("knowledge_sources", "flashcards", "questions"):
-        op.drop_index(f"ix_{table_name}_owner_id", table_name=table_name)
-        op.drop_constraint(
-            f"fk_{table_name}_owner_id_users", table_name=table_name, type_="foreignkey"
-        )
-        op.drop_column(table_name, "owner_id")
+        with op.batch_alter_table(table_name) as batch_op:
+            batch_op.drop_index(f"ix_{table_name}_owner_id")
+            batch_op.drop_constraint(f"fk_{table_name}_owner_id_users", type_="foreignkey")
+            batch_op.drop_column("owner_id")

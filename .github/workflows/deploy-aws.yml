@@ -116,6 +116,13 @@ jobs:
           aws ecr describe-repositories --repository-names study-reviewer --region $AWS_REGION || \
           aws ecr create-repository --repository-name study-reviewer --region $AWS_REGION
 
+      - name: Log in to Amazon ECR Public (Avoid 429 Rate Limits)
+        if: github.event.inputs.fetch_logs_only != 'true'
+        continue-on-error: true
+        run: |
+          echo "==> Autenticando no Amazon ECR Public para evitar rate limit 429 no download da base image..."
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws || true
+
       - name: Build, Tag and Push Container Image to ECR
         if: github.event.inputs.fetch_logs_only != 'true'
         env:
@@ -124,7 +131,12 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           echo "==> Construindo imagem Dockerfile.lambda..."
-          docker build -f Dockerfile.lambda -t $ECR_REGISTRY/study-reviewer:$TARGET_ENV .
+          for i in 1 2 3; do
+            docker build -f Dockerfile.lambda -t $ECR_REGISTRY/study-reviewer:$TARGET_ENV . && break || {
+              echo "Tentativa $i falhou. Aguardando 5s antes de tentar novamente..."
+              sleep 5
+            }
+          done
 
           echo "==> Aplicando tag imutável do commit SHA ($COMMIT_SHA) para rollback..."
           docker tag $ECR_REGISTRY/study-reviewer:$TARGET_ENV $ECR_REGISTRY/study-reviewer:$COMMIT_SHA

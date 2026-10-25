@@ -11,7 +11,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.adapters.persistence.repositories import (
+    SqlAlchemyFlashcardRepository,
+    SqlAlchemyKnowledgeSourceRepository,
     SqlAlchemyQuestionRepository,
+    SqlAlchemyStudyEdgeRepository,
     SqlAlchemyStudyMapRepository,
     SqlAlchemyStudyNodeRepository,
     SqlAlchemySubjectRepository,
@@ -19,7 +22,10 @@ from src.adapters.persistence.repositories import (
     SqlAlchemyUserRepository,
 )
 from src.domain.entities import (
+    Flashcard,
+    KnowledgeSource,
     Question,
+    StudyEdge,
     StudyMap,
     StudyNode,
     Subject,
@@ -318,3 +324,250 @@ def test_migrate_legacy_taxonomy_endpoint(
     data2 = resp2.json()
     assert data2["maps_created"] == 0
     assert data2["nodes_created"] == 0
+
+
+@pytest.mark.integration
+def test_node_crud_endpoints(client: TestClient, db_session: Session, test_user: User) -> None:
+    user_repo = SqlAlchemyUserRepository(db_session)
+    map_repo = SqlAlchemyStudyMapRepository(db_session)
+    node_repo = SqlAlchemyStudyNodeRepository(db_session)
+    user_repo.save(test_user)
+
+    s_map = map_repo.save(StudyMap(owner_id=test_user.id, title="Mapa Node CRUD"))
+    node = node_repo.save(StudyNode(map_id=s_map.id, title="Nó Inicial"))
+
+    # Update - 404
+    put_404 = client.patch(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{uuid4()}",
+        json={"title": "Inexistente"},
+    )
+    assert put_404.status_code == 404
+
+    # Update - 400 (validação de domínio: título vazio)
+    put_bad = client.patch(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}",
+        json={"title": " "},
+    )
+    assert put_bad.status_code == 400
+
+    # Update - Sucesso
+    put_ok = client.patch(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}",
+        json={"title": "Nó Renomeado", "description": "Nova Desc", "icon": "zap"},
+    )
+    assert put_ok.status_code == 200
+    assert put_ok.json()["title"] == "Nó Renomeado"
+
+    # Positions Batch - Sucesso
+    batch_resp = client.put(
+        f"/api/v1/study-maps/{s_map.id}/nodes/positions-batch",
+        json={"positions": [{"node_id": str(node.id), "pos_x": 150.0, "pos_y": 250.0}]},
+    )
+    assert batch_resp.status_code == 204
+
+    # Delete - 404
+    del_404 = client.delete(f"/api/v1/study-maps/{s_map.id}/nodes/{uuid4()}")
+    assert del_404.status_code == 404
+
+    # Delete - Sucesso
+    del_ok = client.delete(f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}")
+    assert del_ok.status_code == 204
+
+
+@pytest.mark.integration
+def test_edge_and_content_endpoints_edge_cases(
+    client: TestClient, db_session: Session, test_user: User
+) -> None:
+    user_repo = SqlAlchemyUserRepository(db_session)
+    map_repo = SqlAlchemyStudyMapRepository(db_session)
+    node_repo = SqlAlchemyStudyNodeRepository(db_session)
+    subj_repo = SqlAlchemySubjectRepository(db_session)
+    top_repo = SqlAlchemyTopicRepository(db_session)
+    f_repo = SqlAlchemyFlashcardRepository(db_session)
+    k_repo = SqlAlchemyKnowledgeSourceRepository(db_session)
+
+    user_repo.save(test_user)
+    subj = Subject(name="Ciência da Computação", owner_id=test_user.id)
+    subj_repo.save(subj)
+    topic = Topic(subject_id=subj.id, name="Grafos")
+    top_repo.save(topic)
+
+    fc = Flashcard(front="F", back="V", topic_id=topic.id)
+    f_repo.save(fc)
+    mat = KnowledgeSource(title="Livro Grafos", topic_id=topic.id)
+    k_repo.save(mat)
+
+    s_map = map_repo.save(StudyMap(owner_id=test_user.id, title="Mapa Conteúdos"))
+    node = node_repo.save(StudyNode(map_id=s_map.id, title="Nó Grafos"))
+
+    # Delete Edge 404
+    del_edge_404 = client.delete(f"/api/v1/study-maps/{s_map.id}/edges/{uuid4()}")
+    assert del_edge_404.status_code == 404
+
+    # Attach Flashcard & Material
+    att_fc = client.post(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/contents",
+        json={"content_type": "flashcard", "content_id": str(fc.id)},
+    )
+    assert att_fc.status_code == 204
+
+    att_mat = client.post(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/contents",
+        json={"content_type": "material", "content_id": str(mat.id)},
+    )
+    assert att_mat.status_code == 204
+
+    # Attach Invalid Type -> 400
+    att_bad = client.post(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/contents",
+        json={"content_type": "invalid_type", "content_id": str(fc.id)},
+    )
+    assert att_bad.status_code == 400
+
+    # Detach Node 404
+    det_404 = client.delete(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{uuid4()}/contents/flashcard/{fc.id}"
+    )
+    assert det_404.status_code == 404
+
+    # Hub -> Sucesso com materials e flashcards
+    hub_res = client.get(f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/hub")
+    assert hub_res.status_code == 200
+    hub_json = hub_res.json()
+    assert len(hub_json["materials"]) == 1
+    assert len(hub_json["flashcards"]) == 1
+
+    # Hub Node 404
+    hub_404 = client.get(f"/api/v1/study-maps/{s_map.id}/nodes/{uuid4()}/hub")
+    assert hub_404.status_code == 404
+
+    # Detach Flashcard & Material
+    det_fc = client.delete(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/contents/flashcard/{fc.id}"
+    )
+    assert det_fc.status_code == 204
+
+    det_mat = client.delete(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/contents/material/{mat.id}"
+    )
+    assert det_mat.status_code == 204
+
+    # Detach Invalid Type -> 400
+    det_bad = client.delete(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/contents/unknown/{fc.id}"
+    )
+    assert det_bad.status_code == 400
+
+
+@pytest.mark.integration
+def test_all_controller_404_and_403_branches(
+    client: TestClient, db_session: Session, test_user: User, other_user: User
+) -> None:
+    user_repo = SqlAlchemyUserRepository(db_session)
+    map_repo = SqlAlchemyStudyMapRepository(db_session)
+    node_repo = SqlAlchemyStudyNodeRepository(db_session)
+    edge_repo = SqlAlchemyStudyEdgeRepository(db_session)
+
+    user_repo.save(test_user)
+    user_repo.save(other_user)
+
+    s_map = map_repo.save(StudyMap(owner_id=test_user.id, title="Mapa Autorização"))
+    node1 = node_repo.save(StudyNode(map_id=s_map.id, title="Nó 1"))
+    node2 = node_repo.save(StudyNode(map_id=s_map.id, title="Nó 2"))
+    edge = edge_repo.save(
+        StudyEdge(map_id=s_map.id, source_node_id=node1.id, target_node_id=node2.id)
+    )
+
+    fake_map_id = uuid4()
+    fake_node_id = uuid4()
+    fake_edge_id = uuid4()
+
+    # 404s
+    assert client.get(f"/api/v1/study-maps/{fake_map_id}").status_code == 404
+    assert client.delete(f"/api/v1/study-maps/{fake_map_id}").status_code == 404
+    assert (
+        client.post(f"/api/v1/study-maps/{fake_map_id}/nodes", json={"title": "Nó"}).status_code
+        == 404
+    )
+    assert (
+        client.delete(f"/api/v1/study-maps/{fake_map_id}/nodes/{fake_node_id}").status_code == 404
+    )
+    assert (
+        client.patch(
+            f"/api/v1/study-maps/{fake_map_id}/nodes/positions-batch",
+            json={"positions": [{"node_id": str(fake_node_id), "pos_x": 1.0, "pos_y": 1.0}]},
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/study-maps/{fake_map_id}/edges",
+            json={"source_node_id": str(fake_node_id), "target_node_id": str(fake_node_id)},
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(f"/api/v1/study-maps/{fake_map_id}/edges/{fake_edge_id}").status_code == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/study-maps/{fake_map_id}/nodes/{fake_node_id}/contents",
+            json={"content_type": "flashcard", "content_id": str(uuid4())},
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/api/v1/study-maps/{fake_map_id}/nodes/{fake_node_id}/contents/flashcard/{uuid4()}"
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(f"/api/v1/study-maps/{fake_map_id}/nodes/{fake_node_id}/hub").status_code == 404
+    )
+
+    # 403s com other_user
+    app.dependency_overrides[get_current_user] = lambda: other_user
+
+    assert (
+        client.patch(
+            f"/api/v1/study-maps/{s_map.id}/nodes/positions-batch",
+            json={"positions": [{"node_id": str(node1.id), "pos_x": 1.0, "pos_y": 1.0}]},
+        ).status_code
+        == 403
+    )
+    assert client.delete(f"/api/v1/study-maps/{s_map.id}/nodes/{node1.id}").status_code == 403
+    assert (
+        client.patch(
+            f"/api/v1/study-maps/{s_map.id}/nodes/{node1.id}", json={"title": "Hacked"}
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            f"/api/v1/study-maps/{s_map.id}/edges",
+            json={"source_node_id": str(node1.id), "target_node_id": str(node2.id)},
+        ).status_code
+        == 403
+    )
+    assert client.delete(f"/api/v1/study-maps/{s_map.id}/edges/{edge.id}").status_code == 403
+    assert (
+        client.post(
+            f"/api/v1/study-maps/{s_map.id}/nodes/{node1.id}/contents",
+            json={"content_type": "flashcard", "content_id": str(uuid4())},
+        ).status_code
+        == 403
+    )
+    assert (
+        client.delete(
+            f"/api/v1/study-maps/{s_map.id}/nodes/{node1.id}/contents/flashcard/{uuid4()}"
+        ).status_code
+        == 403
+    )
+    assert client.get(f"/api/v1/study-maps/{s_map.id}/nodes/{node1.id}/hub").status_code == 403
+
+    # Restaura autenticação de test_user
+    app.dependency_overrides[get_current_user] = lambda: test_user
+
+    # Delete do mapa com sucesso
+    assert client.delete(f"/api/v1/study-maps/{s_map.id}").status_code == 204

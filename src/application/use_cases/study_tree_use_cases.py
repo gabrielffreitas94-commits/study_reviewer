@@ -255,7 +255,9 @@ class UpdateStudyNodeUseCase:
         self, map_id: UUID, user_id: UUID, node_id: UUID, dto: UpdateStudyNodeDTO
     ) -> StudyNodeDTO:
         study_map = self.map_repo.get_by_id(map_id)
-        if study_map is None or study_map.owner_id != user_id:
+        if study_map is None:
+            raise StudyMapNotFoundError("Mapa não encontrado.")
+        if study_map.owner_id != user_id:
             raise ResourceOwnershipError("Sem permissão para atualizar nós deste mapa.")
 
         node = self.node_repo.get_by_id(node_id)
@@ -302,7 +304,9 @@ class UpdateNodePositionsBatchUseCase:
 
     def execute(self, map_id: UUID, user_id: UUID, positions: list[NodePositionDTO]) -> None:
         study_map = self.map_repo.get_by_id(map_id)
-        if study_map is None or study_map.owner_id != user_id:
+        if study_map is None:
+            raise StudyMapNotFoundError("Mapa nao encontrado.")
+        if study_map.owner_id != user_id:
             raise ResourceOwnershipError("Sem permissão para alterar posições neste mapa.")
 
         coords = [(p.node_id, p.pos_x, p.pos_y) for p in positions]
@@ -322,7 +326,9 @@ class DeleteStudyNodeUseCase:
 
     def execute(self, map_id: UUID, user_id: UUID, node_id: UUID) -> None:
         study_map = self.map_repo.get_by_id(map_id)
-        if study_map is None or study_map.owner_id != user_id:
+        if study_map is None:
+            raise StudyMapNotFoundError("Mapa não encontrado.")
+        if study_map.owner_id != user_id:
             raise ResourceOwnershipError("Sem permissão para excluir nós deste mapa.")
 
         node = self.node_repo.get_by_id(node_id)
@@ -347,7 +353,9 @@ class ConnectStudyNodesUseCase:
 
     def execute(self, map_id: UUID, user_id: UUID, dto: ConnectNodesDTO) -> StudyEdgeDTO:
         study_map = self.map_repo.get_by_id(map_id)
-        if study_map is None or study_map.owner_id != user_id:
+        if study_map is None:
+            raise StudyMapNotFoundError("Mapa não encontrado.")
+        if study_map.owner_id != user_id:
             raise ResourceOwnershipError("Sem permissão para alterar dependências deste mapa.")
 
         source_node = self.node_repo.get_by_id(dto.source_node_id)
@@ -392,7 +400,9 @@ class DisconnectStudyNodesUseCase:
 
     def execute(self, map_id: UUID, user_id: UUID, edge_id: UUID) -> None:
         study_map = self.map_repo.get_by_id(map_id)
-        if study_map is None or study_map.owner_id != user_id:
+        if study_map is None:
+            raise StudyMapNotFoundError("Mapa não encontrado.")
+        if study_map.owner_id != user_id:
             raise ResourceOwnershipError("Sem permissão para alterar dependências deste mapa.")
 
         edge = self.edge_repo.get_by_id(edge_id)
@@ -424,7 +434,9 @@ class AttachContentToNodeUseCase:
         content_id: UUID,
     ) -> None:
         study_map = self.map_repo.get_by_id(map_id)
-        if study_map is None or study_map.owner_id != user_id:
+        if study_map is None:
+            raise StudyMapNotFoundError("Mapa não encontrado.")
+        if study_map.owner_id != user_id:
             raise ResourceOwnershipError("Sem permissão para alterar conteúdos deste nó.")
 
         node = self.node_repo.get_by_id(node_id)
@@ -466,7 +478,9 @@ class DetachContentFromNodeUseCase:
         content_id: UUID,
     ) -> None:
         study_map = self.map_repo.get_by_id(map_id)
-        if study_map is None or study_map.owner_id != user_id:
+        if study_map is None:
+            raise StudyMapNotFoundError("Mapa não encontrado.")
+        if study_map.owner_id != user_id:
             raise ResourceOwnershipError("Sem permissão para alterar conteúdos deste nó.")
 
         node = self.node_repo.get_by_id(node_id)

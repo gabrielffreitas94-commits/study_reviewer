@@ -160,6 +160,18 @@ class TestUserNodeProgressEntity:
                 user_id=uuid4(), node_id=uuid4(), effective_level=-1, is_unlocked=False
             )
 
+    def test_negative_overdue_questions_raises_error(self) -> None:
+        with pytest.raises(
+            DomainValidationError, match="Contagem de perguntas vencidas não pode ser negativa."
+        ):
+            UserNodeProgress(
+                user_id=uuid4(),
+                node_id=uuid4(),
+                effective_level=1,
+                is_unlocked=True,
+                overdue_questions_count=-1,
+            )
+
 
 class TestDAGValidatorService:
     """Testes do serviço de validação topológica de grafo acíclico dirigido."""

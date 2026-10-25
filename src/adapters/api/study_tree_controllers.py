@@ -309,6 +309,9 @@ def create_study_node(
 @api_study_tree_router.patch(
     "/study-maps/{map_id}/nodes/positions-batch", status_code=status.HTTP_204_NO_CONTENT
 )
+@api_study_tree_router.put(
+    "/study-maps/{map_id}/nodes/positions-batch", status_code=status.HTTP_204_NO_CONTENT
+)
 def update_node_positions_batch(
     map_id: UUID,
     payload: UpdatePositionsBatchRequest,
@@ -333,6 +336,7 @@ def update_node_positions_batch(
 
 
 @api_study_tree_router.patch("/study-maps/{map_id}/nodes/{node_id}")
+@api_study_tree_router.put("/study-maps/{map_id}/nodes/{node_id}")
 def update_study_node(
     map_id: UUID,
     node_id: UUID,
@@ -365,6 +369,8 @@ def update_study_node(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ResourceOwnershipError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except DomainValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @api_study_tree_router.delete(

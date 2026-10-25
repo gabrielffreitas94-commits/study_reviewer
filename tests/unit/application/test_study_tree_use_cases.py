@@ -10,6 +10,7 @@ from src.application.dto.study_tree_dto import (
     CreateStudyMapDTO,
     CreateStudyNodeDTO,
     NodePositionDTO,
+    UpdateStudyNodeDTO,
 )
 from src.application.ports.repositories import (
     INodeContentRepository,
@@ -23,9 +24,13 @@ from src.application.use_cases.study_tree_use_cases import (
     ConnectStudyNodesUseCase,
     CreateStudyMapUseCase,
     CreateStudyNodeUseCase,
+    DeleteStudyNodeUseCase,
     DetachContentFromNodeUseCase,
+    DisconnectStudyNodesUseCase,
+    GetNodeStudyHubUseCase,
     GetStudyMapGraphUseCase,
     UpdateNodePositionsBatchUseCase,
+    UpdateStudyNodeUseCase,
 )
 from src.domain.entities import (
     StudyEdge,
@@ -35,7 +40,11 @@ from src.domain.entities import (
 )
 from src.domain.exceptions import (
     CyclicDependencyError,
+    DomainValidationError,
     ResourceOwnershipError,
+    StudyEdgeNotFoundError,
+    StudyMapNotFoundError,
+    StudyNodeNotFoundError,
 )
 
 
@@ -397,3 +406,296 @@ class TestAttachAndDetachContentUseCase:
         )
         _, ques_after, _ = content_repo.get_attached_ids(node.id)
         assert q_id not in ques_after
+
+
+class TestStudyTreeUseCasesEdgeCasesAndBranches:
+    def test_create_submap_with_nonexistent_parent_node_raises_error(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        use_case = CreateStudyMapUseCase(map_repo=map_repo, node_repo=node_repo)
+        with pytest.raises(StudyNodeNotFoundError):
+            use_case.execute(
+                owner_id=owner_id,
+                dto=CreateStudyMapDTO(title="Submapa Inválido", parent_node_id=uuid4()),
+            )
+
+    def test_get_graph_map_not_found(self) -> None:
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        edge_repo = FakeStudyEdgeRepository()
+        content_repo = FakeNodeContentRepository()
+        prog_repo = FakeQuestionProgressRepository()
+        use_case = GetStudyMapGraphUseCase(map_repo, node_repo, edge_repo, content_repo, prog_repo)
+        with pytest.raises(StudyMapNotFoundError):
+            use_case.execute(map_id=uuid4(), user_id=uuid4())
+
+    def test_get_graph_unauthorized(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Privado", is_public=False))
+        node_repo = FakeStudyNodeRepository()
+        edge_repo = FakeStudyEdgeRepository()
+        content_repo = FakeNodeContentRepository()
+        prog_repo = FakeQuestionProgressRepository()
+        use_case = GetStudyMapGraphUseCase(map_repo, node_repo, edge_repo, content_repo, prog_repo)
+        with pytest.raises(ResourceOwnershipError):
+            use_case.execute(map_id=s_map.id, user_id=uuid4())
+
+    def test_get_graph_question_without_progress_jit_fallback(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        edge_repo = FakeStudyEdgeRepository()
+        content_repo = FakeNodeContentRepository()
+        prog_repo = FakeQuestionProgressRepository()
+
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa JIT"))
+        node = node_repo.save(StudyNode(map_id=s_map.id, title="Nó JIT"))
+        q_id = uuid4()
+        content_repo.attach_question(node.id, q_id)
+
+        use_case = GetStudyMapGraphUseCase(map_repo, node_repo, edge_repo, content_repo, prog_repo)
+        graph = use_case.execute(map_id=s_map.id, user_id=owner_id)
+        assert graph.nodes[0].effective_level == 0
+        assert graph.nodes[0].overdue_questions_count == 1
+
+    def test_create_node_errors(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        use_case = CreateStudyNodeUseCase(map_repo, node_repo)
+
+        # Mapa não encontrado
+        with pytest.raises(StudyMapNotFoundError):
+            use_case.execute(uuid4(), owner_id, CreateStudyNodeDTO(title="Nó"))
+
+        # Usuário não proprietário
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa"))
+        with pytest.raises(ResourceOwnershipError):
+            use_case.execute(s_map.id, uuid4(), CreateStudyNodeDTO(title="Nó"))
+
+    def test_update_node_use_case(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa"))
+        node = node_repo.save(StudyNode(map_id=s_map.id, title="Título Original"))
+
+        use_case = UpdateStudyNodeUseCase(map_repo, node_repo)
+
+        with pytest.raises(StudyMapNotFoundError):
+            use_case.execute(uuid4(), owner_id, node.id, UpdateStudyNodeDTO(title="Novo"))
+        with pytest.raises(ResourceOwnershipError):
+            use_case.execute(s_map.id, uuid4(), node.id, UpdateStudyNodeDTO(title="Novo"))
+
+        # Nó inexistente
+        with pytest.raises(StudyNodeNotFoundError):
+            use_case.execute(s_map.id, owner_id, uuid4(), UpdateStudyNodeDTO(title="Novo"))
+
+        # Atualização com sucesso
+        updated = use_case.execute(
+            s_map.id,
+            owner_id,
+            node.id,
+            UpdateStudyNodeDTO(title="Título Novo", description="Nova Desc", icon="rocket"),
+        )
+        assert updated.title == "Título Novo"
+        assert updated.description == "Nova Desc"
+        assert updated.icon == "rocket"
+
+    def test_update_positions_batch_unauthorized(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa"))
+        use_case = UpdateNodePositionsBatchUseCase(map_repo, node_repo)
+        with pytest.raises(ResourceOwnershipError):
+            use_case.execute(
+                s_map.id, uuid4(), [NodePositionDTO(node_id=uuid4(), pos_x=10, pos_y=20)]
+            )
+        with pytest.raises(StudyMapNotFoundError):
+            use_case.execute(
+                uuid4(), owner_id, [NodePositionDTO(node_id=uuid4(), pos_x=10, pos_y=20)]
+            )
+
+    def test_delete_node_use_case(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa"))
+        node = node_repo.save(StudyNode(map_id=s_map.id, title="Para Deletar"))
+
+        use_case = DeleteStudyNodeUseCase(map_repo, node_repo)
+
+        with pytest.raises(StudyMapNotFoundError):
+            use_case.execute(uuid4(), owner_id, node.id)
+        with pytest.raises(ResourceOwnershipError):
+            use_case.execute(s_map.id, uuid4(), node.id)
+
+        with pytest.raises(StudyNodeNotFoundError):
+            use_case.execute(s_map.id, owner_id, uuid4())
+
+        use_case.execute(s_map.id, owner_id, node.id)
+        assert node_repo.get_by_id(node.id) is None
+
+    def test_connect_nodes_errors(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        edge_repo = FakeStudyEdgeRepository()
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa"))
+        n1 = node_repo.save(StudyNode(map_id=s_map.id, title="N1"))
+
+        use_case = ConnectStudyNodesUseCase(map_repo, node_repo, edge_repo)
+
+        with pytest.raises(StudyMapNotFoundError):
+            use_case.execute(
+                uuid4(), owner_id, ConnectNodesDTO(source_node_id=n1.id, target_node_id=uuid4())
+            )
+        with pytest.raises(ResourceOwnershipError):
+            use_case.execute(
+                s_map.id, uuid4(), ConnectNodesDTO(source_node_id=n1.id, target_node_id=uuid4())
+            )
+
+        with pytest.raises(StudyNodeNotFoundError):
+            use_case.execute(
+                s_map.id, owner_id, ConnectNodesDTO(source_node_id=uuid4(), target_node_id=n1.id)
+            )
+
+        with pytest.raises(StudyNodeNotFoundError):
+            use_case.execute(
+                s_map.id, owner_id, ConnectNodesDTO(source_node_id=n1.id, target_node_id=uuid4())
+            )
+
+    def test_disconnect_nodes_use_case(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        edge_repo = FakeStudyEdgeRepository()
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa"))
+        edge = edge_repo.save(
+            StudyEdge(map_id=s_map.id, source_node_id=uuid4(), target_node_id=uuid4())
+        )
+
+        use_case = DisconnectStudyNodesUseCase(map_repo, edge_repo)
+
+        with pytest.raises(StudyMapNotFoundError):
+            use_case.execute(uuid4(), owner_id, edge.id)
+        with pytest.raises(ResourceOwnershipError):
+            use_case.execute(s_map.id, uuid4(), edge.id)
+
+        with pytest.raises(StudyEdgeNotFoundError):
+            use_case.execute(s_map.id, owner_id, uuid4())
+
+        use_case.execute(s_map.id, owner_id, edge.id)
+        assert edge_repo.get_by_id(edge.id) is None
+
+    def test_attach_and_detach_content_validation_and_ownership(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        content_repo = FakeNodeContentRepository()
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa"))
+        node = node_repo.save(StudyNode(map_id=s_map.id, title="Nó"))
+
+        attach_uc = AttachContentToNodeUseCase(map_repo, node_repo, content_repo)
+        detach_uc = DetachContentFromNodeUseCase(map_repo, node_repo, content_repo)
+
+        with pytest.raises(StudyMapNotFoundError):
+            attach_uc.execute(uuid4(), owner_id, node.id, "question", uuid4())
+        with pytest.raises(StudyMapNotFoundError):
+            detach_uc.execute(uuid4(), owner_id, node.id, "question", uuid4())
+        with pytest.raises(ResourceOwnershipError):
+            attach_uc.execute(s_map.id, uuid4(), node.id, "question", uuid4())
+        with pytest.raises(ResourceOwnershipError):
+            detach_uc.execute(s_map.id, uuid4(), node.id, "question", uuid4())
+
+        # Node not found
+        with pytest.raises(StudyNodeNotFoundError):
+            attach_uc.execute(s_map.id, owner_id, uuid4(), "question", uuid4())
+        with pytest.raises(StudyNodeNotFoundError):
+            detach_uc.execute(s_map.id, owner_id, uuid4(), "question", uuid4())
+
+        # Invalid content type
+        with pytest.raises(DomainValidationError):
+            attach_uc.execute(s_map.id, owner_id, node.id, "invalid_type", uuid4())
+        with pytest.raises(DomainValidationError):
+            detach_uc.execute(s_map.id, owner_id, node.id, "invalid_type", uuid4())
+
+        # Detach material and flashcard
+        m_id = uuid4()
+        f_id = uuid4()
+        attach_uc.execute(s_map.id, owner_id, node.id, "material", m_id)
+        attach_uc.execute(s_map.id, owner_id, node.id, "flashcard", f_id)
+        detach_uc.execute(s_map.id, owner_id, node.id, "material", m_id)
+        detach_uc.execute(s_map.id, owner_id, node.id, "flashcard", f_id)
+
+        mats, _, flashs = content_repo.get_attached_ids(node.id)
+        assert m_id not in mats
+        assert f_id not in flashs
+
+    def test_get_node_study_hub_use_case(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        node_repo = FakeStudyNodeRepository()
+        content_repo = FakeNodeContentRepository()
+        prog_repo = FakeQuestionProgressRepository()
+
+        from unittest.mock import MagicMock
+
+        from src.application.ports.repositories import (
+            IFlashcardRepository,
+            IKnowledgeSourceRepository,
+            IQuestionRepository,
+        )
+        from src.domain.entities import Flashcard, KnowledgeSource, Question
+
+        q_repo = MagicMock(spec=IQuestionRepository)
+        k_repo = MagicMock(spec=IKnowledgeSourceRepository)
+        f_repo = MagicMock(spec=IFlashcardRepository)
+
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa Hub"))
+        node = node_repo.save(StudyNode(map_id=s_map.id, title="Nó Hub"))
+
+        qid = uuid4()
+        mid = uuid4()
+        fid = uuid4()
+        content_repo.attach_question(node.id, qid)
+        content_repo.attach_knowledge_source(node.id, mid)
+        content_repo.attach_flashcard(node.id, fid)
+
+        q_repo.get_by_id.return_value = Question(
+            id=qid, prompt="P?", expected_answer="R", topic_ids=(uuid4(),)
+        )
+        k_repo.get_by_id.return_value = KnowledgeSource(
+            id=mid, title="Doc", content_type="PDF", topic_id=uuid4()
+        )
+        f_repo.get_by_id.return_value = Flashcard(id=fid, front="F", back="V", topic_id=uuid4())
+
+        hub_uc = GetNodeStudyHubUseCase(
+            map_repo=map_repo,
+            node_repo=node_repo,
+            content_repo=content_repo,
+            progress_repo=prog_repo,
+            question_repo=q_repo,
+            knowledge_repo=k_repo,
+            flashcard_repo=f_repo,
+        )
+
+        # Mapa não encontrado
+        with pytest.raises(StudyMapNotFoundError):
+            hub_uc.execute(uuid4(), owner_id, node.id)
+
+        # Sem permissão
+        with pytest.raises(ResourceOwnershipError):
+            hub_uc.execute(s_map.id, uuid4(), node.id)
+
+        # Nó não encontrado
+        with pytest.raises(StudyNodeNotFoundError):
+            hub_uc.execute(s_map.id, owner_id, uuid4())
+
+        # Sucesso
+        hub_dto = hub_uc.execute(s_map.id, owner_id, node.id)
+        assert len(hub_dto.all_questions) == 1
+        assert len(hub_dto.materials) == 1
+        assert len(hub_dto.flashcards) == 1
