@@ -17,7 +17,17 @@
                 Explore seus grafos de aprendizado em estilo RPG. Posicione nós, desbloqueie habilidades e progrida com o motor SRS.
             </p>
         </div>
-        <div class="mt-4 sm:mt-0 flex space-x-3">
+        <div class="mt-4 sm:mt-0 flex items-center space-x-3">
+            <button
+                type="button"
+                id="btn-migrate-legacy"
+                onclick="migrateLegacyTaxonomy()"
+                class="inline-flex items-center px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 transition-all cursor-pointer"
+                title="Converte matérias e tópicos legados em Árvores RPG automaticamente"
+            >
+                <span class="mr-1.5" aria-hidden="true">🔄</span>
+                <span>Importar Matérias Antigas</span>
+            </button>
             <button
                 type="button"
                 onclick="document.getElementById('new-map-modal').classList.remove('hidden')"
@@ -198,6 +208,31 @@ async function handleCreateMap(e) {
     } finally {
         btn.disabled = false;
         btn.textContent = 'Criar Mapa';
+    }
+}
+
+async function migrateLegacyTaxonomy() {
+    if (!confirm('Deseja importar todas as matérias e tópicos legados para Árvores de Estudo RPG?')) return;
+
+    const btn = document.getElementById('btn-migrate-legacy');
+    btn.disabled = true;
+    btn.textContent = 'Importando...';
+
+    try {
+        const res = await fetch('/api/v1/study-maps/migrate-legacy', { method: 'POST' });
+        if (res.ok) {
+            const data = await res.json();
+            alert(`Migração concluída com sucesso!\n• Árvores criadas: ${data.maps_created}\n• Nós criados: ${data.nodes_created}\n• Perguntas vinculadas: ${data.questions_linked}\n• Flashcards vinculados: ${data.flashcards_linked}`);
+            window.location.reload();
+        } else {
+            const err = await res.json();
+            alert('Erro ao migrar matérias: ' + (err.detail || 'Falha inesperada'));
+        }
+    } catch (err) {
+        alert('Erro de conexão: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Importar Matérias Antigas';
     }
 }
 

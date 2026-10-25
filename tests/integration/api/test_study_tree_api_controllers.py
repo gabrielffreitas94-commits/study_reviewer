@@ -282,3 +282,39 @@ def test_idor_protection_rejects_unauthorized_user(
         json={"title": "Nó Invasor"},
     )
     assert post_node_resp.status_code == 403
+
+
+@pytest.mark.integration
+def test_migrate_legacy_taxonomy_endpoint(
+    client: TestClient, db_session: Session, test_user: User
+) -> None:
+    user_repo = SqlAlchemyUserRepository(db_session)
+    subj_repo = SqlAlchemySubjectRepository(db_session)
+    top_repo = SqlAlchemyTopicRepository(db_session)
+    q_repo = SqlAlchemyQuestionRepository(db_session)
+
+    user_repo.save(test_user)
+    subj = Subject(name="História Geral", owner_id=test_user.id)
+    subj_repo.save(subj)
+    topic = Topic(subject_id=subj.id, name="Idade Média")
+    top_repo.save(topic)
+    q = Question(
+        topic_id=topic.id,
+        prompt="Quem foi Carlos Magno?",
+        expected_answer="Rei dos Francos e Imperador do Sacro Império",
+    )
+    q_repo.save(q)
+
+    resp = client.post("/api/v1/study-maps/migrate-legacy")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["maps_created"] == 1
+    assert data["nodes_created"] == 1
+    assert data["questions_linked"] == 1
+
+    # Chamada subsequente é idempotente
+    resp2 = client.post("/api/v1/study-maps/migrate-legacy")
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    assert data2["maps_created"] == 0
+    assert data2["nodes_created"] == 0

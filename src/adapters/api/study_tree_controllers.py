@@ -101,6 +101,40 @@ class AttachContentRequest(BaseModel):
 # --- Endpoints RESTful ---
 
 
+@api_study_tree_router.post("/study-maps/migrate-legacy")
+def migrate_legacy_taxonomy(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Migra matérias e tópicos legados do usuário para Mapas e Nós de Estudo RPG."""
+    from src.adapters.persistence.repositories import (
+        SqlAlchemySubjectRepository,
+        SqlAlchemyTopicRepository,
+    )
+    from src.application.use_cases.migrate_legacy_taxonomy_use_case import (
+        MigrateLegacyTaxonomyUseCase,
+    )
+
+    use_case = MigrateLegacyTaxonomyUseCase(
+        subject_repo=SqlAlchemySubjectRepository(db),
+        topic_repo=SqlAlchemyTopicRepository(db),
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+        content_repo=SqlAlchemyNodeContentRepository(db),
+        question_repo=SqlAlchemyQuestionRepository(db),
+        flashcard_repo=SqlAlchemyFlashcardRepository(db),
+        knowledge_source_repo=SqlAlchemyKnowledgeSourceRepository(db),
+    )
+    report = use_case.execute(user_id=current_user.id)
+    return {
+        "maps_created": report.maps_created,
+        "nodes_created": report.nodes_created,
+        "questions_linked": report.questions_linked,
+        "flashcards_linked": report.flashcards_linked,
+        "sources_linked": report.sources_linked,
+    }
+
+
 @api_study_tree_router.get("/study-maps")
 def list_study_maps(
     current_user: User = Depends(get_current_user),
