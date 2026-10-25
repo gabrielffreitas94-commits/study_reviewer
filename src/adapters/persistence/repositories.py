@@ -16,6 +16,9 @@ from src.adapters.persistence.mappers import (
     QuestionProgressMapper,
     ReviewAuditLogMapper,
     SessionMapper,
+    StudyEdgeMapper,
+    StudyMapMapper,
+    StudyNodeMapper,
     SubjectMapper,
     TokenLedgerMapper,
     TokenTransactionMapper,
@@ -28,11 +31,17 @@ from src.adapters.persistence.models import (
     KnowledgeChunkModel,
     KnowledgeSourceModel,
     KnowledgeSourceTopicModel,
+    NodeFlashcardModel,
+    NodeKnowledgeSourceModel,
+    NodeQuestionModel,
     PoolSessionModel,
     QuestionModel,
     QuestionTopicModel,
     ReviewAuditLogModel,
+    StudyEdgeModel,
     StudyEventModel,
+    StudyMapModel,
+    StudyNodeModel,
     SubjectModel,
     TokenLedgerModel,
     TokenTransactionModel,
@@ -45,11 +54,15 @@ from src.application.ports.repositories import (
     IFlashcardRepository,
     IKnowledgeChunkRepository,
     IKnowledgeSourceRepository,
+    INodeContentRepository,
     IQuestionProgressRepository,
     IQuestionRepository,
     IReviewAuditRepository,
     ISessionRepository,
+    IStudyEdgeRepository,
     IStudyEventRepository,
+    IStudyMapRepository,
+    IStudyNodeRepository,
     ISubjectRepository,
     ITokenLedgerRepository,
     ITopicRepository,
@@ -63,6 +76,9 @@ from src.domain.entities import (
     KnowledgeSource,
     Question,
     ReviewAuditLog,
+    StudyEdge,
+    StudyMap,
+    StudyNode,
     Subject,
     TokenLedger,
     TokenTransaction,
@@ -925,3 +941,203 @@ class SqlAlchemyTokenLedgerRepository(ITokenLedgerRepository):
             .limit(limit)
         )
         return [TokenTransactionMapper.to_domain(m) for m in self._session.scalars(stmt)]
+
+
+# --- Árvore de Estudos RPG & Grafo de Conhecimento ---
+
+
+class SqlAlchemyStudyMapRepository(IStudyMapRepository):
+    """Repositório SQLAlchemy para Mapas de Estudo RPG."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_by_id(self, map_id: UUID) -> StudyMap | None:
+        stmt = (
+            select(StudyMapModel)
+            .options(selectinload(StudyMapModel.nodes), selectinload(StudyMapModel.edges))
+            .where(StudyMapModel.id == map_id)
+        )
+        model = self._session.scalars(stmt).first()
+        return StudyMapMapper.to_domain(model) if model else None
+
+    def list_by_owner(self, owner_id: UUID) -> list[StudyMap]:
+        stmt = (
+            select(StudyMapModel)
+            .where(StudyMapModel.owner_id == owner_id)
+            .order_by(StudyMapModel.created_at.desc())
+        )
+        return [StudyMapMapper.to_domain(m) for m in self._session.scalars(stmt).all()]
+
+    def save(self, study_map: StudyMap) -> StudyMap:
+        model = self._session.get(StudyMapModel, study_map.id)
+        if model:
+            model.title = study_map.title
+            model.description = study_map.description
+            model.is_public = study_map.is_public
+            model.parent_node_id = study_map.parent_node_id
+            model.updated_at = study_map.updated_at
+        else:
+            model = StudyMapMapper.to_model(study_map)
+            self._session.add(model)
+        self._session.commit()
+        return StudyMapMapper.to_domain(model)
+
+    def delete(self, map_id: UUID) -> None:
+        model = self._session.get(StudyMapModel, map_id)
+        if model:
+            self._session.delete(model)
+            self._session.commit()
+
+
+class SqlAlchemyStudyNodeRepository(IStudyNodeRepository):
+    """Repositório SQLAlchemy para Nós da Árvore de Estudos."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_by_id(self, node_id: UUID) -> StudyNode | None:
+        model = self._session.get(StudyNodeModel, node_id)
+        return StudyNodeMapper.to_domain(model) if model else None
+
+    def list_by_map(self, map_id: UUID) -> list[StudyNode]:
+        stmt = (
+            select(StudyNodeModel)
+            .where(StudyNodeModel.map_id == map_id)
+            .order_by(StudyNodeModel.created_at.asc())
+        )
+        return [StudyNodeMapper.to_domain(m) for m in self._session.scalars(stmt).all()]
+
+    def save(self, node: StudyNode) -> StudyNode:
+        model = self._session.get(StudyNodeModel, node.id)
+        if model:
+            model.title = node.title
+            model.description = node.description
+            model.pos_x = node.pos_x
+            model.pos_y = node.pos_y
+            model.icon = node.icon
+            model.updated_at = node.updated_at
+        else:
+            model = StudyNodeMapper.to_model(node)
+            self._session.add(model)
+        self._session.commit()
+        return StudyNodeMapper.to_domain(model)
+
+    def update_positions_batch(self, positions: list[tuple[UUID, float, float]]) -> None:
+        for node_id, x, y in positions:
+            model = self._session.get(StudyNodeModel, node_id)
+            if model:
+                model.pos_x = float(x)
+                model.pos_y = float(y)
+        self._session.commit()
+
+    def delete(self, node_id: UUID) -> None:
+        model = self._session.get(StudyNodeModel, node_id)
+        if model:
+            self._session.delete(model)
+            self._session.commit()
+
+
+class SqlAlchemyStudyEdgeRepository(IStudyEdgeRepository):
+    """Repositório SQLAlchemy para Arestas de Pré-requisito."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def list_by_map(self, map_id: UUID) -> list[StudyEdge]:
+        stmt = select(StudyEdgeModel).where(StudyEdgeModel.map_id == map_id)
+        return [StudyEdgeMapper.to_domain(m) for m in self._session.scalars(stmt).all()]
+
+    def get_by_id(self, edge_id: UUID) -> StudyEdge | None:
+        model = self._session.get(StudyEdgeModel, edge_id)
+        return StudyEdgeMapper.to_domain(model) if model else None
+
+    def save(self, edge: StudyEdge) -> StudyEdge:
+        model = StudyEdgeMapper.to_model(edge)
+        self._session.add(model)
+        self._session.commit()
+        return StudyEdgeMapper.to_domain(model)
+
+    def delete(self, edge_id: UUID) -> None:
+        model = self._session.get(StudyEdgeModel, edge_id)
+        if model:
+            self._session.delete(model)
+            self._session.commit()
+
+
+class SqlAlchemyNodeContentRepository(INodeContentRepository):
+    """Repositório SQLAlchemy para associações N:N entre Nós e Conteúdos."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def attach_knowledge_source(self, node_id: UUID, source_id: UUID) -> None:
+        existing = select(NodeKnowledgeSourceModel).where(
+            NodeKnowledgeSourceModel.node_id == node_id,
+            NodeKnowledgeSourceModel.source_id == source_id,
+        )
+        if not self._session.scalars(existing).first():
+            self._session.add(NodeKnowledgeSourceModel(node_id=node_id, source_id=source_id))
+            self._session.commit()
+
+    def detach_knowledge_source(self, node_id: UUID, source_id: UUID) -> None:
+        stmt = select(NodeKnowledgeSourceModel).where(
+            NodeKnowledgeSourceModel.node_id == node_id,
+            NodeKnowledgeSourceModel.source_id == source_id,
+        )
+        record = self._session.scalars(stmt).first()
+        if record:
+            self._session.delete(record)
+            self._session.commit()
+
+    def attach_question(self, node_id: UUID, question_id: UUID) -> None:
+        existing = select(NodeQuestionModel).where(
+            NodeQuestionModel.node_id == node_id,
+            NodeQuestionModel.question_id == question_id,
+        )
+        if not self._session.scalars(existing).first():
+            self._session.add(NodeQuestionModel(node_id=node_id, question_id=question_id))
+            self._session.commit()
+
+    def detach_question(self, node_id: UUID, question_id: UUID) -> None:
+        stmt = select(NodeQuestionModel).where(
+            NodeQuestionModel.node_id == node_id,
+            NodeQuestionModel.question_id == question_id,
+        )
+        record = self._session.scalars(stmt).first()
+        if record:
+            self._session.delete(record)
+            self._session.commit()
+
+    def attach_flashcard(self, node_id: UUID, flashcard_id: UUID) -> None:
+        existing = select(NodeFlashcardModel).where(
+            NodeFlashcardModel.node_id == node_id,
+            NodeFlashcardModel.flashcard_id == flashcard_id,
+        )
+        if not self._session.scalars(existing).first():
+            self._session.add(NodeFlashcardModel(node_id=node_id, flashcard_id=flashcard_id))
+            self._session.commit()
+
+    def detach_flashcard(self, node_id: UUID, flashcard_id: UUID) -> None:
+        stmt = select(NodeFlashcardModel).where(
+            NodeFlashcardModel.node_id == node_id,
+            NodeFlashcardModel.flashcard_id == flashcard_id,
+        )
+        record = self._session.scalars(stmt).first()
+        if record:
+            self._session.delete(record)
+            self._session.commit()
+
+    def get_attached_ids(self, node_id: UUID) -> tuple[list[UUID], list[UUID], list[UUID]]:
+        mat_stmt = select(NodeKnowledgeSourceModel.source_id).where(
+            NodeKnowledgeSourceModel.node_id == node_id
+        )
+        q_stmt = select(NodeQuestionModel.question_id).where(NodeQuestionModel.node_id == node_id)
+        f_stmt = select(NodeFlashcardModel.flashcard_id).where(
+            NodeFlashcardModel.node_id == node_id
+        )
+        return (
+            list(self._session.scalars(mat_stmt).all()),
+            list(self._session.scalars(q_stmt).all()),
+            list(self._session.scalars(f_stmt).all()),
+        )

@@ -8,6 +8,9 @@ from src.adapters.persistence.models import (
     PoolSessionModel,
     QuestionModel,
     ReviewAuditLogModel,
+    StudyEdgeModel,
+    StudyMapModel,
+    StudyNodeModel,
     SubjectModel,
     TokenLedgerModel,
     TokenTransactionModel,
@@ -22,6 +25,9 @@ from src.domain.entities import (
     KnowledgeSource,
     Question,
     ReviewAuditLog,
+    StudyEdge,
+    StudyMap,
+    StudyNode,
     Subject,
     TokenLedger,
     TokenTransaction,
@@ -362,5 +368,91 @@ class TokenTransactionMapper:
             transaction_type=entity.transaction_type,
             amount=entity.amount,
             reference_id=entity.reference_id,
+            created_at=entity.created_at,
+        )
+
+
+class StudyMapMapper:
+    """Conversor para Mapa de Estudos RPG."""
+
+    @staticmethod
+    def to_domain(model: StudyMapModel) -> StudyMap:
+        return StudyMap(
+            id=model.id,
+            owner_id=model.owner_id,
+            title=model.title,
+            description=model.description,
+            is_public=model.is_public,
+            parent_node_id=model.parent_node_id,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    @staticmethod
+    def to_model(entity: StudyMap) -> StudyMapModel:
+        return StudyMapModel(
+            id=entity.id,
+            owner_id=entity.owner_id,
+            title=entity.title,
+            description=entity.description,
+            is_public=entity.is_public,
+            parent_node_id=entity.parent_node_id,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+        )
+
+
+class StudyNodeMapper:
+    """Conversor para Nó da Árvore de Conhecimento."""
+
+    @staticmethod
+    def to_domain(model: StudyNodeModel) -> StudyNode:
+        return StudyNode(
+            id=model.id,
+            map_id=model.map_id,
+            title=model.title,
+            description=model.description,
+            pos_x=model.pos_x,
+            pos_y=model.pos_y,
+            icon=model.icon,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    @staticmethod
+    def to_model(entity: StudyNode) -> StudyNodeModel:
+        return StudyNodeModel(
+            id=entity.id,
+            map_id=entity.map_id,
+            title=entity.title,
+            description=entity.description,
+            pos_x=entity.pos_x,
+            pos_y=entity.pos_y,
+            icon=entity.icon,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+        )
+
+
+class StudyEdgeMapper:
+    """Conversor para Aresta de Pré-requisito."""
+
+    @staticmethod
+    def to_domain(model: StudyEdgeModel) -> StudyEdge:
+        return StudyEdge(
+            id=model.id,
+            map_id=model.map_id,
+            source_node_id=model.source_node_id,
+            target_node_id=model.target_node_id,
+            created_at=model.created_at,
+        )
+
+    @staticmethod
+    def to_model(entity: StudyEdge) -> StudyEdgeModel:
+        return StudyEdgeModel(
+            id=entity.id,
+            map_id=entity.map_id,
+            source_node_id=entity.source_node_id,
+            target_node_id=entity.target_node_id,
             created_at=entity.created_at,
         )
