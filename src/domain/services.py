@@ -7,11 +7,20 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from uuid import UUID
 
-from src.domain.entities import Flashcard, KnowledgeChunk, ReviewAuditLog, UserQuestionProgress
+from src.domain.entities import (
+    Flashcard,
+    KnowledgeChunk,
+    ReviewAuditLog,
+    StudyEdge,
+    UserQuestionProgress,
+)
 from src.domain.exceptions import (
+    CrossMapEdgeError,
+    CyclicDependencyError,
     DomainValidationError,
     EmptyKnowledgeContentError,
     InvalidScoreError,
+    SelfReferencingEdgeError,
 )
 from src.domain.protocols import IRandomGenerator
 
@@ -472,3 +481,94 @@ class DocumentTextExtractorService:
         if not clean:
             raise DomainValidationError("O arquivo de texto está vazio.")
         return clean
+
+
+# --- Árvore de Estudos RPG & Grafo de Aprendizado ---
+
+
+class DAGValidatorService:
+    """Validador para garantir que o grafo de estudos permaneça Acíclico Dirigido (DAG)."""
+
+    @classmethod
+    def validate_new_edge(
+        cls,
+        existing_edges: Sequence[StudyEdge],
+        map_id: UUID,
+        source_node_id: UUID,
+        target_node_id: UUID,
+    ) -> bool:
+        """Verifica se a adição da aresta source -> target é permitida e não gera ciclos."""
+        if source_node_id == target_node_id:
+            raise SelfReferencingEdgeError("Um nó não pode ter dependência de si mesmo.")
+
+        for edge in existing_edges:
+            if edge.map_id != map_id:
+                raise CrossMapEdgeError("Arestas só podem conectar nós pertencentes ao mesmo mapa.")
+
+        # Constrói o grafo direcionado de adjacências existentes
+        adj: dict[UUID, list[UUID]] = {}
+        for edge in existing_edges:
+            if edge.source_node_id not in adj:
+                adj[edge.source_node_id] = []
+            adj[edge.source_node_id].append(edge.target_node_id)
+
+        # Se já existe caminho de target_node_id até source_node_id,
+        # adicionar a aresta source -> target completará um ciclo!
+        visited: set[UUID] = set()
+        queue = [target_node_id]
+
+        while queue:
+            curr = queue.pop()
+            if curr == source_node_id:
+                raise CyclicDependencyError(
+                    "Aresta gera dependência cíclica no grafo de estudos."
+                )
+            if curr not in visited:
+                visited.add(curr)
+                queue.extend(adj.get(curr, []))
+
+        return True
+
+
+class StudyTreeProgressionService:
+    """Motor de cálculo de nível e regras de desbloqueio para a Árvore de Estudos RPG."""
+
+    @classmethod
+    def calculate_node_level(
+        cls,
+        question_srs_levels: Sequence[int],
+        sub_nodes_levels: Sequence[int] | None = None,
+    ) -> int:
+        """Calcula o nível efetivo de um nó (0 a 6).
+
+        - Se possui perguntas no SRS: min(srs_level das perguntas).
+        - Se não possui perguntas diretas, mas possui sub-mapa: min(níveis dos sub-nós).
+        - Se não possui perguntas nem sub-nós: 0.
+        """
+        if question_srs_levels:
+            return min(question_srs_levels)
+        if sub_nodes_levels:
+            return min(sub_nodes_levels)
+        return 0
+
+    @classmethod
+    def evaluate_unlock_status(
+        cls,
+        incoming_edges: Sequence[StudyEdge],
+        prerequisites_levels: dict[UUID, int],
+    ) -> bool:
+        """Determina se o nó está desbloqueado para estudo.
+
+        - Nós raiz (sem arestas de entrada) iniciam desbloqueados.
+        - Nós com dependências exigem que TODOS os nós pré-requisitos tenham nível >= 1.
+        """
+        if not incoming_edges:
+            return True
+
+        for edge in incoming_edges:
+            parent_level = prerequisites_levels.get(edge.source_node_id, 0)
+            if parent_level < 1:
+                return False
+
+        return True
+
