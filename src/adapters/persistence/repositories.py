@@ -688,6 +688,18 @@ class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
         models = self._session.scalars(stmt).all()
         return [QuestionProgressMapper.to_domain(m) for m in models]
 
+    def get_by_questions(
+        self, user_id: UUID, question_ids: list[UUID]
+    ) -> dict[UUID, UserQuestionProgress]:
+        if not question_ids:
+            return {}
+        stmt = select(UserQuestionProgressModel).where(
+            UserQuestionProgressModel.user_id == user_id,
+            UserQuestionProgressModel.question_id.in_(question_ids),
+        )
+        models = self._session.scalars(stmt).all()
+        return {m.question_id: QuestionProgressMapper.to_domain(m) for m in models}
+
 
 class SqlAlchemyReviewAuditRepository(IReviewAuditRepository):
     """Repositório SQLAlchemy para a Trilha de Auditoria Histórica (Sprint 04)."""

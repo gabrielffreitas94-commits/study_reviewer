@@ -244,6 +244,12 @@ class IQuestionProgressRepository(Protocol):
         """Lista todos os registros de progresso de um estudante."""
         ...
 
+    def get_by_questions(
+        self, user_id: UUID, question_ids: list[UUID]
+    ) -> dict[UUID, UserQuestionProgress]:
+        """Retorna mapa question_id -> UserQuestionProgress para uma lista de perguntas."""
+        ...
+
 
 class IReviewAuditRepository(Protocol):
     """Porta de persistência para a Trilha de Auditoria Histórica de Revisões (Sprint 04)."""
