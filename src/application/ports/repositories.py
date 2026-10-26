@@ -437,6 +437,14 @@ class IStudyEdgeRepository(Protocol):
         """Persiste uma nova dependência entre nós."""
         ...
 
+    def update(self, edge: StudyEdge) -> StudyEdge:
+        """Atualiza uma dependência existente."""
+        ...
+
+    def update_edge(self, edge: StudyEdge) -> StudyEdge:
+        """Alias para atualização de uma dependência existente."""
+        ...
+
     def delete(self, edge_id: UUID) -> None:
         """Remove uma dependência orientada."""
         ...
