@@ -135,6 +135,42 @@ def migrate_legacy_taxonomy(
     }
 
 
+@api_study_tree_router.post("/study-maps/sample-math", status_code=status.HTTP_201_CREATED)
+def create_sample_math_study_map(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Cria uma Árvore de Conhecimento demonstrativa completa
+    de Matemática Aplicada & Computacional.
+    """
+    from src.adapters.persistence.repositories import (
+        SqlAlchemySubjectRepository,
+        SqlAlchemyTopicRepository,
+    )
+    from src.application.use_cases.sample_study_map_use_case import (
+        CreateSampleMathStudyMapUseCase,
+    )
+
+    use_case = CreateSampleMathStudyMapUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+        edge_repo=SqlAlchemyStudyEdgeRepository(db),
+        content_repo=SqlAlchemyNodeContentRepository(db),
+        source_repo=SqlAlchemyKnowledgeSourceRepository(db),
+        question_repo=SqlAlchemyQuestionRepository(db),
+        flashcard_repo=SqlAlchemyFlashcardRepository(db),
+        subject_repo=SqlAlchemySubjectRepository(db),
+        topic_repo=SqlAlchemyTopicRepository(db),
+    )
+    study_map = use_case.execute(user_id=current_user.id)
+    return {
+        "id": str(study_map.id),
+        "title": study_map.title,
+        "description": study_map.description,
+        "message": "Árvore de Matemática Aplicada gerada com sucesso!",
+    }
+
+
 @api_study_tree_router.get("/study-maps")
 def list_study_maps(
     current_user: User = Depends(get_current_user),

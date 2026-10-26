@@ -52,7 +52,8 @@ extend-immutable-calls = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "S105", "S106", "E501"]  # Permite assert, tokens de teste e docstrings longas nos testes
+"tests/*" = ["S101", "S105", "S106", "E501"]
+"src/application/use_cases/sample_study_map_use_case.py" = ["E501"]  # Permite assert, tokens de teste e docstrings longas nos testes
 
 [tool.mypy]
 python_version = "3.13"

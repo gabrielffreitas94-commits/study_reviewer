@@ -571,3 +571,24 @@ def test_all_controller_404_and_403_branches(
 
     # Delete do mapa com sucesso
     assert client.delete(f"/api/v1/study-maps/{s_map.id}").status_code == 204
+
+
+@pytest.mark.integration
+def test_create_sample_math_study_map_endpoint(
+    client: TestClient, db_session: Session, test_user: User
+) -> None:
+    user_repo = SqlAlchemyUserRepository(db_session)
+    user_repo.save(test_user)
+
+    resp = client.post("/api/v1/study-maps/sample-math")
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "id" in data
+    assert "Matemática Aplicada" in data["title"]
+
+    # Verifica se os nós e arestas foram criados no grafo
+    graph_resp = client.get(f"/api/v1/study-maps/{data['id']}")
+    assert graph_resp.status_code == 200
+    graph_data = graph_resp.json()
+    assert len(graph_data["nodes"]) == 5
+    assert len(graph_data["edges"]) == 5
