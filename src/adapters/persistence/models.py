@@ -592,6 +592,7 @@ class StudyEdgeModel(Base):
     target_node_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    required_level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )

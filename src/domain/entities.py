@@ -741,12 +741,15 @@ class StudyEdge:
     map_id: UUID
     source_node_id: UUID
     target_node_id: UUID
+    required_level: int = 1
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
         if self.source_node_id == self.target_node_id:
             raise SelfReferencingEdgeError("Um nó não pode ter dependência de si mesmo.")
+        if self.required_level < 1:
+            raise ValueError("required_level deve ser maior ou igual a 1")
 
 
 @dataclass(slots=True)

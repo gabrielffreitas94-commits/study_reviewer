@@ -120,7 +120,7 @@ def test_study_node_and_edge_repository(db_session: Session) -> None:
     assert updated_a.pos_x == 75.0
     assert updated_a.pos_y == 150.0
 
-    # Cria aresta A -> B
+    # Cria aresta A -> B com default required_level = 1
     edge = edge_repo.save(
         StudyEdge(map_id=s_map.id, source_node_id=node_a.id, target_node_id=node_b.id)
     )
@@ -128,6 +128,48 @@ def test_study_node_and_edge_repository(db_session: Session) -> None:
     assert len(edges) == 1
     assert edges[0].source_node_id == node_a.id
     assert edges[0].target_node_id == node_b.id
+    assert edges[0].required_level == 1
+
+    # Atualiza aresta para required_level = 3 via save
+    updated_edge = StudyEdge(
+        id=edge.id,
+        map_id=edge.map_id,
+        source_node_id=edge.source_node_id,
+        target_node_id=edge.target_node_id,
+        required_level=3,
+        created_at=edge.created_at,
+    )
+    edge_repo.save(updated_edge)
+    reloaded_edge = edge_repo.get_by_id(edge.id)
+    assert reloaded_edge is not None
+    assert reloaded_edge.required_level == 3
+
+    # Atualiza via update e update_edge
+    updated_edge_2 = StudyEdge(
+        id=edge.id,
+        map_id=edge.map_id,
+        source_node_id=edge.source_node_id,
+        target_node_id=edge.target_node_id,
+        required_level=4,
+        created_at=edge.created_at,
+    )
+    edge_repo.update(updated_edge_2)
+    found_edge_2 = edge_repo.get_by_id(edge.id)
+    assert found_edge_2 is not None
+    assert found_edge_2.required_level == 4
+
+    updated_edge_3 = StudyEdge(
+        id=edge.id,
+        map_id=edge.map_id,
+        source_node_id=edge.source_node_id,
+        target_node_id=edge.target_node_id,
+        required_level=2,
+        created_at=edge.created_at,
+    )
+    edge_repo.update_edge(updated_edge_3)
+    found_edge_3 = edge_repo.get_by_id(edge.id)
+    assert found_edge_3 is not None
+    assert found_edge_3.required_level == 2
 
     # Deleta aresta
     edge_repo.delete(edge.id)

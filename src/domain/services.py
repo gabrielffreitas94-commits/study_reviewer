@@ -558,14 +558,15 @@ class StudyTreeProgressionService:
         """Determina se o nó está desbloqueado para estudo.
 
         - Nós raiz (sem arestas de entrada) iniciam desbloqueados.
-        - Nós com dependências exigem que TODOS os nós pré-requisitos tenham nível >= 1.
+        - Nós com dependências exigem que TODOS os nós pré-requisitos atinjam
+          o nível configurado em cada aresta (edge.required_level).
         """
         if not incoming_edges:
             return True
 
         for edge in incoming_edges:
             parent_level = prerequisites_levels.get(edge.source_node_id, 0)
-            if parent_level < 1:
+            if parent_level < edge.required_level:
                 return False
 
         return True

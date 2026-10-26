@@ -103,6 +103,13 @@ class FakeStudyEdgeRepository(IStudyEdgeRepository):
         self.edges[edge.id] = edge
         return edge
 
+    def update(self, edge: StudyEdge) -> StudyEdge:
+        self.edges[edge.id] = edge
+        return edge
+
+    def update_edge(self, edge: StudyEdge) -> StudyEdge:
+        return self.save(edge)
+
     def delete(self, edge_id: UUID) -> None:
         self.edges.pop(edge_id, None)
 

@@ -470,6 +470,7 @@ class StudyEdgeMapper:
             map_id=model.map_id,
             source_node_id=model.source_node_id,
             target_node_id=model.target_node_id,
+            required_level=getattr(model, "required_level", 1) or 1,
             created_at=model.created_at,
         )
 
@@ -480,5 +481,6 @@ class StudyEdgeMapper:
             map_id=entity.map_id,
             source_node_id=entity.source_node_id,
             target_node_id=entity.target_node_id,
+            required_level=entity.required_level,
             created_at=entity.created_at,
         )
