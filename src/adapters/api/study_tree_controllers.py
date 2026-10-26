@@ -13,6 +13,7 @@ from src.adapters.persistence.repositories import (
     SqlAlchemyNodeContentRepository,
     SqlAlchemyQuestionProgressRepository,
     SqlAlchemyQuestionRepository,
+    SqlAlchemyReviewAuditRepository,
     SqlAlchemyStudyEdgeRepository,
     SqlAlchemyStudyMapRepository,
     SqlAlchemyStudyNodeRepository,
@@ -27,14 +28,20 @@ from src.application.dto.study_tree_dto import (
 from src.application.use_cases.study_tree_use_cases import (
     AttachContentToNodeUseCase,
     ConnectStudyNodesUseCase,
+    CreateNodeMaterialUseCase,
+    CreateNodeQuestionUseCase,
     CreateStudyMapUseCase,
     CreateStudyNodeUseCase,
+    DeleteNodeMaterialUseCase,
+    DeleteNodeQuestionUseCase,
     DeleteStudyNodeUseCase,
     DetachContentFromNodeUseCase,
     DisconnectStudyNodesUseCase,
     GetNodeStudyHubUseCase,
     GetStudyMapGraphUseCase,
+    ReviewNodeQuestionUseCase,
     UpdateNodePositionsBatchUseCase,
+    UpdateNodeTheoryUseCase,
     UpdateStudyNodeUseCase,
 )
 from src.domain.entities import User
@@ -42,6 +49,8 @@ from src.domain.exceptions import (
     CrossMapEdgeError,
     CyclicDependencyError,
     DomainValidationError,
+    EntityNotFoundError,
+    QuestionNotFoundError,
     ResourceOwnershipError,
     SelfReferencingEdgeError,
     StudyEdgeNotFoundError,
@@ -51,7 +60,7 @@ from src.domain.exceptions import (
 from src.infrastructure.database import get_db
 from src.infrastructure.security.dependencies import get_current_user
 
-api_study_tree_router = APIRouter(prefix="/api/v1", tags=["Study Tree & Knowledge Graph"])
+_study_tree_base_router = APIRouter()
 
 
 # --- Schemas de Entrada (Pydantic v2) ---
@@ -78,6 +87,27 @@ class UpdateStudyNodeRequest(BaseModel):
     icon: str | None = Field(default=None, max_length=50)
 
 
+class UpdateNodeTheoryRequest(BaseModel):
+    theory_content: str = Field(default="", max_length=50000)
+
+
+class CreateNodeQuestionRequest(BaseModel):
+    prompt: str = Field(default="", max_length=5000)
+    statement: str = Field(default="", max_length=5000)
+    expected_answer: str = Field(..., min_length=1, max_length=5000)
+
+
+class ReviewNodeQuestionRequest(BaseModel):
+    score: int = Field(default=100, ge=0, le=100)
+    difficulty: str | None = Field(default=None, max_length=20)
+
+
+class CreateNodeMaterialRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    raw_text: str = Field(default="", max_length=100000)
+    content_type: str = Field(default="TEXT", max_length=20)
+
+
 class NodePositionItem(BaseModel):
     node_id: UUID
     pos_x: float
@@ -98,10 +128,34 @@ class AttachContentRequest(BaseModel):
     content_id: UUID
 
 
+# --- Serializadores Auxiliares ---
+
+
+def _serialize_node(node: Any) -> dict[str, Any]:
+    """Serializa dados de nó e suas estatísticas de estudo para JSON da API REST."""
+    return {
+        "id": str(node.id),
+        "map_id": str(node.map_id),
+        "title": node.title,
+        "description": node.description,
+        "pos_x": getattr(node, "pos_x", 0.0),
+        "pos_y": getattr(node, "pos_y", 0.0),
+        "icon": getattr(node, "icon", "brain"),
+        "effective_level": getattr(node, "effective_level", 0),
+        "is_unlocked": getattr(node, "is_unlocked", True),
+        "overdue_questions_count": getattr(node, "overdue_questions_count", 0),
+        "has_submap": getattr(node, "has_submap", False),
+        "materials_count": getattr(node, "materials_count", 0),
+        "questions_count": getattr(node, "questions_count", 0),
+        "flashcards_count": getattr(node, "flashcards_count", 0),
+        "theory_content": getattr(node, "theory_content", ""),
+    }
+
+
 # --- Endpoints RESTful ---
 
 
-@api_study_tree_router.post("/study-maps/migrate-legacy")
+@_study_tree_base_router.post("/study-maps/migrate-legacy")
 def migrate_legacy_taxonomy(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -135,7 +189,7 @@ def migrate_legacy_taxonomy(
     }
 
 
-@api_study_tree_router.post("/study-maps/sample-math", status_code=status.HTTP_201_CREATED)
+@_study_tree_base_router.post("/study-maps/sample-math", status_code=status.HTTP_201_CREATED)
 def create_sample_math_study_map(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -171,7 +225,7 @@ def create_sample_math_study_map(
     }
 
 
-@api_study_tree_router.get("/study-maps")
+@_study_tree_base_router.get("/study-maps")
 def list_study_maps(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -195,7 +249,7 @@ def list_study_maps(
     ]
 
 
-@api_study_tree_router.post("/study-maps", status_code=status.HTTP_201_CREATED)
+@_study_tree_base_router.post("/study-maps", status_code=status.HTTP_201_CREATED)
 def create_study_map(
     payload: CreateStudyMapRequest,
     current_user: User = Depends(get_current_user),
@@ -225,7 +279,7 @@ def create_study_map(
     }
 
 
-@api_study_tree_router.get("/study-maps/{map_id}")
+@_study_tree_base_router.get("/study-maps/{map_id}")
 def get_study_map_graph(
     map_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -252,25 +306,7 @@ def get_study_map_graph(
                 if graph.map.parent_node_id
                 else None,
             },
-            "nodes": [
-                {
-                    "id": str(n.id),
-                    "map_id": str(n.map_id),
-                    "title": n.title,
-                    "description": n.description,
-                    "pos_x": n.pos_x,
-                    "pos_y": n.pos_y,
-                    "icon": n.icon,
-                    "effective_level": n.effective_level,
-                    "is_unlocked": n.is_unlocked,
-                    "overdue_questions_count": n.overdue_questions_count,
-                    "has_submap": n.has_submap,
-                    "materials_count": n.materials_count,
-                    "questions_count": n.questions_count,
-                    "flashcards_count": n.flashcards_count,
-                }
-                for n in graph.nodes
-            ],
+            "nodes": [_serialize_node(n) for n in graph.nodes],
             "edges": [
                 {
                     "id": str(e.id),
@@ -287,7 +323,7 @@ def get_study_map_graph(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
-@api_study_tree_router.delete("/study-maps/{map_id}", status_code=status.HTTP_204_NO_CONTENT)
+@_study_tree_base_router.delete("/study-maps/{map_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_study_map(
     map_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -303,7 +339,7 @@ def delete_study_map(
     map_repo.delete(map_id)
 
 
-@api_study_tree_router.post("/study-maps/{map_id}/nodes", status_code=status.HTTP_201_CREATED)
+@_study_tree_base_router.post("/study-maps/{map_id}/nodes", status_code=status.HTTP_201_CREATED)
 def create_study_node(
     map_id: UUID,
     payload: CreateStudyNodeRequest,
@@ -324,28 +360,17 @@ def create_study_node(
             icon=payload.icon,
         )
         node = use_case.execute(map_id=map_id, user_id=current_user.id, dto=dto)
-        return {
-            "id": str(node.id),
-            "map_id": str(node.map_id),
-            "title": node.title,
-            "description": node.description,
-            "pos_x": node.pos_x,
-            "pos_y": node.pos_y,
-            "icon": node.icon,
-            "effective_level": node.effective_level,
-            "is_unlocked": node.is_unlocked,
-            "overdue_questions_count": node.overdue_questions_count,
-        }
+        return _serialize_node(node)
     except StudyMapNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ResourceOwnershipError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
-@api_study_tree_router.patch(
+@_study_tree_base_router.patch(
     "/study-maps/{map_id}/nodes/positions-batch", status_code=status.HTTP_204_NO_CONTENT
 )
-@api_study_tree_router.put(
+@_study_tree_base_router.put(
     "/study-maps/{map_id}/nodes/positions-batch", status_code=status.HTTP_204_NO_CONTENT
 )
 def update_node_positions_batch(
@@ -371,8 +396,8 @@ def update_node_positions_batch(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
-@api_study_tree_router.patch("/study-maps/{map_id}/nodes/{node_id}")
-@api_study_tree_router.put("/study-maps/{map_id}/nodes/{node_id}")
+@_study_tree_base_router.patch("/study-maps/{map_id}/nodes/{node_id}")
+@_study_tree_base_router.put("/study-maps/{map_id}/nodes/{node_id}")
 def update_study_node(
     map_id: UUID,
     node_id: UUID,
@@ -392,15 +417,7 @@ def update_study_node(
             icon=payload.icon,
         )
         node = use_case.execute(map_id=map_id, user_id=current_user.id, node_id=node_id, dto=dto)
-        return {
-            "id": str(node.id),
-            "map_id": str(node.map_id),
-            "title": node.title,
-            "description": node.description,
-            "pos_x": node.pos_x,
-            "pos_y": node.pos_y,
-            "icon": node.icon,
-        }
+        return _serialize_node(node)
     except (StudyMapNotFoundError, StudyNodeNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ResourceOwnershipError as exc:
@@ -409,7 +426,7 @@ def update_study_node(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@api_study_tree_router.delete(
+@_study_tree_base_router.delete(
     "/study-maps/{map_id}/nodes/{node_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 def delete_study_node(
@@ -431,7 +448,226 @@ def delete_study_node(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
-@api_study_tree_router.post("/study-maps/{map_id}/edges", status_code=status.HTTP_201_CREATED)
+@_study_tree_base_router.patch("/study-maps/{map_id}/nodes/{node_id}/theory")
+def update_node_theory(
+    map_id: UUID,
+    node_id: UUID,
+    payload: UpdateNodeTheoryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Atualiza o conteúdo do Tomo de Sabedoria (teoria) de um nó."""
+    use_case = UpdateNodeTheoryUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+    )
+    try:
+        updated = use_case.execute(
+            map_id=map_id,
+            node_id=node_id,
+            user_id=current_user.id,
+            theory_content=payload.theory_content,
+        )
+        return _serialize_node(updated)
+    except (StudyMapNotFoundError, StudyNodeNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@_study_tree_base_router.post(
+    "/study-maps/{map_id}/nodes/{node_id}/questions",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_node_question(
+    map_id: UUID,
+    node_id: UUID,
+    payload: CreateNodeQuestionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Cria uma provação SRS diretamente ancorada no nó."""
+    effective_prompt = (payload.prompt or payload.statement).strip()
+    if not effective_prompt:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="O enunciado da pergunta ('prompt' ou 'statement') é obrigatório.",
+        )
+    use_case = CreateNodeQuestionUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+        question_repo=SqlAlchemyQuestionRepository(db),
+        progress_repo=SqlAlchemyQuestionProgressRepository(db),
+        content_repo=SqlAlchemyNodeContentRepository(db),
+    )
+    try:
+        res = use_case.execute(
+            map_id=map_id,
+            node_id=node_id,
+            user_id=current_user.id,
+            prompt=effective_prompt,
+            expected_answer=payload.expected_answer.strip(),
+        )
+        return {
+            "id": str(res["id"]),
+            "question_id": str(res["id"]),
+            "node_id": str(res["node_id"]),
+            "prompt": res["prompt"],
+            "statement": res["statement"],
+            "expected_answer": res["expected_answer"],
+            "current_level": res["current_level"],
+            "next_review_date": res["next_review_date"],
+            "created_at": res["created_at"],
+        }
+    except (StudyMapNotFoundError, StudyNodeNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@_study_tree_base_router.delete(
+    "/study-maps/{map_id}/nodes/{node_id}/questions/{question_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_node_question(
+    map_id: UUID,
+    node_id: UUID,
+    question_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Exclui uma provação SRS associada ao nó."""
+    use_case = DeleteNodeQuestionUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+        question_repo=SqlAlchemyQuestionRepository(db),
+        content_repo=SqlAlchemyNodeContentRepository(db),
+    )
+    try:
+        use_case.execute(
+            map_id=map_id,
+            node_id=node_id,
+            user_id=current_user.id,
+            question_id=question_id,
+        )
+    except (StudyMapNotFoundError, StudyNodeNotFoundError, QuestionNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@_study_tree_base_router.post(
+    "/study-maps/{map_id}/nodes/{node_id}/questions/{question_id}/review",
+)
+def review_node_question(
+    map_id: UUID,
+    node_id: UUID,
+    question_id: UUID,
+    payload: ReviewNodeQuestionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Submete uma revisão SRS no nó com suporte ao Modo Treino Livre."""
+    use_case = ReviewNodeQuestionUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+        question_repo=SqlAlchemyQuestionRepository(db),
+        progress_repo=SqlAlchemyQuestionProgressRepository(db),
+        content_repo=SqlAlchemyNodeContentRepository(db),
+        edge_repo=SqlAlchemyStudyEdgeRepository(db),
+        audit_repo=SqlAlchemyReviewAuditRepository(db),
+    )
+    try:
+        res = use_case.execute(
+            map_id=map_id,
+            node_id=node_id,
+            user_id=current_user.id,
+            question_id=question_id,
+            score=payload.score,
+            difficulty=payload.difficulty,
+        )
+        return {k: (str(v) if isinstance(v, UUID) else v) for k, v in res.items()}
+    except (StudyMapNotFoundError, StudyNodeNotFoundError, QuestionNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@_study_tree_base_router.post(
+    "/study-maps/{map_id}/nodes/{node_id}/materials",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_node_material(
+    map_id: UUID,
+    node_id: UUID,
+    payload: CreateNodeMaterialRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Cria um material/pergaminho inline associado ao nó."""
+    use_case = CreateNodeMaterialUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+        source_repo=SqlAlchemyKnowledgeSourceRepository(db),
+        content_repo=SqlAlchemyNodeContentRepository(db),
+    )
+    try:
+        res = use_case.execute(
+            map_id=map_id,
+            node_id=node_id,
+            user_id=current_user.id,
+            title=payload.title,
+            raw_text=payload.raw_text,
+            content_type=payload.content_type,
+        )
+        return {
+            "id": str(res["id"]),
+            "material_id": str(res["id"]),
+            "node_id": str(res["node_id"]),
+            "title": res["title"],
+            "content_type": res["content_type"],
+            "raw_text": res["raw_text"],
+            "char_count": res["char_count"],
+            "created_at": res["created_at"],
+        }
+    except (StudyMapNotFoundError, StudyNodeNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@_study_tree_base_router.delete(
+    "/study-maps/{map_id}/nodes/{node_id}/materials/{material_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_node_material(
+    map_id: UUID,
+    node_id: UUID,
+    material_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Remove um material associado ao nó."""
+    use_case = DeleteNodeMaterialUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+        source_repo=SqlAlchemyKnowledgeSourceRepository(db),
+        content_repo=SqlAlchemyNodeContentRepository(db),
+    )
+    try:
+        use_case.execute(
+            map_id=map_id,
+            node_id=node_id,
+            user_id=current_user.id,
+            material_id=material_id,
+        )
+    except (StudyMapNotFoundError, StudyNodeNotFoundError, EntityNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@_study_tree_base_router.post("/study-maps/{map_id}/edges", status_code=status.HTTP_201_CREATED)
 def connect_study_nodes(
     map_id: UUID,
     payload: ConnectNodesRequest,
@@ -464,7 +700,7 @@ def connect_study_nodes(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
-@api_study_tree_router.delete(
+@_study_tree_base_router.delete(
     "/study-maps/{map_id}/edges/{edge_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 def disconnect_study_nodes(
@@ -486,7 +722,7 @@ def disconnect_study_nodes(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
-@api_study_tree_router.post(
+@_study_tree_base_router.post(
     "/study-maps/{map_id}/nodes/{node_id}/contents", status_code=status.HTTP_204_NO_CONTENT
 )
 def attach_content_to_node(
@@ -518,7 +754,7 @@ def attach_content_to_node(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
-@api_study_tree_router.delete(
+@_study_tree_base_router.delete(
     "/study-maps/{map_id}/nodes/{node_id}/contents/{content_type}/{content_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
@@ -552,7 +788,8 @@ def detach_content_from_node(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
-@api_study_tree_router.get("/study-maps/{map_id}/nodes/{node_id}/hub")
+@_study_tree_base_router.get("/study-maps/{map_id}/nodes/{node_id}/hub")
+@_study_tree_base_router.get("/study-maps/{map_id}/nodes/{node_id}/study-hub")
 def get_node_study_hub(
     map_id: UUID,
     node_id: UUID,
@@ -572,15 +809,7 @@ def get_node_study_hub(
     try:
         hub = use_case.execute(map_id=map_id, user_id=current_user.id, node_id=node_id)
         return {
-            "node": {
-                "id": str(hub.node.id),
-                "map_id": str(hub.node.map_id),
-                "title": hub.node.title,
-                "description": hub.node.description,
-                "effective_level": hub.node.effective_level,
-                "is_unlocked": hub.node.is_unlocked,
-                "overdue_questions_count": hub.node.overdue_questions_count,
-            },
+            "node": _serialize_node(hub.node),
             "materials": hub.materials,
             "due_questions": hub.due_questions,
             "all_questions": hub.all_questions,
@@ -590,3 +819,20 @@ def get_node_study_hub(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ResourceOwnershipError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+# --- Roteadores Exportados (com suporte a /api/v1 e /api) ---
+
+api_study_tree_router = APIRouter(prefix="/api/v1", tags=["Study Tree & Knowledge Graph"])
+api_study_tree_router.include_router(_study_tree_base_router)
+
+api_study_tree_compat_router = APIRouter(
+    prefix="/api", tags=["Study Tree & Knowledge Graph (Compat)"]
+)
+api_study_tree_compat_router.include_router(_study_tree_base_router)
+
+__all__ = [
+    "api_study_tree_router",
+    "api_study_tree_compat_router",
+    "_serialize_node",
+]
