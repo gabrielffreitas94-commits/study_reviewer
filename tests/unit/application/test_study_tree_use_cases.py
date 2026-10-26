@@ -14,7 +14,6 @@ from src.application.dto.study_tree_dto import (
 )
 from src.application.ports.repositories import (
     INodeContentRepository,
-    IQuestionProgressRepository,
     IStudyEdgeRepository,
     IStudyMapRepository,
     IStudyNodeRepository,
@@ -46,6 +45,7 @@ from src.domain.exceptions import (
     StudyMapNotFoundError,
     StudyNodeNotFoundError,
 )
+from tests.unit.application.fakes import FakeQuestionProgressRepository
 
 
 class FakeStudyMapRepository(IStudyMapRepository):
@@ -139,24 +139,7 @@ class FakeNodeContentRepository(INodeContentRepository):
         )
 
 
-class FakeQuestionProgressRepository(IQuestionProgressRepository):
-    def __init__(self) -> None:
-        self.progresses: dict[tuple[UUID, UUID], UserQuestionProgress] = {}
-
-    def get(self, user_id: UUID, question_id: UUID) -> UserQuestionProgress | None:
-        return self.progresses.get((user_id, question_id))
-
-    def save(self, progress: UserQuestionProgress) -> None:
-        self.progresses[(progress.user_id, progress.question_id)] = progress
-
-    def get_by_questions(
-        self, user_id: UUID, question_ids: list[UUID]
-    ) -> dict[UUID, UserQuestionProgress]:
-        return {
-            qid: self.progresses[(user_id, qid)]
-            for qid in question_ids
-            if (user_id, qid) in self.progresses
-        }
+# Using FakeQuestionProgressRepository from fakes.py
 
 
 # --- Testes dos Casos de Uso ---

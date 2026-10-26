@@ -36,13 +36,9 @@ def upgrade() -> None:
     ks_cols = {c["name"] for c in insp.get_columns("knowledge_sources")}
     with op.batch_alter_table("knowledge_sources") as batch_op:
         if "raw_text" not in ks_cols:
-            batch_op.add_column(
-                sa.Column("raw_text", sa.Text(), nullable=False, server_default="")
-            )
+            batch_op.add_column(sa.Column("raw_text", sa.Text(), nullable=False, server_default=""))
         if "node_id" not in ks_cols:
-            batch_op.add_column(
-                sa.Column("node_id", sa.Uuid(), nullable=True)
-            )
+            batch_op.add_column(sa.Column("node_id", sa.Uuid(), nullable=True))
             batch_op.create_foreign_key(
                 "fk_knowledge_sources_node_id_study_nodes",
                 "study_nodes",
@@ -56,9 +52,7 @@ def upgrade() -> None:
     q_cols = {c["name"] for c in insp.get_columns("questions")}
     if "node_id" not in q_cols:
         with op.batch_alter_table("questions") as batch_op:
-            batch_op.add_column(
-                sa.Column("node_id", sa.Uuid(), nullable=True)
-            )
+            batch_op.add_column(sa.Column("node_id", sa.Uuid(), nullable=True))
             batch_op.create_foreign_key(
                 "fk_questions_node_id_study_nodes",
                 "study_nodes",

@@ -193,7 +193,12 @@ def study_node_grimoire_page(
 
     is_unlocked = StudyTreeProgressionService.evaluate_unlock_status(incoming_edges, node_levels)
 
-    mastered_count = sum(1 for q in hub.all_questions if q.get("current_level", 0) >= 1)
+    mastered_count = 0
+    for q_item in hub.all_questions:
+        if isinstance(q_item, dict):
+            lvl_val = q_item.get("current_level", 0)
+            if isinstance(lvl_val, int) and lvl_val >= 1:
+                mastered_count += 1
     total_questions = len(hub.all_questions)
     progress_percent = (
         round((mastered_count / total_questions) * 100, 1) if total_questions > 0 else 0.0

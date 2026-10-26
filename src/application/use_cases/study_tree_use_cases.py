@@ -27,7 +27,6 @@ from src.application.ports.repositories import (
     IStudyEdgeRepository,
     IStudyMapRepository,
     IStudyNodeRepository,
-    IUnitOfWork,
 )
 from src.domain.entities import (
     KnowledgeSource,
@@ -573,7 +572,6 @@ class CreateNodeQuestionUseCase:
         progress_repo: IQuestionProgressRepository,
         content_repo: INodeContentRepository,
         clock: IClockService | None = None,
-        uow: IUnitOfWork | None = None,
     ) -> None:
         self.map_repo = map_repo
         self.node_repo = node_repo
@@ -581,7 +579,6 @@ class CreateNodeQuestionUseCase:
         self.progress_repo = progress_repo
         self.content_repo = content_repo
         self.clock = clock
-        self.uow = uow
 
     def execute(
         self,
@@ -620,16 +617,9 @@ class CreateNodeQuestionUseCase:
             next_review_date=today,
         )
 
-        try:
-            self.question_repo.save(question)
-            self.content_repo.attach_question(node.id, question.id)
-            self.progress_repo.save(initial_progress)
-            if self.uow is not None:
-                self.uow.commit()
-        except Exception:
-            if self.uow is not None:
-                self.uow.rollback()
-            raise
+        self.question_repo.save(question)
+        self.content_repo.attach_question(node.id, question.id)
+        self.progress_repo.save(initial_progress)
 
         return {
             "id": question.id,
@@ -653,13 +643,11 @@ class DeleteNodeQuestionUseCase:
         node_repo: IStudyNodeRepository,
         question_repo: IQuestionRepository,
         content_repo: INodeContentRepository,
-        uow: IUnitOfWork | None = None,
     ) -> None:
         self.map_repo = map_repo
         self.node_repo = node_repo
         self.question_repo = question_repo
         self.content_repo = content_repo
-        self.uow = uow
 
     def execute(
         self,
@@ -684,15 +672,8 @@ class DeleteNodeQuestionUseCase:
         if question is None:
             raise QuestionNotFoundError(f"Pergunta '{question_id}' não encontrada.")
 
-        try:
-            self.content_repo.detach_question(node.id, question_id)
-            self.question_repo.delete(question_id)
-            if self.uow is not None:
-                self.uow.commit()
-        except Exception:
-            if self.uow is not None:
-                self.uow.rollback()
-            raise
+        self.content_repo.detach_question(node.id, question_id)
+        self.question_repo.delete(question_id)
 
 
 class CreateNodeMaterialUseCase:
@@ -705,14 +686,12 @@ class CreateNodeMaterialUseCase:
         source_repo: IKnowledgeSourceRepository,
         content_repo: INodeContentRepository,
         clock: IClockService | None = None,
-        uow: IUnitOfWork | None = None,
     ) -> None:
         self.map_repo = map_repo
         self.node_repo = node_repo
         self.source_repo = source_repo
         self.content_repo = content_repo
         self.clock = clock
-        self.uow = uow
 
     def execute(
         self,
@@ -749,15 +728,8 @@ class CreateNodeMaterialUseCase:
             created_at=today,
         )
 
-        try:
-            saved = self.source_repo.save(source)
-            self.content_repo.attach_knowledge_source(node.id, saved.id)
-            if self.uow is not None:
-                self.uow.commit()
-        except Exception:
-            if self.uow is not None:
-                self.uow.rollback()
-            raise
+        saved = self.source_repo.save(source)
+        self.content_repo.attach_knowledge_source(node.id, saved.id)
 
         return {
             "id": saved.id,
@@ -780,13 +752,11 @@ class DeleteNodeMaterialUseCase:
         node_repo: IStudyNodeRepository,
         source_repo: IKnowledgeSourceRepository,
         content_repo: INodeContentRepository,
-        uow: IUnitOfWork | None = None,
     ) -> None:
         self.map_repo = map_repo
         self.node_repo = node_repo
         self.source_repo = source_repo
         self.content_repo = content_repo
-        self.uow = uow
 
     def execute(
         self,
@@ -811,15 +781,8 @@ class DeleteNodeMaterialUseCase:
         if source is None:
             raise EntityNotFoundError(f"Material '{material_id}' não encontrado.")
 
-        try:
-            self.content_repo.detach_knowledge_source(node.id, material_id)
-            self.source_repo.delete(material_id)
-            if self.uow is not None:
-                self.uow.commit()
-        except Exception:
-            if self.uow is not None:
-                self.uow.rollback()
-            raise
+        self.content_repo.detach_knowledge_source(node.id, material_id)
+        self.source_repo.delete(material_id)
 
 
 class ReviewNodeQuestionUseCase:
@@ -835,7 +798,6 @@ class ReviewNodeQuestionUseCase:
         edge_repo: IStudyEdgeRepository | None = None,
         audit_repo: IReviewAuditRepository | None = None,
         clock: IClockService | None = None,
-        uow: IUnitOfWork | None = None,
     ) -> None:
         self.map_repo = map_repo
         self.node_repo = node_repo
@@ -845,7 +807,6 @@ class ReviewNodeQuestionUseCase:
         self.edge_repo = edge_repo
         self.audit_repo = audit_repo
         self.clock = clock
-        self.uow = uow
 
     def execute(
         self,
@@ -896,8 +857,7 @@ class ReviewNodeQuestionUseCase:
 
         # Nível inicial do nó antes da revisão
         old_levels = [
-            progress_map[qid].current_level if qid in progress_map else 0
-            for qid in all_q_list
+            progress_map[qid].current_level if qid in progress_map else 0 for qid in all_q_list
         ]
         old_node_level = StudyTreeProgressionService.calculate_node_level(old_levels)
 
@@ -932,30 +892,23 @@ class ReviewNodeQuestionUseCase:
             interval_days = SpacingPolicyService.get_interval(new_q_level)
             progress.apply_review(new_level=new_q_level, next_date=next_date, reviewed_at=now)
 
-            try:
-                self.progress_repo.save(progress)
-                if self.audit_repo is not None:
-                    audit_log = ReviewAuditLog(
-                        user_id=user_id,
-                        question_id=question_id,
-                        subject_id=None,
-                        topic_id=None,
-                        historical_subject_name=study_map.title,
-                        historical_topic_name=node.title,
-                        review_date=today,
-                        score=effective_score,
-                        level_before=old_q_level,
-                        level_after=new_q_level,
-                        evaluation_mode="MANUAL",
-                        logged_at=now,
-                    )
-                    self.audit_repo.save(audit_log)
-                if self.uow is not None:
-                    self.uow.commit()
-            except Exception:
-                if self.uow is not None:
-                    self.uow.rollback()
-                raise
+            self.progress_repo.save(progress)
+            if self.audit_repo is not None:
+                audit_log = ReviewAuditLog(
+                    user_id=user_id,
+                    question_id=question_id,
+                    subject_id=None,
+                    topic_id=None,
+                    historical_subject_name=study_map.title,
+                    historical_topic_name=node.title,
+                    review_date=today,
+                    score=effective_score,
+                    level_before=old_q_level,
+                    level_after=new_q_level,
+                    evaluation_mode="MANUAL",
+                    logged_at=now,
+                )
+                self.audit_repo.save(audit_log)
 
             # Recalcula níveis das questões do nó
             updated_levels = [
@@ -988,9 +941,7 @@ class ReviewNodeQuestionUseCase:
                                 n_prog_map = self.progress_repo.get_by_questions(user_id, n_q_ids)
                                 lvl = StudyTreeProgressionService.calculate_node_level(
                                     [
-                                        n_prog_map[qid].current_level
-                                        if qid in n_prog_map
-                                        else 0
+                                        n_prog_map[qid].current_level if qid in n_prog_map else 0
                                         for qid in n_q_ids
                                     ]
                                 )
@@ -1094,9 +1045,7 @@ class GetNodeStudyHubUseCase:
                 all_mat_ids_set.add(m.id)
         all_mat_ids = list(all_mat_ids_set)
 
-        progress_map = (
-            self.progress_repo.get_by_questions(user_id, all_q_ids) if all_q_ids else {}
-        )
+        progress_map = self.progress_repo.get_by_questions(user_id, all_q_ids) if all_q_ids else {}
         srs_levels = [
             progress_map[qid].current_level if qid in progress_map else 0 for qid in all_q_ids
         ]
@@ -1129,8 +1078,9 @@ class GetNodeStudyHubUseCase:
         due_questions_list: list[dict[str, object]] = []
         if self.question_repo is not None and all_q_ids:
             for qid in all_q_ids:
-                q = self.question_repo.get_by_id(qid)
-                if q:
+                q_obj = self.question_repo.get_by_id(qid)
+                if q_obj is not None:
+                    q = q_obj
                     prog = progress_map.get(qid)
                     cur_lvl = prog.current_level if prog else 0
                     nxt_dt = prog.next_review_date.isoformat() if prog else today.isoformat()
@@ -1152,8 +1102,9 @@ class GetNodeStudyHubUseCase:
         materials_list: list[dict[str, object]] = []
         if self.knowledge_repo is not None and all_mat_ids:
             for mid in all_mat_ids:
-                m = self.knowledge_repo.get_by_id(mid)
-                if m:
+                m_obj = self.knowledge_repo.get_by_id(mid)
+                if m_obj is not None:
+                    m = m_obj
                     materials_list.append(
                         {
                             "id": str(m.id),

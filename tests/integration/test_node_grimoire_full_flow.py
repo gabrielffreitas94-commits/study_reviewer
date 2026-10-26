@@ -98,7 +98,7 @@ def test_sample_math_tree_to_node_grimoire_end_to_end(authenticated_client: Test
 
     # Breadcrumb para o Canvas
     assert f"/study-maps/{map_id}/canvas" in html
-    assert ("Voltar à Árvore" in html or "Retornar à Árvore" in html)
+    assert "Voltar à Árvore" in html or "Retornar à Árvore" in html
 
     # Coluna Esquerda: Tomo de Sabedoria com Cormorant Garamond, editor e materiais
     assert "Tomo de Sabedoria" in html
@@ -154,7 +154,9 @@ def test_sample_math_tree_to_node_grimoire_end_to_end(authenticated_client: Test
 
 
 @pytest.mark.integration
-def test_daily_trials_and_performance_hub_render_rpg_theme(authenticated_client: TestClient) -> None:
+def test_daily_trials_and_performance_hub_render_rpg_theme(
+    authenticated_client: TestClient,
+) -> None:
     """Verifica que Provações Diárias e Crônicas renderizam com estilo RPG Grimoire."""
     # 1. Provações Diárias (/questions/study)
     study_res = authenticated_client.get("/questions/study")

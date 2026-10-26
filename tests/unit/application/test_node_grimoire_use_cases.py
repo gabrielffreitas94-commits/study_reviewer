@@ -21,6 +21,7 @@ from src.application.dto.study_tree_dto import (
     ConnectNodesDTO,
     CreateStudyMapDTO,
     CreateStudyNodeDTO,
+    UpdateStudyNodeDTO,
 )
 from src.application.use_cases.study_tree_use_cases import (
     ConnectStudyNodesUseCase,
@@ -33,10 +34,14 @@ from src.application.use_cases.study_tree_use_cases import (
     GetNodeStudyHubUseCase,
     ReviewNodeQuestionUseCase,
     UpdateNodeTheoryUseCase,
+    UpdateStudyNodeUseCase,
 )
 from src.domain.entities import User
 from src.domain.exceptions import (
+    EntityNotFoundError,
+    QuestionNotFoundError,
     ResourceOwnershipError,
+    StudyMapNotFoundError,
     StudyNodeNotFoundError,
 )
 from src.infrastructure.database import Base
@@ -61,7 +66,14 @@ def test_node_grimoire_lifecycle_theory_question_and_free_training(db_session: S
     """Valida o ciclo de vida do Nó Grimoire: teoria, pergunta inline e modo treino livre."""
     user_id = uuid4()
     user_repo = SqlAlchemyUserRepository(db_session)
-    user_repo.save(User(id=user_id, name="Mago do Conhecimento", email="mago@arcana.dev", google_sub="sub_test_grimoire"))
+    user_repo.save(
+        User(
+            id=user_id,
+            name="Mago do Conhecimento",
+            email="mago@arcana.dev",
+            google_sub="sub_test_grimoire",
+        )
+    )
 
     map_repo = SqlAlchemyStudyMapRepository(db_session)
     node_repo = SqlAlchemyStudyNodeRepository(db_session)
@@ -137,7 +149,9 @@ def test_create_and_delete_node_question(db_session: Session) -> None:
     """Verifica criação e exclusão inline de perguntas em um nó."""
     user_id = uuid4()
     user_repo = SqlAlchemyUserRepository(db_session)
-    user_repo.save(User(id=user_id, name="Alquimista", email="alquimia@arcana.dev", google_sub="sub_q_node"))
+    user_repo.save(
+        User(id=user_id, name="Alquimista", email="alquimia@arcana.dev", google_sub="sub_q_node")
+    )
 
     map_repo = SqlAlchemyStudyMapRepository(db_session)
     node_repo = SqlAlchemyStudyNodeRepository(db_session)
@@ -199,7 +213,9 @@ def test_create_and_delete_node_material(db_session: Session) -> None:
     """Verifica criação e exclusão inline de materiais (pergaminhos) em um nó."""
     user_id = uuid4()
     user_repo = SqlAlchemyUserRepository(db_session)
-    user_repo.save(User(id=user_id, name="Escriba", email="escriba@arcana.dev", google_sub="sub_mat_node"))
+    user_repo.save(
+        User(id=user_id, name="Escriba", email="escriba@arcana.dev", google_sub="sub_mat_node")
+    )
 
     map_repo = SqlAlchemyStudyMapRepository(db_session)
     node_repo = SqlAlchemyStudyNodeRepository(db_session)
@@ -261,7 +277,9 @@ def test_review_node_question_level_up_and_unlock_downstream(db_session: Session
     """Verifica progressão de Rank do nó e destrancamento de nós a jusante."""
     user_id = uuid4()
     user_repo = SqlAlchemyUserRepository(db_session)
-    user_repo.save(User(id=user_id, name="Cavaleiro", email="cavaleiro@arcana.dev", google_sub="sub_lvl_node"))
+    user_repo.save(
+        User(id=user_id, name="Cavaleiro", email="cavaleiro@arcana.dev", google_sub="sub_lvl_node")
+    )
 
     map_repo = SqlAlchemyStudyMapRepository(db_session)
     node_repo = SqlAlchemyStudyNodeRepository(db_session)
@@ -335,8 +353,12 @@ def test_update_node_theory_ownership_and_validation(db_session: Session) -> Non
     owner_id = uuid4()
     other_user_id = uuid4()
     user_repo = SqlAlchemyUserRepository(db_session)
-    user_repo.save(User(id=owner_id, name="Mestre", email="mestre@arcana.dev", google_sub="sub_mestre"))
-    user_repo.save(User(id=other_user_id, name="Intruso", email="intruso@arcana.dev", google_sub="sub_intruso"))
+    user_repo.save(
+        User(id=owner_id, name="Mestre", email="mestre@arcana.dev", google_sub="sub_mestre")
+    )
+    user_repo.save(
+        User(id=other_user_id, name="Intruso", email="intruso@arcana.dev", google_sub="sub_intruso")
+    )
 
     map_repo = SqlAlchemyStudyMapRepository(db_session)
     node_repo = SqlAlchemyStudyNodeRepository(db_session)
@@ -372,7 +394,11 @@ def test_get_node_study_hub_includes_theory_and_raw_text(db_session: Session) ->
     """Valida que GetNodeStudyHubUseCase retorna theory_content no nó e raw_text nos materiais."""
     user_id = uuid4()
     user_repo = SqlAlchemyUserRepository(db_session)
-    user_repo.save(User(id=user_id, name="Arquivista", email="arquivista@arcana.dev", google_sub="sub_hub_node"))
+    user_repo.save(
+        User(
+            id=user_id, name="Arquivista", email="arquivista@arcana.dev", google_sub="sub_hub_node"
+        )
+    )
 
     map_repo = SqlAlchemyStudyMapRepository(db_session)
     node_repo = SqlAlchemyStudyNodeRepository(db_session)
@@ -438,9 +464,194 @@ def test_get_node_study_hub_includes_theory_and_raw_text(db_session: Session) ->
         node_id=node.id,
     )
 
-    assert hub.node.theory_content == "## Origem dos Magos\nOs magos ancestrais dominaram as energias planares."
+    assert (
+        hub.node.theory_content
+        == "## Origem dos Magos\nOs magos ancestrais dominaram as energias planares."
+    )
     assert len(hub.materials) == 1
     assert hub.materials[0]["raw_text"] == "No princípio era o éter silencioso."
     assert len(hub.all_questions) == 1
     assert hub.all_questions[0]["prompt"] == "O que havia no princípio?"
     assert hub.all_questions[0]["is_due"] is True
+
+
+def test_node_use_cases_edge_cases_and_error_branches(db_session: Session) -> None:
+    """Testa todas as ramificações de erro e casos de borda dos casos de uso de nós."""
+    user_id = uuid4()
+    other_user_id = uuid4()
+    user_repo = SqlAlchemyUserRepository(db_session)
+    user_repo.save(
+        User(id=user_id, name="Test Owner", email="owner@test.com", google_sub="sub_owner")
+    )
+    user_repo.save(
+        User(id=other_user_id, name="Other User", email="other@test.com", google_sub="sub_other")
+    )
+
+    map_repo = SqlAlchemyStudyMapRepository(db_session)
+    node_repo = SqlAlchemyStudyNodeRepository(db_session)
+    q_repo = SqlAlchemyQuestionRepository(db_session)
+    source_repo = SqlAlchemyKnowledgeSourceRepository(db_session)
+    prog_repo = SqlAlchemyQuestionProgressRepository(db_session)
+    content_repo = SqlAlchemyNodeContentRepository(db_session)
+
+    study_map = CreateStudyMapUseCase(map_repo, node_repo).execute(
+        owner_id=user_id,
+        dto=CreateStudyMapDTO(title="Mapa para Teste de Bordas"),
+    )
+    node = CreateStudyNodeUseCase(map_repo, node_repo).execute(
+        map_id=study_map.id,
+        user_id=user_id,
+        dto=CreateStudyNodeDTO(title="Nó Alpha"),
+    )
+
+    fake_id = uuid4()
+
+    # 1. UpdateStudyNodeUseCase com theory_content (linha 288)
+    updated_node = UpdateStudyNodeUseCase(map_repo, node_repo).execute(
+        map_id=study_map.id,
+        node_id=node.id,
+        user_id=user_id,
+        dto=UpdateStudyNodeDTO(theory_content="Teoria via UpdateStudyNodeDTO"),
+    )
+    assert updated_node.theory_content == "Teoria via UpdateStudyNodeDTO"
+
+    # 2. UpdateNodeTheoryUseCase com mapa inexistente (linha 327)
+    with pytest.raises(StudyMapNotFoundError):
+        UpdateNodeTheoryUseCase(map_repo, node_repo).execute(
+            map_id=fake_id,
+            node_id=node.id,
+            user_id=user_id,
+            theory_content="...",
+        )
+
+    # 3. CreateNodeQuestionUseCase: mapa inexistente e nó inexistente (linhas 596, 604)
+    with pytest.raises(StudyMapNotFoundError):
+        CreateNodeQuestionUseCase(map_repo, node_repo, q_repo, prog_repo, content_repo).execute(
+            map_id=fake_id, node_id=node.id, user_id=user_id, prompt="P", expected_answer="R"
+        )
+
+    with pytest.raises(StudyNodeNotFoundError):
+        CreateNodeQuestionUseCase(map_repo, node_repo, q_repo, prog_repo, content_repo).execute(
+            map_id=study_map.id, node_id=fake_id, user_id=user_id, prompt="P", expected_answer="R"
+        )
+
+    # 4. DeleteNodeQuestionUseCase: mapa inexistente, nó inexistente, pergunta inexistente (linhas 673, 681, 685)
+    with pytest.raises(StudyMapNotFoundError):
+        DeleteNodeQuestionUseCase(map_repo, node_repo, q_repo, content_repo).execute(
+            map_id=fake_id, node_id=node.id, user_id=user_id, question_id=fake_id
+        )
+
+    with pytest.raises(StudyNodeNotFoundError):
+        DeleteNodeQuestionUseCase(map_repo, node_repo, q_repo, content_repo).execute(
+            map_id=study_map.id, node_id=fake_id, user_id=user_id, question_id=fake_id
+        )
+
+    with pytest.raises(QuestionNotFoundError):
+        DeleteNodeQuestionUseCase(map_repo, node_repo, q_repo, content_repo).execute(
+            map_id=study_map.id, node_id=node.id, user_id=user_id, question_id=fake_id
+        )
+
+    # 5. CreateNodeMaterialUseCase: mapa inexistente e nó inexistente (linhas 728, 736)
+    with pytest.raises(StudyMapNotFoundError):
+        CreateNodeMaterialUseCase(map_repo, node_repo, source_repo, content_repo).execute(
+            map_id=fake_id, node_id=node.id, user_id=user_id, title="M", raw_text="T"
+        )
+
+    with pytest.raises(StudyNodeNotFoundError):
+        CreateNodeMaterialUseCase(map_repo, node_repo, source_repo, content_repo).execute(
+            map_id=study_map.id, node_id=fake_id, user_id=user_id, title="M", raw_text="T"
+        )
+
+    # 6. DeleteNodeMaterialUseCase: mapa inexistente, nó inexistente, material inexistente (linhas 800, 808, 812)
+    with pytest.raises(StudyMapNotFoundError):
+        DeleteNodeMaterialUseCase(map_repo, node_repo, source_repo, content_repo).execute(
+            map_id=fake_id, node_id=node.id, user_id=user_id, material_id=fake_id
+        )
+
+    with pytest.raises(StudyNodeNotFoundError):
+        DeleteNodeMaterialUseCase(map_repo, node_repo, source_repo, content_repo).execute(
+            map_id=study_map.id, node_id=fake_id, user_id=user_id, material_id=fake_id
+        )
+
+    with pytest.raises(EntityNotFoundError):
+        DeleteNodeMaterialUseCase(map_repo, node_repo, source_repo, content_repo).execute(
+            map_id=study_map.id, node_id=node.id, user_id=user_id, material_id=fake_id
+        )
+
+    # Cria pergunta real para testar ReviewNodeQuestionUseCase
+    created_q = CreateNodeQuestionUseCase(
+        map_repo, node_repo, q_repo, prog_repo, content_repo
+    ).execute(
+        map_id=study_map.id, node_id=node.id, user_id=user_id, prompt="P1", expected_answer="R1"
+    )
+    q_id = created_q["id"]
+
+    # 7. ReviewNodeQuestionUseCase: erros de validação (linhas 861, 863, 867, 871)
+    rev_uc = ReviewNodeQuestionUseCase(
+        map_repo=map_repo,
+        node_repo=node_repo,
+        question_repo=q_repo,
+        progress_repo=prog_repo,
+        content_repo=content_repo,
+    )
+
+    with pytest.raises(StudyMapNotFoundError):
+        rev_uc.execute(map_id=fake_id, node_id=node.id, user_id=user_id, question_id=q_id)
+
+    with pytest.raises(ResourceOwnershipError):
+        rev_uc.execute(
+            map_id=study_map.id, node_id=node.id, user_id=other_user_id, question_id=q_id
+        )
+
+    with pytest.raises(StudyNodeNotFoundError):
+        rev_uc.execute(map_id=study_map.id, node_id=fake_id, user_id=user_id, question_id=q_id)
+
+    with pytest.raises(QuestionNotFoundError):
+        rev_uc.execute(map_id=study_map.id, node_id=node.id, user_id=user_id, question_id=fake_id)
+
+    # 8. Review com difficulty HARD e AGAIN (linhas 881-884)
+    res_hard = rev_uc.execute(
+        map_id=study_map.id,
+        node_id=node.id,
+        user_id=user_id,
+        question_id=q_id,
+        difficulty="HARD",
+    )
+    assert res_hard["is_training_only"] is False
+
+    res_again = rev_uc.execute(
+        map_id=study_map.id,
+        node_id=node.id,
+        user_id=user_id,
+        question_id=q_id,
+        difficulty="AGAIN",
+    )
+    assert res_again["is_training_only"] is False
+
+    # Cria pergunta 2 para subir de nível e acionar treino livre
+    created_q2 = CreateNodeQuestionUseCase(
+        map_repo, node_repo, q_repo, prog_repo, content_repo
+    ).execute(
+        map_id=study_map.id, node_id=node.id, user_id=user_id, prompt="P2", expected_answer="R2"
+    )
+    q2_id = created_q2["id"]
+
+    res_easy = rev_uc.execute(
+        map_id=study_map.id,
+        node_id=node.id,
+        user_id=user_id,
+        question_id=q2_id,
+        difficulty="EASY",
+    )
+    assert res_easy["is_training_only"] is False
+    assert res_easy["current_question_level"] == 1
+
+    # Segunda revisão no mesmo dia ativa o Modo Treino Livre
+    res_training = rev_uc.execute(
+        map_id=study_map.id,
+        node_id=node.id,
+        user_id=user_id,
+        question_id=q2_id,
+        difficulty="GOOD",
+    )
+    assert res_training["is_training_only"] is True

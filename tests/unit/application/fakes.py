@@ -413,6 +413,15 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
     def list_by_user(self, user_id: UUID) -> list[UserQuestionProgress]:
         return [p for (u_id, _), p in self._progress.items() if u_id == user_id]
 
+    def get_by_questions(
+        self, user_id: UUID, question_ids: list[UUID]
+    ) -> dict[UUID, UserQuestionProgress]:
+        return {
+            q_id: p
+            for (u_id, q_id), p in self._progress.items()
+            if u_id == user_id and q_id in question_ids
+        }
+
 
 class FakeReviewAuditRepository(IReviewAuditRepository):
     """Implementação em memória de IReviewAuditRepository para testes unitários."""

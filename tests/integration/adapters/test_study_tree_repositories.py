@@ -205,6 +205,7 @@ def test_node_content_attachment(db_session: Session) -> None:
     prog_repo = SqlAlchemyQuestionProgressRepository(db_session)
     assert prog_repo.get_by_questions(user.id, []) == {}
 
+
 @pytest.mark.integration
 def test_rpg_grimoire_repository_direct_bindings(db_session: Session) -> None:
     user_repo = SqlAlchemyUserRepository(db_session)
@@ -303,4 +304,3 @@ def test_rpg_grimoire_repository_direct_bindings(db_session: Session) -> None:
     node_source_ids = {s.id for s in node_sources}
     assert src_direct.id in node_source_ids
     assert src_attached.id in node_source_ids
-

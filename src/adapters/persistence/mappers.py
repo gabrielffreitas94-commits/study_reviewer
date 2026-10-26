@@ -176,8 +176,9 @@ class QuestionMapper:
     @staticmethod
     def to_domain(model: QuestionModel) -> Question:
         topic_ids = tuple(t.id for t in model.topics) if getattr(model, "topics", None) else ()
-        if not topic_ids and getattr(model, "topic_id", None):
-            topic_ids = (model.topic_id,)
+        tid = getattr(model, "topic_id", None)
+        if not topic_ids and tid is not None:
+            topic_ids = (tid,)
         node_id = getattr(model, "node_id", None)
         if not topic_ids and node_id is not None:
             topic_ids = (node_id,)
@@ -279,8 +280,9 @@ class KnowledgeSourceMapper:
     @staticmethod
     def to_domain(model: KnowledgeSourceModel) -> KnowledgeSource:
         topic_ids = tuple(t.id for t in model.topics) if getattr(model, "topics", None) else ()
-        if not topic_ids and getattr(model, "topic_id", None):
-            topic_ids = (model.topic_id,)
+        tid = getattr(model, "topic_id", None)
+        if not topic_ids and tid is not None:
+            topic_ids = (tid,)
         node_id = getattr(model, "node_id", None)
         if not topic_ids and node_id is not None:
             topic_ids = (node_id,)

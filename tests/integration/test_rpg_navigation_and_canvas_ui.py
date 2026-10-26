@@ -139,7 +139,8 @@ def test_study_canvas_js_navigation_and_icon_map() -> None:
     assert (
         "`/study-maps/${state.mapId}/nodes/${node.id}`" in content
         or "`/study-maps/${state.mapId}/nodes/${nodeId}`" in content
-        or "/study-maps/" in content and "/nodes/" in content
+        or "/study-maps/" in content
+        and "/nodes/" in content
     )
 
     # Todos os ícones obrigatórios em ICON_MAP

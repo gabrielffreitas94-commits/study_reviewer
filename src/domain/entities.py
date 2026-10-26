@@ -309,8 +309,7 @@ class Question:
         self.expected_answer = (
             self.expected_answer.strip() if self.expected_answer is not None else ""
         )
-        if not self.topic_ids and self.node_id is not None:
-            object.__setattr__(self, "topic_ids", (self.node_id,))
+        # topic_ids already defaulted to (node_id,) in __init__
 
         if not self.topic_ids or len(self.topic_ids) < 1:
             raise DomainValidationError("Pergunta deve estar associada a pelo menos 1 tema.")
@@ -468,8 +467,7 @@ class KnowledgeSource:
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        if not self.topic_ids and self.node_id is not None:
-            object.__setattr__(self, "topic_ids", (self.node_id,))
+        # topic_ids already defaulted to (node_id,) in __init__
 
         if len(self.title) < 2 or len(self.title) > 200:
             raise DomainValidationError("Título do material deve ter entre 2 e 200 caracteres.")

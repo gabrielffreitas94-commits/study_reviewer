@@ -2,13 +2,6 @@
 
 from uuid import UUID, uuid4
 
-from src.application.ports.repositories import (
-    IFlashcardRepository,
-    IKnowledgeSourceRepository,
-    IQuestionRepository,
-    ISubjectRepository,
-    ITopicRepository,
-)
 from src.application.use_cases.sample_study_map_use_case import (
     CreateSampleMathStudyMapUseCase,
 )
@@ -21,7 +14,7 @@ from tests.unit.application.test_study_tree_use_cases import (
 )
 
 
-class FakeSubjectRepo(ISubjectRepository):
+class FakeSubjectRepo:
     def __init__(self) -> None:
         self.subjects: dict[UUID, Subject] = {}
 
@@ -48,7 +41,7 @@ class FakeSubjectRepo(ISubjectRepository):
         return subject
 
 
-class FakeTopicRepo(ITopicRepository):
+class FakeTopicRepo:
     def __init__(self) -> None:
         self.topics: dict[UUID, Topic] = {}
 
@@ -66,7 +59,7 @@ class FakeTopicRepo(ITopicRepository):
         return topic
 
 
-class FakeSourceRepository(IKnowledgeSourceRepository):
+class FakeSourceRepository:
     def __init__(self) -> None:
         self.sources: dict[UUID, KnowledgeSource] = {}
 
@@ -90,7 +83,7 @@ class FakeSourceRepository(IKnowledgeSourceRepository):
         self.sources.pop(source_id, None)
 
 
-class FakeQuestionRepo(IQuestionRepository):
+class FakeQuestionRepo:
     def __init__(self) -> None:
         self.questions: dict[UUID, Question] = {}
 
@@ -122,7 +115,7 @@ class FakeQuestionRepo(IQuestionRepository):
         self.questions.pop(question_id, None)
 
 
-class FakeFlashcardRepo(IFlashcardRepository):
+class FakeFlashcardRepo:
     def __init__(self) -> None:
         self.flashcards: dict[UUID, Flashcard] = {}
 
@@ -165,11 +158,11 @@ def test_create_sample_math_study_map_use_case() -> None:
         node_repo=node_repo,
         edge_repo=edge_repo,
         content_repo=content_repo,
-        source_repo=source_repo,
-        question_repo=question_repo,
-        flashcard_repo=flashcard_repo,
-        subject_repo=subject_repo,
-        topic_repo=topic_repo,
+        source_repo=source_repo,  # type: ignore[arg-type]
+        question_repo=question_repo,  # type: ignore[arg-type]
+        flashcard_repo=flashcard_repo,  # type: ignore[arg-type]
+        subject_repo=subject_repo,  # type: ignore[arg-type]
+        topic_repo=topic_repo,  # type: ignore[arg-type]
     )
 
     user_id = uuid4()

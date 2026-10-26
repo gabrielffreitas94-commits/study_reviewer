@@ -356,3 +356,121 @@ def test_node_grimoire_anti_idor_and_security(
     fake_map_id = uuid4()
     not_found_map = authenticated_client.get(f"/study-maps/{fake_map_id}/nodes/{fake_node_id}")
     assert not_found_map.status_code == 404
+
+
+@pytest.mark.integration
+def test_node_grimoire_web_route_with_empty_node(
+    authenticated_client: TestClient,
+) -> None:
+    """Garante que um mapa com nó sem perguntas calcula lvl = 0 corretamente (linha 191)."""
+    map_res = authenticated_client.post(
+        "/api/v1/study-maps",
+        json={"title": "Árvore de Teste Vazia", "description": "Nó sem perguntas"},
+    )
+    map_id = map_res.json()["id"]
+
+    node1 = authenticated_client.post(
+        f"/api/v1/study-maps/{map_id}/nodes",
+        json={"title": "Nó 1", "icon": "scroll"},
+    ).json()
+
+    # Cria segundo nó sem perguntas no mesmo mapa
+    authenticated_client.post(
+        f"/api/v1/study-maps/{map_id}/nodes",
+        json={"title": "Nó 2 (Sem Provações)", "icon": "shield"},
+    ).json()
+
+    # Adiciona pergunta apenas ao nó 1
+    authenticated_client.post(
+        f"/api/v1/study-maps/{map_id}/nodes/{node1['id']}/questions",
+        json={"prompt": "Questão 1", "expected_answer": "Resp 1"},
+    )
+
+    # Acessa a página web do nó 1 (irá iterar sobre all_map_nodes incluindo o nó 2 que tem 0 perguntas)
+    res = authenticated_client.get(f"/study-maps/{map_id}/nodes/{node1['id']}")
+    assert res.status_code == 200
+    assert "Nó 1" in res.text
+
+
+@pytest.mark.integration
+def test_node_grimoire_api_error_branches(
+    authenticated_client: TestClient,
+    test_user: User,
+    other_user: User,
+) -> None:
+    """Cobre as ramificações de erro (404, 422, 403) nos controllers da API de Nós."""
+    map_res = authenticated_client.post(
+        "/api/v1/study-maps",
+        json={"title": "Códice de Erros", "description": "Validação de erros"},
+    )
+    map_id = map_res.json()["id"]
+    node_res = authenticated_client.post(
+        f"/api/v1/study-maps/{map_id}/nodes",
+        json={"title": "Nó Base", "icon": "code"},
+    )
+    node_id = node_res.json()["id"]
+
+    q_res = authenticated_client.post(
+        f"/api/v1/study-maps/{map_id}/nodes/{node_id}/questions",
+        json={"prompt": "Questão Teste", "expected_answer": "Resp"},
+    )
+    q_id = q_res.json()["id"]
+
+    fake_id = uuid4()
+
+    # 1. PATCH theory com mapa inexistente -> 404
+    res = authenticated_client.patch(
+        f"/api/v1/study-maps/{fake_id}/nodes/{node_id}/theory",
+        json={"theory_content": "Novo texto"},
+    )
+    assert res.status_code == 404
+
+    # 2. POST question sem prompt -> 422 (controller logic)
+    res = authenticated_client.post(
+        f"/api/v1/study-maps/{map_id}/nodes/{node_id}/questions",
+        json={"prompt": "   ", "statement": "", "expected_answer": "Gabarito"},
+    )
+    assert res.status_code == 422
+    assert "obrigatório" in res.text
+
+    # 3. POST question com mapa inexistente -> 404
+    res = authenticated_client.post(
+        f"/api/v1/study-maps/{fake_id}/nodes/{fake_id}/questions",
+        json={"prompt": "Questão Válida", "expected_answer": "Resp"},
+    )
+    assert res.status_code == 404
+
+    # 4. DELETE question inexistente -> 404
+    res = authenticated_client.delete(
+        f"/api/v1/study-maps/{map_id}/nodes/{node_id}/questions/{fake_id}"
+    )
+    assert res.status_code == 404
+
+    # 5. POST review com mapa ou pergunta inexistente -> 404
+    res = authenticated_client.post(
+        f"/api/v1/study-maps/{fake_id}/nodes/{node_id}/questions/{fake_id}/review",
+        json={"score": 100},
+    )
+    assert res.status_code == 404
+
+    # 6. POST review com usuário invasor em mapa privado -> 403
+    app.dependency_overrides[get_current_user] = lambda: other_user
+    res = authenticated_client.post(
+        f"/api/v1/study-maps/{map_id}/nodes/{node_id}/questions/{q_id}/review",
+        json={"score": 100},
+    )
+    assert res.status_code == 403
+    app.dependency_overrides[get_current_user] = lambda: test_user
+
+    # 7. POST material com mapa inexistente -> 404
+    res = authenticated_client.post(
+        f"/api/v1/study-maps/{fake_id}/nodes/{node_id}/materials",
+        json={"title": "Livro", "raw_text": "Texto"},
+    )
+    assert res.status_code == 404
+
+    # 8. DELETE material inexistente -> 404
+    res = authenticated_client.delete(
+        f"/api/v1/study-maps/{map_id}/nodes/{node_id}/materials/{fake_id}"
+    )
+    assert res.status_code == 404
