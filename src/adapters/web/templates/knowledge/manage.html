@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+
+{% block title %}Bases de Conhecimento (RAG) — Study Reviewer{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto w-full py-4 space-y-8">
+    <!-- Breadcrumb e Cabeçalho -->
+    <div>
+        <nav class="flex text-xs text-slate-500 dark:text-slate-400 space-x-2 mb-2" aria-label="Breadcrumb">
+            <a href="/cadastros" class="hover:text-indigo-600 dark:hover:text-indigo-400">Cadastros</a>
+            <span>/</span>
+            <span class="text-slate-800 dark:text-slate-200 font-semibold">Bases de Conhecimento (RAG)</span>
+        </nav>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 dark:text-white flex items-center space-x-2.5">
+                    <span aria-hidden="true">📚</span>
+                    <span>Bases de Conhecimento (RAG)</span>
+                </h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Cadastre materiais didáticos colando texto ou enviando PDFs/DOCX e vincule-os a múltiplos temas para fundamentar a avaliação por IA.
+                </p>
+            </div>
+            <a href="/questions/manage" class="inline-flex items-center px-4 py-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm shrink-0 self-start sm:self-auto min-h-[44px]">
+                <span>Ir para Estúdio de Perguntas</span>
+                <span class="ml-1.5" aria-hidden="true">➔</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Feedbacks de Sucesso e Erro -->
+    {% if error %}
+    <div class="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-800 dark:text-rose-300 text-sm flex items-center space-x-2" role="alert">
+        <span class="text-lg" aria-hidden="true">⚠️</span>
+        <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    {% if success %}
+    <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm flex items-center space-x-2" role="alert">
+        <span class="text-lg" aria-hidden="true">✅</span>
+        <span>{{ success }}</span>
+    </div>
+    {% endif %}
+
+    {% if not subjects %}
+    <!-- Empty State: Nenhuma Matéria Cadastrada -->
+    <div class="bg-white dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 sm:p-12 text-center max-w-lg mx-auto">
+        <div class="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold" aria-hidden="true">
+            📂
+        </div>
+        <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-2">
+            Nenhuma Matéria ou Tema Cadastrado
+        </h2>
+        <p class="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+            Para cadastrar materiais didáticos e fontes de conhecimento, você precisa primeiro criar matérias e temas para vinculá-los.
+        </p>
+        <a href="/subjects" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm min-h-[44px]">
+            <span>Criar Temas e Matérias</span>
+            <span class="ml-1.5" aria-hidden="true">➔</span>
+        </a>
+    </div>
+    {% else %}
+
+    <!-- Card de Cadastro de Nova Base de Conhecimento -->
+    <div class="bg-white dark:bg-slate-800 p-6 sm:p-7 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+            <span aria-hidden="true">➕</span>
+            <span>Cadastrar Novo Material Didático</span>
+        </h2>
+
+        <form id="knowledge-form" method="POST" action="/knowledge/manage" enctype="multipart/form-data" class="space-y-6">
+            <!-- Título do Material -->
+            <div>
+                <label for="source_title" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
+                    Título / Identificação do Material <span class="text-rose-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    id="source_title"
+                    name="title"
+                    required
+                    minlength="2"
+                    maxlength="200"
+                    placeholder="Ex: Teoria Geral do Crime - Doutrina Rogério Sanches"
+                    class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+            </div>
+
+            <!-- Tabs de Modo de Entrada: Texto vs Upload de Arquivo -->
+            <div>
+                <div class="flex border-b border-slate-200 dark:border-slate-700 space-x-4 mb-4">
+                    <button
+                        type="button"
+                        id="tab-btn-text"
+                        onclick="switchIngestMode('TEXT')"
+                        class="pb-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400 focus:outline-none flex items-center space-x-2"
+                    >
+                        <span>📝 Colar Texto</span>
+                    </button>
+                    <button
+                        type="button"
+                        id="tab-btn-file"
+                        onclick="switchIngestMode('FILE')"
+                        class="pb-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 border-b-2 border-transparent hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none flex items-center space-x-2"
+                    >
+                        <span>📄 Upload de Arquivo (PDF, DOCX, TXT, MD)</span>
+                    </button>
+                </div>
+
+                <!-- Painel: Colar Texto -->
+                <div id="panel-text-mode" class="space-y-2">
+                    <label for="content_text" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                        Conteúdo do Material Didático (mínimo 20 caracteres)
+                    </label>
+                    <textarea
+                        id="content_text"
+                        name="content_text"
+                        rows="7"
+                        placeholder="Cole aqui transcrições de aulas, resumos, leis comentadas, doutrinas ou anotações..."
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs sm:text-sm"
+                    ></textarea>
+                </div>
+
+                <!-- Painel: Upload de Arquivo -->
+                <div id="panel-file-mode" class="hidden space-y-3">
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                        Selecione ou arraste seu documento
+                    </label>
+                    <div
+                        id="drop-zone"
+                        class="border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-2xl p-6 text-center transition-colors cursor-pointer bg-slate-50/50 dark:bg-slate-900/50"
+                        onclick="document.getElementById('document_file').click()"
+                    >
+                        <div class="text-3xl mb-2" aria-hidden="true">📤</div>
+                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Clique para selecionar ou arraste o arquivo aqui
+                        </p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Formatos suportados: <strong>.pdf, .docx, .txt, .md</strong> (máximo 15 MB)
+                        </p>
+                        <input
+                            type="file"
+                            id="document_file"
+                            name="document_file"
+                            accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+                            class="hidden"
+                            onchange="handleFileSelected(this)"
+                        >
+                    </div>
+
+                    <!-- Card de Preview do Arquivo -->
+                    <div id="file-preview-card" class="hidden p-4 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs space-y-2">
+                        <div class="flex items-center justify-between font-semibold text-indigo-900 dark:text-indigo-200">
+                            <span id="preview-file-name">arquivo.pdf</span>
+                            <span id="preview-file-size" class="text-slate-500 dark:text-slate-400">0 KB</span>
+                        </div>
+                        <div id="preview-status" class="text-indigo-700 dark:text-indigo-300">
+                            Extraindo texto para pré-visualização...
+                        </div>
+                        <div id="preview-content-box" class="hidden max-h-32 overflow-y-auto p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-indigo-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-pre-wrap"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vínculo Many-to-Many: Seleção de Temas -->
+            <div class="border-t border-slate-200 dark:border-slate-700 pt-5 space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                            Vincular aos Temas (Relação N:N) <span class="text-rose-500">*</span>
+                        </label>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            Selecione um ou múltiplos temas aos quais este material deve servir de embasamento.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onclick="toggleAllTopics()"
+                        class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline self-start sm:self-auto"
+                    >
+                        Alternar Todos
+                    </button>
+                </div>
+
+                <!-- Grupos de Temas por Matéria -->
+                <div class="space-y-4 max-h-64 overflow-y-auto pr-1">
+                    {% for sub in subjects %}
+                    {% set s_topics = topics_by_subject.get(sub.id|string, []) %}
+                    {% if s_topics %}
+                    <div class="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
+                                <span>📁</span>
+                                <span>{{ sub.name }}</span>
+                            </span>
+                            <button
+                                type="button"
+                                onclick="toggleSubjectTopics('{{ sub.id }}')"
+                                class="text-[11px] text-slate-500 dark:text-slate-400 hover:text-indigo-600"
+                            >
+                                Marcar Matéria
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                            {% for top in s_topics %}
+                            <label class="flex items-center space-x-2 text-xs text-slate-700 dark:text-slate-300 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    name="topic_ids"
+                                    value="{{ top.id }}"
+                                    data-subject-id="{{ sub.id }}"
+                                    class="topic-checkbox w-4 h-4 text-indigo-600 rounded border-slate-300 dark:border-slate-700 focus:ring-indigo-500"
+                                >
+                                <span class="truncate" title="{{ top.name }}">🏷️ {{ top.name }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Botão de Submissão -->
+            <div class="flex justify-end pt-2">
+                <button
+                    type="submit"
+                    id="submit-source-btn"
+                    class="min-h-[44px] px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition shadow text-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                    <span>Salvar e Vetorizar Material (RAG)</span>
+                    <span aria-hidden="true">➔</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Lista de Materiais Cadastrados -->
+    <div class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white flex items-center space-x-2">
+                <span>Materiais Didáticos Cadastrados</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold" id="sources-count-badge">
+                    {{ sources | length }}
+                </span>
+            </h2>
+
+            {% if sources %}
+            <div class="relative w-full sm:w-64">
+                <input
+                    type="search"
+                    id="search-sources-input"
+                    oninput="filterSources(this.value)"
+                    placeholder="Filtrar materiais didáticos..."
+                    class="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    aria-label="Filtrar materiais didáticos"
+                >
+            </div>
+            {% endif %}
+        </div>
+
+        {% if sources %}
+        <div class="space-y-3" id="sources-list">
+            {% for src in sources %}
+            <div id="source-item-{{ src.id }}" class="source-entry bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div class="space-y-2 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-sm font-bold text-slate-900 dark:text-slate-100 source-title-text">
+                            {{ src.title }}
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold uppercase tracking-wider">
+                            {{ src.content_type }}
+                        </span>
+                        <span class="text-[11px] text-slate-400">
+                            {{ src.created_at.strftime('%d/%m/%Y') }}
+                        </span>
+                    </div>
+
+                    <!-- Metadados de Chunks e Caracteres -->
+                    <div class="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+                        <span>🧩 <strong>{{ src.total_chunks }}</strong> fragmentos (vetores)</span>
+                        <span>📏 <strong>{{ src.char_count }}</strong> caracteres</span>
+                    </div>
+
+                    <!-- Temas Associados (Badges) -->
+                    <div class="flex flex-wrap gap-1.5 pt-1">
+                        {% if src.topic_ids %}
+                            {% for tid in src.topic_ids %}
+                            <span class="inline-flex items-center text-[11px] px-2.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                                🏷️ Tema #{{ tid|string|truncate(8, True, '') }}
+                            </span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-xs text-amber-600 dark:text-amber-400 italic">Nenhum tema vinculado</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2 self-end md:self-start">
+                    <!-- Formulário de Exclusão -->
+                    <form method="POST" action="/knowledge/manage/{{ src.id }}/delete" onsubmit="return confirm('Deseja realmente excluir este material didático e todos os seus fragmentos vetoriais?');">
+                        <button
+                            type="submit"
+                            class="p-2 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer flex items-center space-x-1"
+                            title="Excluir Material"
+                        >
+                            <span>🗑️ Excluir</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-sm text-slate-500 dark:text-slate-400">
+            Nenhuma base de conhecimento cadastrada ainda. Utilize o formulário acima para colar um texto ou enviar um arquivo didático.
+        </div>
+        {% endif %}
+    </div>
+
+    {% endif %}
+</div>
+
+<script>
+    let activeMode = 'TEXT';
+
+    function switchIngestMode(mode) {
+        activeMode = mode;
+        const textBtn = document.getElementById('tab-btn-text');
+        const fileBtn = document.getElementById('tab-btn-file');
+        const textPanel = document.getElementById('panel-text-mode');
+        const filePanel = document.getElementById('panel-file-mode');
+
+        if (mode === 'TEXT') {
+            textBtn.className = 'pb-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400 focus:outline-none flex items-center space-x-2';
+            fileBtn.className = 'pb-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 border-b-2 border-transparent hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none flex items-center space-x-2';
+            textPanel.classList.remove('hidden');
+            filePanel.classList.add('hidden');
+        } else {
+            fileBtn.className = 'pb-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400 focus:outline-none flex items-center space-x-2';
+            textBtn.className = 'pb-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 border-b-2 border-transparent hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none flex items-center space-x-2';
+            filePanel.classList.remove('hidden');
+            textPanel.classList.add('hidden');
+        }
+    }
+
+    async function handleFileSelected(input) {
+        if (!input.files || input.files.length === 0) return;
+        const file = input.files[0];
+
+        const card = document.getElementById('file-preview-card');
+        const nameEl = document.getElementById('preview-file-name');
+        const sizeEl = document.getElementById('preview-file-size');
+        const statusEl = document.getElementById('preview-status');
+        const contentBox = document.getElementById('preview-content-box');
+
+        card.classList.remove('hidden');
+        nameEl.textContent = file.name;
+        sizeEl.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+        statusEl.textContent = 'Enviando para validação e extração textual preliminar...';
+        contentBox.classList.add('hidden');
+
+        // Se o título estiver vazio, preenche automaticamente com o nome do arquivo sem extensão
+        const titleInput = document.getElementById('source_title');
+        if (titleInput && !titleInput.value.trim()) {
+            titleInput.value = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await fetch('/api/v1/knowledge/extract-file', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                statusEl.textContent = `❌ Falha ao extrair texto: ${errData.detail || 'Formato inválido ou corrompido'}`;
+                return;
+            }
+
+            const data = await response.json();
+            statusEl.textContent = `✅ Texto extraído com sucesso: ${data.char_count} caracteres, ~${data.chunk_estimate} fragmentos estimados.`;
+            contentBox.textContent = data.text_preview;
+            contentBox.classList.remove('hidden');
+        } catch (err) {
+            statusEl.textContent = `⚠️ Não foi possível gerar preview: ${err.message}`;
+        }
+    }
+
+    // Drag and drop handlers
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-indigo-500', 'bg-indigo-50/50');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-indigo-500', 'bg-indigo-50/50');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                const fileInput = document.getElementById('document_file');
+                fileInput.files = dt.files;
+                handleFileSelected(fileInput);
+            }
+        });
+    }
+
+    function toggleAllTopics() {
+        const checkboxes = document.querySelectorAll('.topic-checkbox');
+        const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
+        checkboxes.forEach(cb => cb.checked = anyUnchecked);
+    }
+
+    function toggleSubjectTopics(subjectId) {
+        const checkboxes = document.querySelectorAll(`.topic-checkbox[data-subject-id="${subjectId}"]`);
+        const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
+        checkboxes.forEach(cb => cb.checked = anyUnchecked);
+    }
+
+    function filterSources(term) {
+        const cleanTerm = term.trim().toLowerCase();
+        const entries = document.querySelectorAll('.source-entry');
+        entries.forEach(entry => {
+            const title = entry.querySelector('.source-title-text')?.textContent?.toLowerCase() || '';
+            if (title.includes(cleanTerm)) {
+                entry.classList.remove('hidden');
+            } else {
+                entry.classList.add('hidden');
+            }
+        });
+    }
+
+    // Validação ao submeter
+    document.getElementById('knowledge-form')?.addEventListener('submit', function(e) {
+        const checkboxes = document.querySelectorAll('.topic-checkbox:checked');
+        if (checkboxes.length === 0) {
+            e.preventDefault();
+            alert('Por favor, selecione ao menos 1 tema para vincular este material didático.');
+            return false;
+        }
+
+        if (activeMode === 'TEXT') {
+            const textVal = document.getElementById('content_text').value.trim();
+            if (textVal.length < 20) {
+                e.preventDefault();
+                alert('O conteúdo de texto precisa ter no mínimo 20 caracteres.');
+                return false;
+            }
+        } else {
+            const fileInput = document.getElementById('document_file');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                e.preventDefault();
+                alert('Por favor, selecione um arquivo (.pdf, .docx, .txt, .md) para upload.');
+                return false;
+            }
+        }
+    });
+</script>
+{% endblock %}

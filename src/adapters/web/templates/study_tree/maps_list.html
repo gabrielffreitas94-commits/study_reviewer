@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Códice de Habilidades — Study Reviewer{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header do Códice de Habilidades com Atmosfera RPG -->
+    <div class="sm:flex sm:items-center sm:justify-between border-b border-[#785a28]/60 pb-6 mb-8">
+        <div>
+            <div class="flex items-center space-x-3">
+                <span class="text-3xl" aria-hidden="true">🗺️</span>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-[#f0c869] font-cinzel tracking-wider">
+                    Códice de Habilidades & Árvores Ancestrais
+                </h1>
+            </div>
+            <p class="mt-2 text-sm text-[#a39276] font-tome text-base">
+                Explore seus grafos de maestria em estilo RPG. Forje nós, desbloqueie medalhões e progrida com o motor SRS.
+            </p>
+        </div>
+        <div class="mt-4 sm:mt-0 flex items-center space-x-3">
+            <button
+                type="button"
+                id="btn-sample-math"
+                onclick="createSampleMathMap()"
+                class="rpg-btn-bronze text-xs border-[#10b981]/50 text-[#10b981] hover:text-[#34d399] hover:border-[#10b981]"
+                title="Gera uma árvore didática de Matemática Aplicada com nós, teoria, perguntas e pré-requisitos"
+            >
+                <span class="mr-1.5" aria-hidden="true">📐</span>
+                <span>Invocar Árvore Modelo (Matemática Aplicada)</span>
+            </button>
+            <button
+                type="button"
+                onclick="document.getElementById('new-map-modal').classList.remove('hidden')"
+                class="rpg-btn-gold text-xs sm:text-sm"
+            >
+                <span class="mr-2 text-base" aria-hidden="true">✨</span>
+                <span>Forjar Nova Árvore</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Lista de Mapas (Cards em Grid) -->
+    {% if maps %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for m in maps %}
+        <div class="rpg-panel p-6 flex flex-col justify-between hover:border-[#c89b3c] transition-all duration-300">
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <span class="px-2.5 py-1 text-xs font-bold font-cinzel rounded-lg bg-[#251c14] text-[#f0c869] border border-[#785a28]">
+                        {{ m.nodes_count }} nós
+                    </span>
+                    <span class="text-xs text-[#a39276] font-mono">
+                        {{ m.created_at }}
+                    </span>
+                </div>
+                <h2 class="text-lg font-bold text-[#f5ebd6] font-cinzel hover:text-[#f0c869] transition-colors">
+                    {{ m.title }}
+                </h2>
+                <p class="mt-2 text-sm text-[#a39276] font-tome text-base line-clamp-3">
+                    {{ m.description or 'Sem descrição registrada no tomo.' }}
+                </p>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-[#785a28]/40 flex items-center justify-between">
+                <a
+                    href="/study-maps/{{ m.id }}/canvas"
+                    class="rpg-btn-gold text-xs px-3.5 py-1.5"
+                >
+                    <span>⚔️ Abrir Forja</span>
+                    <svg class="ml-1.5 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                    </svg>
+                </a>
+                <button
+                    type="button"
+                    onclick="deleteMap('{{ m.id }}', '{{ m.title }}')"
+                    class="text-xs text-[#a39276] hover:text-[#e11d48] p-1 font-cinzel transition-colors"
+                    title="Excluir Árvore"
+                >
+                    Excluir
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- Estado Inicial / Empty State do Grimório -->
+    <div class="rpg-panel text-center py-16 px-4">
+        <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[#251c14] border border-[#785a28] flex items-center justify-center text-4xl shadow-inner">
+            🔮
+        </div>
+        <h3 class="text-xl font-bold text-[#f0c869] font-cinzel">Nenhum Tomo Forjado Ainda</h3>
+        <p class="mt-2 text-sm text-[#a39276] font-tome text-base max-w-md mx-auto">
+            Comece forjando sua primeira Árvore de Habilidades ou invoque a Árvore Modelo de Matemática Aplicada para dominar provações com repetição espaçada.
+        </p>
+        <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+                type="button"
+                onclick="createSampleMathMap()"
+                class="rpg-btn-gold text-sm"
+            >
+                <span class="mr-2" aria-hidden="true">📐</span>
+                <span>Invocar Árvore Modelo (Matemática Aplicada)</span>
+            </button>
+            <button
+                type="button"
+                onclick="document.getElementById('new-map-modal').classList.remove('hidden')"
+                class="rpg-btn-bronze text-sm"
+            >
+                <span class="mr-2" aria-hidden="true">✨</span>
+                <span>Forjar em Branco</span>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Forjar Nova Árvore -->
+<div id="new-map-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="document.getElementById('new-map-modal').classList.add('hidden')"></div>
+    <div class="min-h-full flex items-center justify-center p-4">
+        <div class="relative rpg-panel p-6 sm:p-8 max-w-lg w-full bg-[#14100d] border border-[#785a28] shadow-2xl">
+            <div class="flex items-center justify-between pb-4 border-b border-[#785a28]/50">
+                <div class="flex items-center space-x-2.5">
+                    <span class="text-2xl">⚡</span>
+                    <h2 class="text-lg font-bold text-[#f0c869] font-cinzel">Forjar Nova Árvore de Habilidades</h2>
+                </div>
+                <button
+                    type="button"
+                    onclick="document.getElementById('new-map-modal').classList.add('hidden')"
+                    class="text-[#a39276] hover:text-[#f0c869]"
+                >
+                    ✕
+                </button>
+            </div>
+            <form onsubmit="handleCreateMap(event)" class="mt-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">
+                        Título da Árvore / Maestria
+                    </label>
+                    <input
+                        type="text"
+                        id="new-map-title"
+                        required
+                        maxlength="200"
+                        placeholder="Ex: Arquitetura de Software II"
+                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm"
+                    />
+                </div>
+                <div>
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">
+                        Descrição / Objetivo Ancestral (Opcional)
+                    </label>
+                    <textarea
+                        id="new-map-description"
+                        rows="3"
+                        maxlength="2000"
+                        placeholder="Ex: Trilha completa de Clean Architecture, Ports & Adapters e Design Patterns"
+                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm font-tome text-base"
+                    ></textarea>
+                </div>
+                <div class="flex items-center pt-2">
+                    <input
+                        type="checkbox"
+                        id="new-map-public"
+                        class="h-4 w-4 rounded border-[#785a28] text-[#c89b3c] focus:ring-[#f0c869] bg-[#0c0908]"
+                    />
+                    <label for="new-map-public" class="ml-2 text-sm text-[#a39276] font-tome text-base">
+                        Tornar esta árvore pública (outros aventureiros poderão explorar)
+                    </label>
+                </div>
+                <div class="flex justify-end space-x-3 pt-6 border-t border-[#785a28]/50">
+                    <button
+                        type="button"
+                        onclick="document.getElementById('new-map-modal').classList.add('hidden')"
+                        class="px-4 py-2 text-sm font-semibold font-cinzel text-[#a39276] hover:text-[#f5ebd6] rounded-xl transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="submit"
+                        id="submit-create-map-btn"
+                        class="rpg-btn-gold text-sm px-5 py-2"
+                    >
+                        ✨ Forjar Árvore
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+async function handleCreateMap(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submit-create-map-btn');
+    btn.disabled = true;
+    btn.textContent = 'Forjando...';
+
+    const title = document.getElementById('new-map-title').value.trim();
+    const description = document.getElementById('new-map-description').value.trim();
+    const isPublic = document.getElementById('new-map-public').checked;
+
+    try {
+        const res = await fetch('/api/v1/study-maps', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, description, is_public: isPublic })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            window.location.href = `/study-maps/${data.id}/canvas`;
+        } else {
+            const err = await res.json();
+            alert('Erro ao forjar árvore: ' + (err.detail || 'Falha inesperada'));
+        }
+    } catch (err) {
+        alert('Erro de conexão: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ Forjar Árvore';
+    }
+}
+
+async function createSampleMathMap() {
+    const btn = document.getElementById('btn-sample-math');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳ Invocando árvore...</span>';
+    }
+    try {
+        const res = await fetch('/api/v1/study-maps/sample-math', { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json();
+            alert('Erro ao invocar árvore modelo: ' + (err.detail || 'Falha na requisição'));
+            return;
+        }
+        const data = await res.json();
+        window.location.href = `/study-maps/${data.id}/canvas`;
+    } catch (e) {
+        alert('Erro de conexão ao invocar árvore modelo.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="mr-1.5" aria-hidden="true">📐</span><span>Invocar Árvore Modelo (Matemática Aplicada)</span>';
+        }
+    }
+}
+
+async function deleteMap(mapId, title) {
+    if (!confirm(`Deseja realmente dissipar a árvore ancestral "${title}" e todos os seus nós?`)) return;
+
+    try {
+        const res = await fetch(`/api/v1/study-maps/${mapId}`, { method: 'DELETE' });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            alert('Falha ao excluir a árvore.');
+        }
+    } catch (err) {
+        alert('Erro de rede: ' + err.message);
+    }
+}
+</script>
+{% endblock %}

@@ -14,6 +14,7 @@ from src.domain.exceptions import (
     InvalidExpectedAnswerError,
     InvalidGoogleSubError,
     InvalidPromptError,
+    SelfReferencingEdgeError,
 )
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
@@ -245,23 +246,94 @@ class FlashcardPoolSession:
 
 @dataclass(slots=True)
 class Question:
-    """Entidade que representa uma Pergunta Aberta pertencente a um Tema."""
+    """Entidade que representa uma Pergunta Aberta pertencente a um ou mais Temas (N:N)."""
 
-    topic_id: UUID
-    prompt: str
-    expected_answer: str
+    prompt: str = ""
+    expected_answer: str = ""
+    topic_ids: tuple[UUID, ...] = field(default_factory=tuple)
+    node_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: date = field(default_factory=date.today)
+
+    def __init__(
+        self,
+        prompt_or_topic_id: str | UUID = "",
+        expected_answer_or_prompt: str = "",
+        topic_ids: tuple[UUID, ...] | list[UUID] | None = None,
+        id: UUID | None = None,
+        created_at: date | None = None,
+        topic_id: UUID | None = None,
+        prompt: str | None = None,
+        expected_answer: str | None = None,
+        node_id: UUID | None = None,
+    ) -> None:
+        actual_prompt: str = ""
+        actual_answer: str = ""
+        actual_topic_id: UUID | None = topic_id
+
+        if isinstance(prompt_or_topic_id, UUID):
+            actual_topic_id = prompt_or_topic_id
+            actual_prompt = expected_answer_or_prompt
+            if isinstance(topic_ids, str):
+                actual_answer = topic_ids
+                topic_ids = None
+            elif expected_answer is not None:
+                actual_answer = expected_answer
+        else:
+            actual_prompt = prompt if prompt is not None else str(prompt_or_topic_id)
+            actual_answer = (
+                expected_answer if expected_answer is not None else str(expected_answer_or_prompt)
+            )
+
+        self.prompt = actual_prompt.strip() if actual_prompt is not None else ""
+        self.expected_answer = actual_answer.strip() if actual_answer is not None else ""
+        self.id = id if id is not None else uuid4()
+        self.created_at = created_at if created_at is not None else date.today()
+        self.node_id = node_id
+
+        resolved_topics: tuple[UUID, ...]
+        if topic_ids is not None:
+            resolved_topics = tuple(topic_ids)
+        elif actual_topic_id is not None:
+            resolved_topics = (actual_topic_id,)
+        elif node_id is not None:
+            resolved_topics = (node_id,)
+        else:
+            resolved_topics = ()
+
+        self.topic_ids = resolved_topics
+        self.__post_init__()
 
     def __post_init__(self) -> None:
         self.prompt = self.prompt.strip() if self.prompt is not None else ""
         self.expected_answer = (
             self.expected_answer.strip() if self.expected_answer is not None else ""
         )
+        # topic_ids already defaulted to (node_id,) in __init__
+
+        if not self.topic_ids or len(self.topic_ids) < 1:
+            raise DomainValidationError("Pergunta deve estar associada a pelo menos 1 tema.")
+
+        if len(self.topic_ids) > 5:
+            raise DomainValidationError("Pergunta pode estar associada a no máximo 5 temas.")
+
+        if len(set(self.topic_ids)) != len(self.topic_ids):
+            raise DomainValidationError("Pergunta não pode conter temas duplicados.")
+
         if not self.prompt or len(self.prompt) > 10_000:
             raise InvalidPromptError("Enunciado deve ter entre 1 e 10.000 caracteres.")
         if not self.expected_answer or len(self.expected_answer) > 10_000:
             raise InvalidExpectedAnswerError("Gabarito deve ter entre 1 e 10.000 caracteres.")
+
+    @property
+    def primary_topic_id(self) -> UUID:
+        """Retorna o tema principal (primeiro) da pergunta."""
+        return self.topic_ids[0]
+
+    @property
+    def topic_id(self) -> UUID:
+        """Propriedade de compatibilidade retornando o primeiro tema associado."""
+        return self.topic_ids[0]
 
 
 @dataclass(slots=True)
@@ -339,24 +411,81 @@ class ReviewAuditLog:
 
 @dataclass(slots=True)
 class KnowledgeSource:
-    """Entidade que representa um material/fonte de conhecimento associado a um Tema."""
+    """Entidade que representa um material/fonte de conhecimento associado a um ou mais Temas."""
 
-    topic_id: UUID
-    title: str
-    content_type: str = "TEXT"  # TEXT, SUMMARY, BOOK_CHAPTER
+    title: str = ""
+    topic_ids: tuple[UUID, ...] = field(default_factory=tuple)
+    content_type: str = "TEXT"  # TEXT, SUMMARY, BOOK_CHAPTER, PDF, DOCX
     total_chunks: int = 0
     char_count: int = 0
+    raw_text: str = ""
+    node_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: date = field(default_factory=date.today)
 
+    def __init__(
+        self,
+        title: str | UUID = "",
+        topic_ids: tuple[UUID, ...] | list[UUID] | None = None,
+        content_type: str = "TEXT",
+        total_chunks: int = 0,
+        char_count: int = 0,
+        id: UUID | None = None,
+        created_at: date | None = None,
+        topic_id: UUID | None = None,
+        raw_text: str = "",
+        node_id: UUID | None = None,
+    ) -> None:
+        if isinstance(title, UUID):
+            # Compatibilidade com chamada posicional legada: KnowledgeSource(topic_id, title)
+            topic_id = title
+            resolved_title = str(topic_ids) if isinstance(topic_ids, str) else ""
+            topic_ids = None
+        else:
+            resolved_title = str(title) if title is not None else ""
+
+        self.title = resolved_title.strip()
+        self.content_type = content_type or "TEXT"
+        self.total_chunks = total_chunks if total_chunks is not None else 0
+        self.char_count = char_count if char_count is not None else 0
+        self.raw_text = raw_text.strip() if raw_text else ""
+        self.node_id = node_id
+        self.id = id if id is not None else uuid4()
+        self.created_at = created_at if created_at is not None else date.today()
+
+        resolved_topics: tuple[UUID, ...]
+        if topic_ids is not None:
+            resolved_topics = tuple(topic_ids)
+        elif topic_id is not None:
+            resolved_topics = (topic_id,)
+        elif node_id is not None:
+            resolved_topics = (node_id,)
+        else:
+            resolved_topics = ()
+
+        self.topic_ids = resolved_topics
+        self.__post_init__()
+
     def __post_init__(self) -> None:
-        self.title = self.title.strip() if self.title is not None else ""
+        # topic_ids already defaulted to (node_id,) in __init__
+
         if len(self.title) < 2 or len(self.title) > 200:
             raise DomainValidationError("Título do material deve ter entre 2 e 200 caracteres.")
+        if not self.topic_ids:
+            raise DomainValidationError(
+                "Fonte de conhecimento deve estar associada a pelo menos 1 tema."
+            )
+        if len(set(self.topic_ids)) != len(self.topic_ids):
+            raise DomainValidationError("Fonte de conhecimento não pode conter temas duplicados.")
         if self.total_chunks < 0:
             raise DomainValidationError("total_chunks não pode ser negativo.")
         if self.char_count < 0:
             raise DomainValidationError("char_count não pode ser negativo.")
+
+    @property
+    def topic_id(self) -> UUID:
+        """Compatibilidade regressiva: retorna o primeiro tema associado."""
+        return self.topic_ids[0]
 
 
 @dataclass(slots=True)
@@ -499,6 +628,7 @@ class AnswerEvaluationResult:
             raise DomainValidationError("O depth_score deve estar entre 0 e 100.")
         if self.tokens_used < 0:
             raise DomainValidationError("Tokens consumidos não podem ser negativos.")
+
         if not self.feedback or not self.feedback.strip():
             raise DomainValidationError("Feedback de avaliação não pode ser vazio.")
         if self.evaluation_mode not in ("AI_TEXT", "AI_AUDIO", "MULTIAGENT_DISPUTE"):
@@ -530,3 +660,108 @@ class DisputeEvaluationResult:
             raise DomainValidationError("O veredito do árbitro não pode ser vazio.")
         if self.tokens_used < 0:
             raise DomainValidationError("Tokens consumidos não podem ser negativos.")
+
+
+# --- Árvore de Estudos RPG & Grafo de Aprendizado ---
+
+
+@dataclass(slots=True)
+class StudyMap:
+    """Entidade que representa um Mapa de Estudos (Árvore de Talentos RPG)."""
+
+    owner_id: UUID
+    title: str
+    description: str | None = None
+    is_public: bool = False
+    parent_node_id: UUID | None = None
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        self.title = self.title.strip() if self.title is not None else ""
+        if self.description is not None:
+            cleaned = self.description.strip()
+            self.description = cleaned if cleaned else None
+
+        if not self.title:
+            raise DomainValidationError("Título do mapa de estudo não pode ser vazio.")
+        if len(self.title) > 200:
+            raise DomainValidationError(
+                "Título do mapa de estudo deve ter entre 1 e 200 caracteres."
+            )
+
+    @property
+    def is_submap(self) -> bool:
+        return self.parent_node_id is not None
+
+
+@dataclass(slots=True)
+class StudyNode:
+    """Entidade que representa um Nó individual da Árvore de Estudos."""
+
+    map_id: UUID
+    title: str
+    description: str | None = None
+    theory_content: str = ""
+    pos_x: float = 0.0
+    pos_y: float = 0.0
+    icon: str = "brain"
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        self.title = self.title.strip() if self.title is not None else ""
+        if self.description is not None:
+            cleaned = self.description.strip()
+            self.description = cleaned if cleaned else None
+        self.theory_content = self.theory_content.strip() if self.theory_content else ""
+        self.icon = self.icon.strip() if self.icon else "brain"
+
+        if not self.title:
+            raise DomainValidationError("Título do nó de estudo não pode ser vazio.")
+        if len(self.title) > 150:
+            raise DomainValidationError("Título do nó de estudo deve ter entre 1 e 150 caracteres.")
+
+    def update_position(self, x: float, y: float) -> None:
+        self.pos_x = float(x)
+        self.pos_y = float(y)
+        self.updated_at = datetime.now(UTC)
+
+    def update_theory(self, content: str) -> None:
+        self.theory_content = content.strip() if content else ""
+        self.updated_at = datetime.now(UTC)
+
+
+@dataclass(slots=True)
+class StudyEdge:
+    """Entidade que representa uma Aresta de Pré-requisito (Grafo Dirigido)."""
+
+    map_id: UUID
+    source_node_id: UUID
+    target_node_id: UUID
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        if self.source_node_id == self.target_node_id:
+            raise SelfReferencingEdgeError("Um nó não pode ter dependência de si mesmo.")
+
+
+@dataclass(slots=True)
+class UserNodeProgress:
+    """Value Object / Estado de Progresso do Estudante em um Nó da Árvore."""
+
+    user_id: UUID
+    node_id: UUID
+    effective_level: int = 0
+    is_unlocked: bool = False
+    overdue_questions_count: int = 0
+    last_evaluated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        if not (0 <= self.effective_level <= 6):
+            raise DomainValidationError("Nível efetivo deve estar entre 0 e 6.")
+        if self.overdue_questions_count < 0:
+            raise DomainValidationError("Contagem de perguntas vencidas não pode ser negativa.")

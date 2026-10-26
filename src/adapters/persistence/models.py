@@ -9,6 +9,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -94,7 +95,29 @@ class TopicModel(Base):
         lazy="selectin",
     )
     questions: Mapped[list["QuestionModel"]] = relationship(
-        "QuestionModel", back_populates="topic", cascade="all, delete-orphan", lazy="selectin"
+        "QuestionModel",
+        secondary="question_topics",
+        back_populates="topics",
+        lazy="selectin",
+    )
+    knowledge_sources: Mapped[list["KnowledgeSourceModel"]] = relationship(
+        "KnowledgeSourceModel",
+        secondary="knowledge_source_topics",
+        back_populates="topics",
+        lazy="selectin",
+    )
+
+
+class QuestionTopicModel(Base):
+    """Tabela associativa N:N entre Perguntas Abertas e Temas (ADR-004 / N:N)."""
+
+    __tablename__ = "question_topics"
+
+    question_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("questions.id", ondelete="CASCADE"), primary_key=True
+    )
+    topic_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), primary_key=True, index=True
     )
 
 
@@ -117,6 +140,9 @@ class FlashcardModel(Base):
     __tablename__ = "flashcards"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    owner_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     front: Mapped[Text] = mapped_column(Text, nullable=False)
     back: Mapped[Text] = mapped_column(Text, nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False, index=True, default=100)
@@ -196,19 +222,31 @@ class StudyEventModel(Base):
 
 
 class QuestionModel(Base):
-    """Tabela de Perguntas Abertas (Sprint 03)."""
+    """Tabela de Perguntas Abertas (Sprint 03 / N:N)."""
 
     __tablename__ = "questions"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    topic_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    owner_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    topic_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    node_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), nullable=True, index=True
     )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     expected_answer: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
-    topic: Mapped["TopicModel"] = relationship("TopicModel", back_populates="questions")
+    topic: Mapped["TopicModel | None"] = relationship("TopicModel")
+    topics: Mapped[list["TopicModel"]] = relationship(
+        "TopicModel",
+        secondary="question_topics",
+        back_populates="questions",
+        lazy="selectin",
+    )
     progresses: Mapped[list["UserQuestionProgressModel"]] = relationship(
         "UserQuestionProgressModel", back_populates="question", cascade="all, delete-orphan"
     )
@@ -301,23 +339,49 @@ class ReviewAuditLogModel(Base):
     topic: Mapped["TopicModel | None"] = relationship("TopicModel")
 
 
+class KnowledgeSourceTopicModel(Base):
+    """Tabela associativa N:N entre Fontes de Conhecimento e Temas."""
+
+    __tablename__ = "knowledge_source_topics"
+
+    source_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("knowledge_sources.id", ondelete="CASCADE"), primary_key=True
+    )
+    topic_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+
+
 class KnowledgeSourceModel(Base):
-    """Tabela de Fontes/Materiais de Conhecimento vinculados a um Tema."""
+    """Tabela de Fontes/Materiais de Conhecimento vinculados a um ou mais Temas."""
 
     __tablename__ = "knowledge_sources"
     __table_args__ = (Index("ix_knowledge_sources_topic_created", "topic_id", "created_at"),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    topic_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    owner_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    topic_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    node_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), nullable=True, index=True
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content_type: Mapped[str] = mapped_column(String(50), nullable=False, default="TEXT")
     total_chunks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     char_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    raw_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
-    topic: Mapped["TopicModel"] = relationship("TopicModel")
+    topic: Mapped["TopicModel | None"] = relationship("TopicModel", foreign_keys=[topic_id])
+    topics: Mapped[list["TopicModel"]] = relationship(
+        "TopicModel",
+        secondary="knowledge_source_topics",
+        back_populates="knowledge_sources",
+        lazy="selectin",
+    )
     chunks: Mapped[list["KnowledgeChunkModel"]] = relationship(
         "KnowledgeChunkModel",
         back_populates="source",
@@ -339,8 +403,8 @@ class KnowledgeChunkModel(Base):
     source_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("knowledge_sources.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    topic_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    topic_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -351,7 +415,7 @@ class KnowledgeChunkModel(Base):
     source: Mapped["KnowledgeSourceModel"] = relationship(
         "KnowledgeSourceModel", back_populates="chunks"
     )
-    topic: Mapped["TopicModel"] = relationship("TopicModel")
+    topic: Mapped["TopicModel | None"] = relationship("TopicModel", foreign_keys=[topic_id])
 
 
 class TokenLedgerModel(Base):
@@ -389,3 +453,147 @@ class TokenTransactionModel(Base):
     )
 
     user: Mapped["UserModel"] = relationship("UserModel")
+
+
+# --- Árvore de Estudos RPG & Grafo de Conhecimento ---
+
+
+class NodeKnowledgeSourceModel(Base):
+    """Tabela associativa N:N entre Nós de Estudo e Materiais (Knowledge Sources)."""
+
+    __tablename__ = "node_knowledge_sources"
+
+    node_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), primary_key=True
+    )
+    source_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("knowledge_sources.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+
+
+class NodeQuestionModel(Base):
+    """Tabela associativa N:N entre Nós de Estudo e Perguntas Abertas."""
+
+    __tablename__ = "node_questions"
+
+    node_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), primary_key=True
+    )
+    question_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("questions.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+
+
+class NodeFlashcardModel(Base):
+    """Tabela associativa N:N entre Nós de Estudo e Flashcards."""
+
+    __tablename__ = "node_flashcards"
+
+    node_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), primary_key=True
+    )
+    flashcard_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("flashcards.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+
+
+class StudyMapModel(Base):
+    """Tabela de Mapas de Estudo (Árvores de Conhecimento RPG)."""
+
+    __tablename__ = "study_maps"
+    __table_args__ = (
+        Index("ix_study_maps_owner_public", "owner_id", "is_public"),
+        Index("ix_study_maps_parent_node", "parent_node_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    owner_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    parent_node_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("study_nodes.id", ondelete="SET NULL", use_alter=True),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+    nodes: Mapped[list["StudyNodeModel"]] = relationship(
+        "StudyNodeModel",
+        back_populates="map",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        foreign_keys="StudyNodeModel.map_id",
+    )
+    edges: Mapped[list["StudyEdgeModel"]] = relationship(
+        "StudyEdgeModel",
+        back_populates="map",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class StudyNodeModel(Base):
+    """Tabela de Nós da Árvore de Conhecimento."""
+
+    __tablename__ = "study_nodes"
+    __table_args__ = (Index("ix_study_nodes_map", "map_id"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    map_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("study_maps.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(150), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    theory_content: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    pos_x: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    pos_y: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    icon: Mapped[str] = mapped_column(String(50), nullable=False, default="brain")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+    map: Mapped["StudyMapModel"] = relationship(
+        "StudyMapModel",
+        back_populates="nodes",
+        foreign_keys=[map_id],
+    )
+
+
+class StudyEdgeModel(Base):
+    """Tabela de Arestas de Pré-requisito (Grafo Dirigido)."""
+
+    __tablename__ = "study_edges"
+    __table_args__ = (
+        Index("ix_study_edges_map", "map_id"),
+        Index("ix_study_edges_source", "source_node_id"),
+        Index("ix_study_edges_target", "target_node_id"),
+        UniqueConstraint("map_id", "source_node_id", "target_node_id", name="uq_study_edge"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    map_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("study_maps.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_node_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_node_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+    map: Mapped["StudyMapModel"] = relationship("StudyMapModel", back_populates="edges")

@@ -20,30 +20,41 @@ on:
         description: 'Período retroativo de logs (ex: 30m, 1h, 3h, 24h)'
         required: false
         default: '3h'
-  push:
+  pull_request:
+    types:
+      - closed
     branches:
       - main
       - staging
 
 concurrency:
-  group: deploy-aws-${{ github.ref_name }}
+  group: deploy-aws-${{ github.event.pull_request.base.ref || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   deploy-aws-serverless:
     name: Deploy to AWS Lambda & DynamoDB (R$ 0,00)
     runs-on: ubuntu-latest
-    if: ${{ !github.event.repository.fork }}
+    if: >
+      !github.event.repository.fork &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.merged == true))
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
 
       - name: Resolve Target Environment
         id: env-resolver
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TARGET_ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+            TARGET_ENV="production"
+          elif [ "${{ github.event.pull_request.base.ref }}" = "staging" ]; then
+            TARGET_ENV="staging"
           elif [ "${{ github.ref_name }}" = "main" ]; then
             TARGET_ENV="production"
           else
@@ -53,7 +64,7 @@ jobs:
           echo "TARGET_ENV=$TARGET_ENV" >> $GITHUB_ENV
           echo "=========================================================="
           echo "🎯 AMBIENTE DE DEPLOY ALVO: $TARGET_ENV"
-          echo "📌 GATILHO: ${{ github.event_name }} (${{ github.ref_name }})"
+          echo "📌 GATILHO: ${{ github.event_name }} (base: ${{ github.event.pull_request.base.ref || github.ref_name }})"
           echo "=========================================================="
 
       - name: Configure AWS Credentials
@@ -116,6 +127,13 @@ jobs:
           aws ecr describe-repositories --repository-names study-reviewer --region $AWS_REGION || \
           aws ecr create-repository --repository-name study-reviewer --region $AWS_REGION
 
+      - name: Log in to Amazon ECR Public (Avoid 429 Rate Limits)
+        if: github.event.inputs.fetch_logs_only != 'true'
+        continue-on-error: true
+        run: |
+          echo "==> Autenticando no Amazon ECR Public para evitar rate limit 429 no download da base image..."
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws || true
+
       - name: Build, Tag and Push Container Image to ECR
         if: github.event.inputs.fetch_logs_only != 'true'
         env:
@@ -124,7 +142,12 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           echo "==> Construindo imagem Dockerfile.lambda..."
-          docker build -f Dockerfile.lambda -t $ECR_REGISTRY/study-reviewer:$TARGET_ENV .
+          for i in 1 2 3; do
+            docker build -f Dockerfile.lambda -t $ECR_REGISTRY/study-reviewer:$TARGET_ENV . && break || {
+              echo "Tentativa $i falhou. Aguardando 5s antes de tentar novamente..."
+              sleep 5
+            }
+          done
 
           echo "==> Aplicando tag imutável do commit SHA ($COMMIT_SHA) para rollback..."
           docker tag $ECR_REGISTRY/study-reviewer:$TARGET_ENV $ECR_REGISTRY/study-reviewer:$COMMIT_SHA

@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}{{ map.title }} — Forja Ancestral & Canvas RPG{% endblock %}
+
+{% block content %}
+<div class="relative w-full h-[calc(100vh-4rem)] bg-[#0c0908] overflow-hidden flex flex-col select-none text-[#f5ebd6]">
+
+    <!-- Topbar do Canvas RPG (HUD da Forja) -->
+    <div class="h-16 bg-[#14100d]/95 border-b border-[#785a28]/60 backdrop-blur px-4 sm:px-6 flex items-center justify-between z-20 shadow-lg shadow-black/50">
+        <div class="flex items-center space-x-4">
+            {% if map.is_submap and map.parent_map_id %}
+            <a
+                href="/study-maps/{{ map.parent_map_id }}/canvas"
+                class="rpg-btn-bronze text-xs py-1.5 px-3"
+                title="Voltar ao mapa superior"
+            >
+                <span class="mr-1">←</span> Voltar para: {{ map.parent_node_title or 'Mapa Superior' }}
+            </a>
+            {% else %}
+            <a
+                href="/study-maps"
+                class="rpg-btn-bronze text-xs py-1.5 px-3 font-cinzel"
+            >
+                <span class="mr-1">←</span> Códice de Habilidades
+            </a>
+            {% endif %}
+
+            <div class="flex items-center space-x-3 border-l border-[#785a28]/50 pl-4">
+                <span class="text-2xl" aria-hidden="true">🌌</span>
+                <div>
+                    <div class="text-[10px] font-bold font-cinzel uppercase tracking-widest text-[#a39276]">Tomo de Habilidades</div>
+                    <h1 class="text-sm sm:text-base font-bold font-cinzel text-[#f0c869] flex items-center space-x-2 leading-none">
+                        <span>{{ map.title }}</span>
+                        {% if map.is_submap %}
+                        <span class="px-2 py-0.5 text-[10px] uppercase font-black bg-[#c89b3c]/20 text-[#f0c869] border border-[#c89b3c]/40 rounded-md">
+                            Sub-mapa
+                        </span>
+                        {% endif %}
+                    </h1>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ferramentas e Modos da Forja -->
+        <div class="flex items-center space-x-3">
+            <!-- Alternância: Modo Jornada (Estudo) vs Modo Forja (Construção) -->
+            <div class="flex items-center bg-[#0c0908] p-1 rounded-xl border border-[#785a28]/60 text-xs shadow-inner">
+                <button
+                    type="button"
+                    id="btn-mode-study"
+                    onclick="setInteractionMode('study')"
+                    class="px-3.5 py-1.5 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5"
+                >
+                    <span>⚔️</span>
+                    <span>Modo Jornada</span>
+                </button>
+                <button
+                    type="button"
+                    id="btn-mode-edit"
+                    onclick="setInteractionMode('edit')"
+                    class="px-3.5 py-1.5 font-medium font-cinzel rounded-lg text-[#a39276] hover:text-[#f0c869] transition-all flex items-center space-x-1.5"
+                >
+                    <span>🔨</span>
+                    <span>Modo Forja</span>
+                </button>
+            </div>
+
+            <!-- Botões de Ação do Editor (visíveis apenas no Modo Forja) -->
+            <div id="editor-actions" class="hidden flex items-center space-x-2 border-l border-[#785a28]/50 pl-3">
+                <button
+                    type="button"
+                    onclick="openCreateNodeModal()"
+                    class="rpg-btn-gold text-xs py-1.5 px-3 flex items-center space-x-1"
+                >
+                    <span>+ Forjar Nó</span>
+                </button>
+                <button
+                    type="button"
+                    id="btn-connect-mode"
+                    onclick="toggleConnectMode()"
+                    class="rpg-btn-bronze text-xs py-1.5 px-3 flex items-center space-x-1"
+                    title="Conectar dois nós como pré-requisito"
+                >
+                    <span>🔗 Traçar Vínculo</span>
+                </button>
+            </div>
+
+            <!-- Controles de Zoom -->
+            <div class="flex items-center bg-[#0c0908] rounded-xl border border-[#785a28]/60 text-xs">
+                <button
+                    type="button"
+                    onclick="zoomOut()"
+                    class="px-2.5 py-1.5 hover:bg-[#1c1612] rounded-l-xl transition-colors font-bold text-[#f5ebd6]"
+                    title="Reduzir Visualização"
+                >
+                    −
+                </button>
+                <button
+                    type="button"
+                    onclick="resetView()"
+                    class="px-2.5 py-1.5 hover:bg-[#1c1612] transition-colors text-[11px] font-mono text-[#a39276]"
+                    id="zoom-label"
+                >
+                    100%
+                </button>
+                <button
+                    type="button"
+                    onclick="zoomIn()"
+                    class="px-2.5 py-1.5 hover:bg-[#1c1612] rounded-r-xl transition-colors font-bold text-[#f5ebd6]"
+                    title="Aumentar Visualização"
+                >
+                    +
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Área do Canvas Infinito com Vinheta e Grade de Runas -->
+    <div id="canvas-viewport" class="relative flex-1 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing bg-[#0c0908]">
+        <!-- Grade Sutil de Runas Ancestrais -->
+        <div class="absolute inset-0 bg-[radial-gradient(#785a28_1px,transparent_1px)] [background-size:32px_32px] pointer-events-none opacity-20"></div>
+        <!-- Vinheta Dramática de Bordas -->
+        <div class="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.95)]"></div>
+
+        <!-- Container Transformável (Pan & Zoom) -->
+        <div id="canvas-container" class="absolute inset-0 origin-top-left">
+            <!-- Camada de Conexões de Energia Dourada (SVG) -->
+            <svg id="canvas-svg" class="absolute inset-0 w-[6000px] h-[6000px] pointer-events-none overflow-visible">
+                <defs>
+                    <linearGradient id="edge-unlocked-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#c89b3c"/>
+                        <stop offset="100%" stop-color="#f0c869"/>
+                    </linearGradient>
+                    <linearGradient id="edge-locked-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#3b322c"/>
+                        <stop offset="100%" stop-color="#241c17"/>
+                    </linearGradient>
+                    <marker id="arrow-unlocked" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                        <polygon points="0 0, 8 4, 0 8" fill="#f0c869"/>
+                    </marker>
+                    <marker id="arrow-locked" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                        <polygon points="0 0, 8 4, 0 8" fill="#4a3b32"/>
+                    </marker>
+                </defs>
+                <g id="edges-group"></g>
+            </svg>
+
+            <!-- Camada de Medalhões de Habilidade (DOM interativo) -->
+            <div id="nodes-layer" class="absolute inset-0 w-[6000px] h-[6000px] pointer-events-auto"></div>
+        </div>
+    </div>
+
+    <!-- Banner Informativo de Conexão Ativa -->
+    <div id="connect-banner" class="hidden absolute top-20 left-1/2 -translate-x-1/2 bg-[#c89b3c] text-[#0c0908] px-5 py-2.5 rounded-2xl shadow-2xl font-bold font-cinzel text-xs flex items-center space-x-2 z-30 border border-[#f0c869] animate-bounce">
+        <span>⚡ TRAÇAR VÍNCULO: Clique no nó de pré-requisito e depois no medalhão dependente</span>
+        <button type="button" onclick="toggleConnectMode()" class="ml-2 text-xs bg-[#0c0908]/20 px-2 py-0.5 rounded font-sans">Cancelar</button>
+    </div>
+
+</div>
+
+<!-- Modal da Forja: Criar ou Editar Medalhão -->
+<div id="node-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeNodeModal()"></div>
+    <div class="min-h-full flex items-center justify-center p-4">
+        <div class="relative rpg-panel bg-[#14100d] border border-[#785a28] rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-[#f5ebd6]">
+            <div class="flex items-center justify-between pb-4 border-b border-[#785a28]/50">
+                <h3 id="node-modal-title" class="text-lg font-bold font-cinzel text-[#f0c869]">Forjar Novo Medalhão</h3>
+                <button type="button" onclick="closeNodeModal()" class="text-[#a39276] hover:text-[#f0c869] transition-colors">✕</button>
+            </div>
+            
+            <form onsubmit="handleSaveNode(event)" class="mt-6 space-y-4">
+                <input type="hidden" id="modal-node-id"/>
+                <div>
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Título do Medalhão</label>
+                    <input
+                        type="text"
+                        id="modal-node-title-input"
+                        required
+                        maxlength="150"
+                        placeholder="Ex: Teoria Espectral de Grafos"
+                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm"
+                    />
+                </div>
+                <div>
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Ícone Rúnico</label>
+                    <select
+                        id="modal-node-icon-select"
+                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm"
+                    >
+                        <option value="calculator">📐 Cálculo & Álgebra (calculator)</option>
+                        <option value="trending-up">📈 Análise & Estatística (trending-up)</option>
+                        <option value="dice">🎲 Probabilidade & Aleatoriedade (dice)</option>
+                        <option value="activity">⚡ Sinais & Dinâmica (activity)</option>
+                        <option value="brain">🧠 Raciocínio & Conceito (brain)</option>
+                        <option value="book">📖 Tomo & Fundamentos (book)</option>
+                        <option value="code">💻 Algoritmos & Código (code)</option>
+                        <option value="cpu">⚙️ Hardware & Arquitetura (cpu)</option>
+                        <option value="database">🗄️ Dados & Persistência (database)</option>
+                        <option value="globe">🌐 Redes & Distribuído (globe)</option>
+                        <option value="layers">📚 Camadas & Design Patterns (layers)</option>
+                        <option value="shield">🛡️ Segurança & Blindagem (shield)</option>
+                        <option value="terminal">🖥️ CLI & Sistema (terminal)</option>
+                        <option value="zap">⚡ Performance & Otimização (zap)</option>
+                        <option value="award">🏆 Conquista & Maestria (award)</option>
+                        <option value="compass">🧭 Navegação & Estratégia (compass)</option>
+                        <option value="feather">🪶 Filosofia & Escrita (feather)</option>
+                        <option value="flame">🔥 Provações & Desafios (flame)</option>
+                        <option value="key">🗝️ Criptografia & Chaves (key)</option>
+                        <option value="scroll">📜 História & Protocolos (scroll)</option>
+                        <option value="sword">⚔️ Prática & Combate (sword)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Descrição Breve do Medalhão</label>
+                    <textarea
+                        id="modal-node-desc-input"
+                        rows="3"
+                        maxlength="2000"
+                        placeholder="Breve descrição dos conceitos abordados neste medalhão..."
+                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm font-tome text-base"
+                    ></textarea>
+                </div>
+
+                <!-- Ações do Modal -->
+                <div class="flex items-center justify-between pt-6 border-t border-[#785a28]/50">
+                    <div id="modal-node-extra-actions" class="flex items-center space-x-2">
+                        <button
+                            type="button"
+                            id="btn-delete-node"
+                            onclick="deleteCurrentNode()"
+                            class="text-xs text-[#e11d48] hover:text-red-400 font-cinzel font-bold px-2 py-1 rounded transition-colors hidden"
+                        >
+                            Dissipar Nó
+                        </button>
+                        <button
+                            type="button"
+                            id="btn-open-grimoire"
+                            onclick="openSelectedNodeGrimoire()"
+                            class="rpg-btn-bronze text-xs py-1.5 px-3 hidden"
+                        >
+                            📖 Abrir Grimório
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button type="button" onclick="closeNodeModal()" class="px-4 py-2 text-sm font-cinzel text-[#a39276] hover:text-[#f5ebd6]">Cancelar</button>
+                        <button type="submit" class="rpg-btn-gold text-sm px-5 py-2">✨ Gravar Medalhão</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.CURRENT_MAP_ID = "{{ map.id }}";
+    window.CURRENT_MAP_IS_OWNER = {{ "true" if map.is_owner else "false" }};
+</script>
+<script src="/static/js/study_canvas.js"></script>
+{% endblock %}

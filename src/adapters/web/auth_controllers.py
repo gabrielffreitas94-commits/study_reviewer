@@ -85,9 +85,7 @@ def _get_oauth_redirect_uri(request: Request) -> str:
        para ambientes remotos (Lambda Function URLs, CloudFront ou instâncias de produção).
     """
     host = (
-        request.headers.get("x-forwarded-host")
-        or request.headers.get("host")
-        or request.url.netloc
+        request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
     )
     req_host_only = host.split(":")[0].strip() if host else ""
 
@@ -97,12 +95,10 @@ def _get_oauth_redirect_uri(request: Request) -> str:
         if conf_host_only and req_host_only and conf_host_only == req_host_only:
             return settings.GOOGLE_REDIRECT_URI
 
-    scheme = (
-        request.headers.get("x-forwarded-proto")
-        or request.url.scheme
-        or "https"
-    )
-    if "lambda-url" in (host or "") or (req_host_only not in ("localhost", "127.0.0.1", "testserver")):
+    scheme = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
+    if "lambda-url" in (host or "") or (
+        req_host_only not in ("localhost", "127.0.0.1", "testserver")
+    ):
         scheme = "https"
 
     return f"{scheme}://{host}/auth/callback"

@@ -21,6 +21,7 @@ from src.application.use_cases.question_use_cases import (
 )
 from src.domain.entities import Question, ReviewAuditLog, Subject, Topic, UserQuestionProgress
 from src.domain.exceptions import (
+    DomainValidationError,
     EntityNotFoundError,
     QuestionNotDueError,
     QuestionNotFoundError,
@@ -141,6 +142,39 @@ def test_create_question_topic_not_found(repos: RepoFixture) -> None:
 
     with pytest.raises(EntityNotFoundError, match="Tema não encontrado"):
         use_case.execute(dto, user_id=uuid4())
+
+
+@pytest.mark.unit
+def test_create_question_without_topics_raises_validation_error(repos: RepoFixture) -> None:
+    """Verifica rejeição quando a pergunta não possui nenhum tema associado."""
+    subj_repo, top_repo, q_repo, prog_repo, clock = repos
+    use_case = CreateQuestionUseCase(q_repo, prog_repo, top_repo, subj_repo, clock)
+    dto = CreateQuestionDTO(topic_id=None, topic_ids=(), prompt="Prompt", expected_answer="Answer")
+
+    with pytest.raises(
+        DomainValidationError, match="Pergunta deve estar associada a pelo menos 1 tema."
+    ):
+        use_case.execute(dto, user_id=uuid4())
+
+
+@pytest.mark.unit
+def test_create_question_with_multiple_topics_success(repos: RepoFixture) -> None:
+    """Verifica criação de pergunta com múltiplos temas."""
+    subj_repo, top_repo, q_repo, prog_repo, clock = repos
+    owner_id = uuid4()
+    subj = Subject(id=uuid4(), name="Direito", owner_id=owner_id)
+    subj_repo.save(subj)
+    t1 = Topic(id=uuid4(), subject_id=subj.id, name="Tema 1")
+    t2 = Topic(id=uuid4(), subject_id=subj.id, name="Tema 2")
+    top_repo.save(t1)
+    top_repo.save(t2)
+
+    use_case = CreateQuestionUseCase(q_repo, prog_repo, top_repo, subj_repo, clock)
+    dto = CreateQuestionDTO(topic_ids=(t1.id, t2.id), prompt="P", expected_answer="R")
+
+    res = use_case.execute(dto, user_id=owner_id)
+    assert set(res.topic_ids) == {t1.id, t2.id}
+    assert res.topic_id == t1.id
 
 
 @pytest.mark.unit

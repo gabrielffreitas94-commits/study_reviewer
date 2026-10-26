@@ -12,6 +12,9 @@ from src.domain.entities import (
     KnowledgeSource,
     Question,
     ReviewAuditLog,
+    StudyEdge,
+    StudyMap,
+    StudyNode,
     Subject,
     TokenLedger,
     TokenTransaction,
@@ -194,6 +197,10 @@ class IQuestionRepository(Protocol):
         """Lista todas as perguntas pertencentes a um determinado tema."""
         ...
 
+    def list_by_node(self, node_id: UUID) -> list[Question]:
+        """Lista todas as perguntas vinculadas a um determinado nó da árvore."""
+        ...
+
     def delete(self, question_id: UUID) -> None:
         """Exclui permanentemente uma pergunta do catálogo."""
         ...
@@ -239,6 +246,12 @@ class IQuestionProgressRepository(Protocol):
 
     def list_by_user(self, user_id: UUID) -> list[UserQuestionProgress]:
         """Lista todos os registros de progresso de um estudante."""
+        ...
+
+    def get_by_questions(
+        self, user_id: UUID, question_ids: list[UUID]
+    ) -> dict[UUID, UserQuestionProgress]:
+        """Retorna mapa question_id -> UserQuestionProgress para uma lista de perguntas."""
         ...
 
 
@@ -311,6 +324,10 @@ class IKnowledgeSourceRepository(Protocol):
         """Lista todas as fontes de conhecimento vinculadas a um tema."""
         ...
 
+    def list_by_node(self, node_id: UUID) -> list[KnowledgeSource]:
+        """Lista todas as fontes de conhecimento vinculadas a um nó da árvore."""
+        ...
+
     def delete(self, source_id: UUID) -> bool:
         """Remove uma fonte de conhecimento."""
         ...
@@ -358,4 +375,100 @@ class ITokenLedgerRepository(Protocol):
 
     def list_transactions(self, user_id: UUID, limit: int = 50) -> list[TokenTransaction]:
         """Lista as transações mais recentes do usuário ordenadas por data descendente."""
+        ...
+
+
+class IStudyMapRepository(Protocol):
+    """Porta de persistência para Mapas de Estudo RPG."""
+
+    def get_by_id(self, map_id: UUID) -> StudyMap | None:
+        """Busca um mapa de estudo pelo seu UUID."""
+        ...
+
+    def list_by_owner(self, owner_id: UUID) -> list[StudyMap]:
+        """Lista todos os mapas criados pelo usuário."""
+        ...
+
+    def save(self, study_map: StudyMap) -> StudyMap:
+        """Persiste ou atualiza um mapa de estudo."""
+        ...
+
+    def delete(self, map_id: UUID) -> None:
+        """Remove um mapa de estudo e seus nós em cascata."""
+        ...
+
+
+class IStudyNodeRepository(Protocol):
+    """Porta de persistência para Nós da Árvore de Estudos."""
+
+    def get_by_id(self, node_id: UUID) -> StudyNode | None:
+        """Busca um nó pelo seu UUID primário."""
+        ...
+
+    def list_by_map(self, map_id: UUID) -> list[StudyNode]:
+        """Lista todos os nós pertencentes a um mapa."""
+        ...
+
+    def save(self, node: StudyNode) -> StudyNode:
+        """Persiste ou atualiza um nó da árvore."""
+        ...
+
+    def update_positions_batch(self, positions: list[tuple[UUID, float, float]]) -> None:
+        """Atualiza em lote as coordenadas (pos_x, pos_y) dos nós."""
+        ...
+
+    def delete(self, node_id: UUID) -> None:
+        """Remove um nó e suas arestas associadas."""
+        ...
+
+
+class IStudyEdgeRepository(Protocol):
+    """Porta de persistência para Arestas de Pré-requisito (Grafo Dirigido)."""
+
+    def list_by_map(self, map_id: UUID) -> list[StudyEdge]:
+        """Lista todas as dependências orientadas de um mapa."""
+        ...
+
+    def get_by_id(self, edge_id: UUID) -> StudyEdge | None:
+        """Busca uma aresta pelo seu UUID."""
+        ...
+
+    def save(self, edge: StudyEdge) -> StudyEdge:
+        """Persiste uma nova dependência entre nós."""
+        ...
+
+    def delete(self, edge_id: UUID) -> None:
+        """Remove uma dependência orientada."""
+        ...
+
+
+class INodeContentRepository(Protocol):
+    """Porta de persistência para relações N:N entre nós e materiais, perguntas e flashcards."""
+
+    def attach_knowledge_source(self, node_id: UUID, source_id: UUID) -> None:
+        """Vincula um material ao nó."""
+        ...
+
+    def detach_knowledge_source(self, node_id: UUID, source_id: UUID) -> None:
+        """Desvincula um material do nó."""
+        ...
+
+    def attach_question(self, node_id: UUID, question_id: UUID) -> None:
+        """Vincula uma pergunta aberta ao nó."""
+        ...
+
+    def detach_question(self, node_id: UUID, question_id: UUID) -> None:
+        """Desvincula uma pergunta aberta do nó."""
+        ...
+
+    def attach_flashcard(self, node_id: UUID, flashcard_id: UUID) -> None:
+        """Vincula um flashcard ao nó."""
+        ...
+
+    def detach_flashcard(self, node_id: UUID, flashcard_id: UUID) -> None:
+        """Desvincula um flashcard do nó."""
+        ...
+
+    def get_attached_ids(self, node_id: UUID) -> tuple[list[UUID], list[UUID], list[UUID]]:
+        """Retorna tupla com (material_ids, question_ids, flashcard_ids) associados ao nó."""
         ...

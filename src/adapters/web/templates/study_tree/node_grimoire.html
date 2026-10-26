@@ -1,0 +1,1007 @@
+{% extends "base.html" %}
+
+{% block title %}{{ node.title }} — Grimório de Habilidades — Study Reviewer{% endblock %}
+
+{% block content %}
+{% set icon_map = {
+    'calculator': '📐',
+    'trending-up': '📈',
+    'dice': '🎲',
+    'activity': '⚡',
+    'brain': '🧠',
+    'book': '📖',
+    'code': '💻',
+    'cpu': '⚙️',
+    'database': '🗄️',
+    'globe': '🌐',
+    'layers': '📚',
+    'shield': '🛡️',
+    'terminal': '🖥️',
+    'zap': '⚡',
+    'award': '🏆',
+    'compass': '🧭',
+    'feather': '🪶',
+    'flame': '🔥',
+    'key': '🗝️',
+    'scroll': '📜',
+    'sword': '⚔️',
+    'fire': '🔥',
+    'flask': '🧪',
+    'gem': '💎',
+    'rune': '🔮'
+} %}
+
+<div class="space-y-6 w-full max-w-7xl mx-auto py-2">
+
+    <!-- Top Navigation / Breadcrumbs -->
+    <nav class="flex flex-wrap items-center justify-between gap-3 border-b border-[#785a28]/40 pb-4">
+        <div class="flex items-center space-x-3">
+            <a
+                href="/study-maps/{{ map.id }}/canvas"
+                class="inline-flex items-center text-sm font-cinzel font-bold text-[#f0c869] hover:text-[#c89b3c] transition-colors"
+            >
+                <span class="mr-2 text-lg" aria-hidden="true">←</span>
+                <span>Voltar à Árvore:</span>
+                <strong class="ml-1.5 text-white underline decoration-[#785a28] decoration-2 underline-offset-4">{{ map.title }}</strong>
+            </a>
+        </div>
+        <div class="flex items-center space-x-3">
+            {% if node.is_unlocked %}
+            <span class="px-3 py-1 text-xs font-bold uppercase rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-700/60 font-cinzel shadow-sm flex items-center gap-1.5">
+                <span aria-hidden="true">🔓</span>
+                <span>Pré-requisitos cumpridos</span>
+            </span>
+            {% else %}
+            <span class="px-3 py-1 text-xs font-bold uppercase rounded-lg bg-rose-950/80 text-rose-400 border border-rose-700/60 font-cinzel shadow-sm flex items-center gap-1.5">
+                <span aria-hidden="true">🔒</span>
+                <span>Selado — Requer Nv. 1 em: {{ node.prereq_titles | join(', ') if node.prereq_titles else 'nós anteriores' }}</span>
+            </span>
+            {% endif %}
+            <span class="px-3 py-1 text-xs font-black uppercase rounded-lg bg-[#14100d] text-[#f0c869] border border-[#785a28] font-cinzel shadow-inner tracking-wider">
+                PATENTE ATUAL: Nv. {{ node.effective_level }}
+            </span>
+        </div>
+    </nav>
+
+    <!-- Node Header Card (HUD RPG) -->
+    <header class="rpg-panel p-6 shadow-2xl relative overflow-hidden">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div class="flex items-center space-x-5">
+                <!-- Medalhão com Ícone Rúnico -->
+                <div class="w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center text-3xl shadow-xl border-2 transition-transform hover:scale-105 {% if not node.is_unlocked %}bg-[#14100d] border-[#3b322c] opacity-75 grayscale{% elif node.effective_level >= 3 %}bg-[#251c14] border-[#f0c869] shadow-[#f0c869]/30 text-[#f0c869]{% elif node.effective_level >= 1 %}bg-[#1f1813] border-[#785a28] shadow-[#c89b3c]/20 text-[#c89b3c]{% else %}bg-[#1c1612] border-[#574737] text-[#a39276]{% endif %}">
+                    {{ icon_map.get(node.icon, '⚔️') }}
+                </div>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-[#f0c869] tracking-wider font-cinzel">
+                        {{ node.title }}
+                    </h1>
+                    <p class="text-sm text-[#a39276] mt-1 font-tome text-base">
+                        {{ node.description or 'Sem descrição rúnica cadastrada neste nó.' }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Resumo de Maestria e Barra de Progresso -->
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4 bg-[#14100d]/80 px-4 py-3 rounded-xl border border-[#785a28]/40 shadow-inner">
+                <div class="text-left sm:text-right">
+                    <span class="text-[11px] uppercase font-bold tracking-wider text-[#a39276] block font-cinzel">Maestria do Nó</span>
+                    <span class="font-bold text-sm text-[#f5ebd6]" id="node-progress-summary">
+                        {{ node.mastered_questions_count }}/{{ node.total_questions_count }} Provações Dominadas ({{ node.progress_percent }}%)
+                    </span>
+                </div>
+                <div class="w-36 bg-[#0c0908] rounded-full h-3 overflow-hidden border border-[#785a28]/60 shadow-inner">
+                    <div
+                        id="node-progress-bar"
+                        class="bg-gradient-to-r from-[#c89b3c] to-[#f0c869] h-3 rounded-full transition-all duration-500 shadow-md"
+                        style="width: {{ node.progress_percent }}%"
+                    ></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Layout Bipartido do Grimório (2 Colunas) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+        <!-- ========================================== -->
+        <!-- COLUNA ESQUERDA: 📖 Tomo de Sabedoria      -->
+        <!-- ========================================== -->
+        <section class="space-y-6">
+
+            <!-- Tomo de Sabedoria Principal (Teoria RAG) -->
+            <div class="rpg-panel p-6 space-y-4">
+                <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
+                    <h2 class="text-lg font-bold text-[#f0c869] flex items-center space-x-2 font-cinzel tracking-wide">
+                        <span aria-hidden="true">📖</span>
+                        <span>Tomo de Sabedoria</span>
+                    </h2>
+                    <button
+                        type="button"
+                        id="btn-edit-theory"
+                        onclick="toggleTheoryEditor()"
+                        class="rpg-btn-bronze text-xs py-1 px-2.5"
+                    >
+                        ✍️ Editar Tomo
+                    </button>
+                </div>
+
+                <!-- Visualização da Teoria com Tipografia Editorial Cormorant Garamond -->
+                <div
+                    id="theory-display"
+                    class="font-tome text-lg text-[#f5ebd6] leading-relaxed whitespace-pre-line bg-[#14100d]/90 p-5 rounded-xl border border-[#785a28]/40 shadow-inner min-h-[10rem] select-text"
+                >
+                    {% if node.theory_content %}
+                    {{ node.theory_content }}
+                    {% else %}
+                    <p class="text-[#a39276] italic text-base">O Tomo de Sabedoria deste nó ainda está em branco. Clique em 'Editar Tomo' para escrever a fundamentação teórica que servirá de âncora para a IA.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Editor de Teoria Inline -->
+                <form
+                    id="theory-editor"
+                    class="hidden space-y-3 pt-2"
+                    onsubmit="event.preventDefault(); saveNodeTheory();"
+                >
+                    <label for="theory-textarea" class="block text-xs font-bold uppercase tracking-wider text-[#a39276] font-cinzel">
+                        Texto Sagrado do Tomo (Markdown / Teoria)
+                    </label>
+                    <textarea
+                        id="theory-textarea"
+                        rows="10"
+                        class="w-full bg-[#14100d] border border-[#785a28] rounded-xl p-3.5 text-[#f5ebd6] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c869] leading-relaxed resize-y"
+                        placeholder="Escreva as definições, teoremas, fórmulas ou explicações do tópico..."
+                    >{{ node.theory_content }}</textarea>
+                    <div class="flex justify-end space-x-2 pt-1">
+                        <button
+                            type="button"
+                            onclick="toggleTheoryEditor()"
+                            class="rpg-btn-bronze text-xs"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            id="btn-save-theory"
+                            class="rpg-btn-gold text-xs"
+                        >
+                            Salvar Tomo
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Pergaminhos & Fontes Complementares (Materials) -->
+            <div class="rpg-panel p-6 space-y-4">
+                <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
+                    <h2 class="text-lg font-bold text-[#f0c869] flex items-center space-x-2 font-cinzel tracking-wide">
+                        <span aria-hidden="true">📜</span>
+                        <span>Pergaminhos & Fontes Complementares</span>
+                    </h2>
+                    <button
+                        type="button"
+                        id="btn-toggle-new-material"
+                        onclick="toggleNewMaterialForm()"
+                        class="rpg-btn-bronze text-xs py-1 px-2.5"
+                    >
+                        + Novo Pergaminho
+                    </button>
+                </div>
+
+                <!-- Formulário Inline: Novo Pergaminho -->
+                <form
+                    id="new-material-form"
+                    class="hidden p-4 rounded-xl bg-[#14100d] border border-[#785a28] space-y-3 shadow-lg"
+                    onsubmit="event.preventDefault(); createNodeMaterial();"
+                >
+                    <div>
+                        <label for="material-title-input" class="block text-xs font-bold uppercase text-[#a39276] mb-1 font-cinzel">
+                            Título do Pergaminho / Artigo
+                        </label>
+                        <input
+                            type="text"
+                            id="material-title-input"
+                            class="w-full bg-[#1c1612] border border-[#785a28]/80 rounded-lg px-3 py-2 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869]"
+                            placeholder="Ex: Teorema Espectral e Aplicações"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label for="material-text-input" class="block text-xs font-bold uppercase text-[#a39276] mb-1 font-cinzel">
+                            Conteúdo Integral do Pergaminho (Texto Puro para Leitura & RAG)
+                        </label>
+                        <textarea
+                            id="material-text-input"
+                            rows="5"
+                            class="w-full bg-[#1c1612] border border-[#785a28]/80 rounded-lg px-3 py-2 text-sm text-[#f5ebd6] font-mono focus:outline-none focus:ring-1 focus:ring-[#f0c869]"
+                            placeholder="Insira o texto integral de referência..."
+                            required
+                        ></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-2 pt-1">
+                        <button
+                            type="button"
+                            onclick="toggleNewMaterialForm()"
+                            class="rpg-btn-bronze text-xs"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            id="btn-create-material"
+                            class="rpg-btn-gold text-xs"
+                        >
+                            Forjar Pergaminho
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Lista de Pergaminhos Cadastrados com Leitura Expansível -->
+                <div id="materials-list" class="space-y-3">
+                    {% if materials %}
+                        {% for m in materials %}
+                        <div class="p-4 rounded-xl bg-[#14100d]/90 border border-[#785a28]/50 space-y-2.5 shadow-sm" id="material-item-{{ m.id }}">
+                            <div class="flex items-center justify-between gap-2">
+                                <h3 class="font-bold text-[#f5ebd6] text-sm flex items-center space-x-2 font-cinzel">
+                                    <span aria-hidden="true">📜</span>
+                                    <span>{{ m.title }}</span>
+                                </h3>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-[10px] uppercase font-bold text-[#a39276] bg-[#1c1612] px-2 py-0.5 rounded border border-[#785a28]/40">
+                                        {{ m.content_type }}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onclick="deleteNodeMaterial('{{ m.id }}')"
+                                        title="Dissipar pergaminho"
+                                        class="text-xs text-[#a39276] hover:text-[#e11d48] transition-colors p-1"
+                                    >
+                                        🗑️
+                                    </button>
+                                </div>
+                            </div>
+                            {% if m.raw_text %}
+                            <div>
+                                <button
+                                    type="button"
+                                    onclick="toggleMaterialText('{{ m.id }}')"
+                                    class="text-xs text-[#f0c869] hover:text-[#c89b3c] flex items-center gap-1 font-semibold"
+                                >
+                                    <span id="mat-icon-{{ m.id }}" aria-hidden="true">👁️</span>
+                                    <span id="mat-label-{{ m.id }}">Expandir Leitura Integral</span>
+                                </button>
+                                <div
+                                    id="mat-text-{{ m.id }}"
+                                    class="mt-2 text-sm text-[#f5ebd6] font-tome text-base leading-relaxed whitespace-pre-line bg-[#0c0908] p-3 rounded-lg border border-[#785a28]/30 max-h-60 overflow-y-auto"
+                                >
+                                    {{ m.raw_text }}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-[#a39276] italic text-sm text-center py-4">Nenhum pergaminho complementar anexado a este nó.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- COLUNA DIREITA: ⚔️ Provações de Maestria   -->
+        <!-- ========================================== -->
+        <section class="space-y-6">
+
+            <!-- Card Principal: Arena de Provação Ativa (SRS & IA) -->
+            <div class="rpg-panel p-6 space-y-5">
+                <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
+                    <h2 class="text-lg font-bold text-[#f0c869] flex items-center space-x-2 font-cinzel tracking-wide">
+                        <span aria-hidden="true">⚔️</span>
+                        <span>Provações de Maestria</span>
+                    </h2>
+                    <button
+                        type="button"
+                        id="btn-toggle-new-question"
+                        onclick="toggleNewQuestionForm()"
+                        class="rpg-btn-bronze text-xs py-1 px-2.5"
+                    >
+                        + Forjar Nova Provação
+                    </button>
+                </div>
+
+                <!-- Formulário Inline: Forjar Nova Provação -->
+                <form
+                    id="new-question-form"
+                    class="hidden p-4 rounded-xl bg-[#14100d] border border-[#785a28] space-y-3 shadow-lg"
+                    onsubmit="event.preventDefault(); createNodeQuestion();"
+                >
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-[#f0c869] font-cinzel">
+                        Forjar Nova Provação SRS
+                    </h3>
+                    <div>
+                        <label for="question-prompt-input" class="block text-xs font-bold uppercase text-[#a39276] mb-1 font-cinzel">
+                            Enunciado da Provação (Desafio Conceitual)
+                        </label>
+                        <input
+                            type="text"
+                            id="question-prompt-input"
+                            class="w-full bg-[#1c1612] border border-[#785a28]/80 rounded-lg px-3 py-2 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869]"
+                            placeholder="Ex: Como a decomposição SVD atua na compressão dimensional?"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label for="question-answer-input" class="block text-xs font-bold uppercase text-[#a39276] mb-1 font-cinzel">
+                            Gabarito / Runas Esperadas (Critério de Correção da IA)
+                        </label>
+                        <textarea
+                            id="question-answer-input"
+                            rows="3"
+                            class="w-full bg-[#1c1612] border border-[#785a28]/80 rounded-lg px-3 py-2 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869]"
+                            placeholder="Ex: A SVD fatora A = U Σ V^T, permitindo truncar os menores valores singulares..."
+                            required
+                        ></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-2 pt-1">
+                        <button
+                            type="button"
+                            onclick="toggleNewQuestionForm()"
+                            class="rpg-btn-bronze text-xs"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            id="btn-create-question"
+                            class="rpg-btn-gold text-xs"
+                        >
+                            Selar Provação
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Banners de Notificação (Rank Up & Treino Livre) -->
+                <div id="rankup-banner" class="hidden p-4 rounded-xl bg-gradient-to-r from-[#c89b3c]/20 via-[#f0c869]/30 to-[#c89b3c]/20 border-2 border-[#f0c869] text-[#f5ebd6] shadow-xl animate-pulse">
+                    <div class="flex items-center gap-3">
+                        <span class="text-3xl" aria-hidden="true">🏆</span>
+                        <div>
+                            <div class="font-cinzel font-black text-sm text-[#f0c869] tracking-wider uppercase">
+                                ⚡ PATENTE ELEVADA! NÓ DOMINADO (RANK I+)
+                            </div>
+                            <div class="text-xs text-[#f5ebd6] mt-0.5" id="rankup-banner-text">
+                                Novos caminhos foram destrancados na Árvore de Conhecimento!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="training-mode-banner" class="hidden p-3.5 rounded-xl bg-[#1c1612] border border-[#785a28] text-[#f5ebd6] shadow-md">
+                    <div class="flex items-center gap-2.5 text-xs text-[#f0c869] font-cinzel font-semibold">
+                        <span class="text-base" aria-hidden="true">⚔️</span>
+                        <span id="training-mode-banner-text">Modo Treino Livre — Provação já agendada para hoje. Nível mantido sem penalidade.</span>
+                    </div>
+                </div>
+
+                <!-- Arena Ativa da Pergunta Selecionada -->
+                <div id="active-srs-arena" class="space-y-4">
+                    {% if questions %}
+                    <!-- Navegação do Carrossel de Provações -->
+                    <div class="flex items-center justify-between bg-[#14100d] p-3 rounded-xl border border-[#785a28]/40">
+                        <button
+                            type="button"
+                            id="btn-prev-question"
+                            onclick="navigateQuestion(-1)"
+                            class="rpg-btn-bronze text-xs py-1 px-2.5"
+                        >
+                            ← Anterior
+                        </button>
+                        <div class="text-center">
+                            <span class="font-cinzel text-xs font-bold text-[#f0c869] tracking-wider" id="arena-question-counter">
+                                Provação 1 de {{ questions | length }}
+                            </span>
+                            <div class="flex items-center justify-center gap-2 mt-0.5">
+                                <span class="text-[10px] uppercase font-bold text-[#c89b3c]" id="arena-question-rank">
+                                    RANK {{ questions[0].current_level }}
+                                </span>
+                                <span class="text-[10px] text-[#a39276]" id="arena-question-due">
+                                    {{ '🔥 VENCIDA' if questions[0].is_due else ('Próxima: ' ~ questions[0].next_review_date) }}
+                                </span>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            id="btn-next-question"
+                            onclick="navigateQuestion(1)"
+                            class="rpg-btn-bronze text-xs py-1 px-2.5"
+                        >
+                            Próxima →
+                        </button>
+                    </div>
+
+                    <!-- Card da Pergunta Ativa -->
+                    <div class="bg-[#14100d] p-5 rounded-xl border border-[#785a28]/50 space-y-4 shadow-inner">
+                        <div class="text-xs uppercase font-bold text-[#a39276] font-cinzel tracking-wider">
+                            Enunciado do Desafio
+                        </div>
+                        <div class="text-base sm:text-lg font-semibold text-[#f5ebd6] leading-relaxed" id="arena-prompt">
+                            {{ questions[0].statement or questions[0].prompt }}
+                        </div>
+
+                        <!-- Seletor de Modo de Resposta -->
+                        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-[#785a28]/30">
+                            <button
+                                type="button"
+                                id="tab-reveal"
+                                onclick="selectArenaMode('reveal')"
+                                class="py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow"
+                            >
+                                🔮 Revelar Runas
+                            </button>
+                            <button
+                                type="button"
+                                id="tab-conjure"
+                                onclick="selectArenaMode('conjure')"
+                                class="py-2 px-2 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all"
+                            >
+                                ✍️ Conjurar Resposta
+                            </button>
+                            <button
+                                type="button"
+                                id="tab-voice"
+                                onclick="selectArenaMode('voice')"
+                                class="py-2 px-2 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all"
+                            >
+                                🎙️ Voz Arcana
+                            </button>
+                        </div>
+
+                        <!-- PAINEL 1: 🔮 Revelar Runas (Gabarito Direto) -->
+                        <div id="panel-reveal" class="space-y-4 pt-2">
+                            <div class="text-center" id="reveal-btn-container">
+                                <button
+                                    type="button"
+                                    id="btn-reveal-runes"
+                                    onclick="revealActiveRunes()"
+                                    class="rpg-btn-gold text-xs px-6 py-2.5"
+                                >
+                                    🔮 Revelar Runas & Gabarito
+                                </button>
+                            </div>
+
+                            <div id="active-expected-answer-box" class="hidden space-y-3">
+                                <div class="bg-[#0c0908] p-4 rounded-xl border border-[#785a28]/60 text-sm font-tome text-base text-[#f5ebd6] leading-relaxed">
+                                    <span class="font-cinzel text-xs font-bold text-[#c89b3c] block uppercase tracking-wider mb-1">
+                                        Runas Esperadas (Gabarito Oficial):
+                                    </span>
+                                    <span id="arena-expected-answer">{{ questions[0].expected_answer }}</span>
+                                </div>
+
+                                <!-- 4 Botões Oficiais de Avaliação SRS -->
+                                <div class="space-y-1.5">
+                                    <span class="block text-center text-xs font-cinzel font-bold text-[#a39276] uppercase">
+                                        Avalie seu Domínio Conceitual:
+                                    </span>
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        <button
+                                            type="button"
+                                            onclick="submitNodeReview(null, 'again', 0)"
+                                            class="py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-rose-800 bg-rose-950/60 text-rose-300 hover:bg-rose-900 transition-colors shadow"
+                                        >
+                                            ❌ Esqueci (Nv. 0)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onclick="submitNodeReview(null, 'hard', 50)"
+                                            class="py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-amber-800 bg-amber-950/60 text-amber-300 hover:bg-amber-900 transition-colors shadow"
+                                        >
+                                            ⚠️ Difícil (50%)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onclick="submitNodeReview(null, 'good', 85)"
+                                            class="py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#f0c869] hover:bg-[#251c14] transition-colors shadow"
+                                        >
+                                            ✅ Bom (+1 Nv.)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onclick="submitNodeReview(null, 'easy', 100)"
+                                            class="py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-emerald-800 bg-emerald-950/60 text-emerald-300 hover:bg-emerald-900 transition-colors shadow"
+                                        >
+                                            ⚡ Fácil (+1 Nv.)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PAINEL 2: ✍️ Conjurar Resposta (Texto + IA RAG) -->
+                        <div id="panel-conjure" class="hidden space-y-3 pt-2">
+                            <label for="conjure-textarea" class="block text-xs font-cinzel font-bold uppercase text-[#a39276]">
+                                Digite sua resposta dissertativa para avaliação:
+                            </label>
+                            <textarea
+                                id="conjure-textarea"
+                                rows="4"
+                                class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869] font-sans leading-relaxed"
+                                placeholder="Explique os conceitos com suas próprias palavras..."
+                            ></textarea>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] text-[#a39276]">Avaliação com Gemini AI & RAG do Tomo</span>
+                                <button
+                                    type="button"
+                                    id="btn-evaluate-text"
+                                    onclick="evaluateTextAnswer()"
+                                    class="rpg-btn-gold text-xs px-4 py-2"
+                                >
+                                    ✨ Avaliar com IA
+                                </button>
+                            </div>
+                            <div id="conjure-feedback-box" class="hidden p-4 rounded-xl bg-[#0c0908] border border-[#785a28] space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-cinzel font-bold text-xs text-[#f0c869]">Feedback da IA</span>
+                                    <span class="text-xs font-bold text-emerald-400" id="conjure-score">100%</span>
+                                </div>
+                                <p class="text-xs text-[#f5ebd6] leading-relaxed" id="conjure-feedback"></p>
+                            </div>
+                        </div>
+
+                        <!-- PAINEL 3: 🎙️ Voz Arcana (Áudio + IA Multimodal) -->
+                        <div id="panel-voice" class="hidden space-y-3 pt-2 text-center">
+                            <p class="text-xs text-[#a39276] leading-relaxed max-w-md mx-auto">
+                                Fale sua resposta em voz alta. O modelo multimodal transcreverá e julgará seu domínio conceitual.
+                            </p>
+                            <div class="py-2">
+                                <button
+                                    type="button"
+                                    id="btn-record-audio"
+                                    onclick="toggleAudioRecording()"
+                                    class="rpg-btn-bronze text-xs px-5 py-2.5 flex items-center justify-center gap-2 mx-auto"
+                                >
+                                    <span id="audio-rec-icon" aria-hidden="true">🔴</span>
+                                    <span id="audio-rec-label">Iniciar Gravação de Voz</span>
+                                </button>
+                            </div>
+                            <div id="voice-status" class="text-xs text-[#f0c869] font-mono hidden">
+                                Gravando áudio... Clique para finalizar.
+                            </div>
+                            <div id="voice-feedback-box" class="hidden text-left p-4 rounded-xl bg-[#0c0908] border border-[#785a28] space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-cinzel font-bold text-xs text-[#f0c869]">Voz Arcana Decodificada</span>
+                                    <span class="text-xs font-bold text-emerald-400" id="voice-score">100%</span>
+                                </div>
+                                <p class="text-xs text-[#f5ebd6] leading-relaxed" id="voice-feedback"></p>
+                            </div>
+                        </div>
+
+                    </div>
+                    {% else %}
+                    <p class="text-[#a39276] italic text-sm text-center py-6">Nenhuma provação SRS forjada para este nó. Use o botão acima para criar a primeira provação!</p>
+                    {% endif %}
+                </div>
+
+                <!-- Lista de Provações Cadastradas (com Exclusão e Consulta Rápida) -->
+                <div class="space-y-3 pt-4 border-t border-[#785a28]/40">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-[#a39276] font-cinzel">
+                        Todas as Provações do Nó ({{ questions | length }})
+                    </h3>
+                    <div id="questions-list" class="space-y-2.5">
+                        {% if questions %}
+                            {% for q in questions %}
+                            <div class="p-3.5 rounded-xl bg-[#14100d]/80 border border-[#785a28]/40 space-y-2 shadow-sm" id="question-card-item-{{ q.id }}">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-[10px] font-black uppercase text-[#f0c869] bg-[#1c1612] px-2 py-0.5 rounded border border-[#785a28]/60 font-cinzel">
+                                            RANK {{ q.current_level }}
+                                        </span>
+                                        {% if q.is_due %}
+                                        <span class="text-[10px] font-bold text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/40 animate-pulse">
+                                            🔥 VENCIDA
+                                        </span>
+                                        {% else %}
+                                        <span class="text-[10px] text-[#a39276]">
+                                            Próxima: {{ q.next_review_date }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onclick="deleteNodeQuestion('{{ q.id }}')"
+                                        title="Dissipar provação"
+                                        class="text-xs text-[#a39276] hover:text-[#e11d48] transition-colors p-1"
+                                    >
+                                        🗑️
+                                    </button>
+                                </div>
+                                <h4 class="font-semibold text-[#f5ebd6] text-xs sm:text-sm">
+                                    {{ q.statement or q.prompt }}
+                                </h4>
+                                <div class="text-xs text-[#a39276] font-tome text-sm bg-[#0c0908] p-2 rounded border border-[#785a28]/20">
+                                    <strong class="font-cinzel text-[10px] text-[#c89b3c] block uppercase">Gabarito:</strong>
+                                    {{ q.expected_answer }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-[#a39276] italic text-xs text-center py-2">Sem provações no registro.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </div>
+</div>
+
+<script>
+const MAP_ID = "{{ map.id }}";
+const NODE_ID = "{{ node.id }}";
+let QUESTIONS = {{ questions | tojson if questions else '[]' }};
+let activeIndex = 0;
+let currentMode = 'reveal';
+let mediaRecorder = null;
+let audioChunks = [];
+
+function toggleTheoryEditor() {
+    const editor = document.getElementById('theory-editor');
+    if (editor) editor.classList.toggle('hidden');
+}
+
+function toggleNewMaterialForm() {
+    const form = document.getElementById('new-material-form');
+    if (form) form.classList.toggle('hidden');
+}
+
+function toggleNewQuestionForm() {
+    const form = document.getElementById('new-question-form');
+    if (form) form.classList.toggle('hidden');
+}
+
+function toggleMaterialText(matId) {
+    const textEl = document.getElementById(`mat-text-${matId}`);
+    const labelEl = document.getElementById(`mat-label-${matId}`);
+    const iconEl = document.getElementById(`mat-icon-${matId}`);
+    if (!textEl) return;
+    if (textEl.classList.contains('hidden')) {
+        textEl.classList.remove('hidden');
+        if (labelEl) labelEl.textContent = 'Ocultar Leitura';
+        if (iconEl) iconEl.textContent = '🙈';
+    } else {
+        textEl.classList.add('hidden');
+        if (labelEl) labelEl.textContent = 'Expandir Leitura Integral';
+        if (iconEl) iconEl.textContent = '👁️';
+    }
+}
+
+async function saveNodeTheory() {
+    const text = document.getElementById('theory-textarea').value;
+    try {
+        const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/theory`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({theory_content: text})
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            alert('Falha ao salvar o Tomo de Sabedoria.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Erro ao comunicar com o servidor.');
+    }
+}
+
+async function createNodeMaterial() {
+    const title = document.getElementById('material-title-input').value;
+    const raw_text = document.getElementById('material-text-input').value;
+    try {
+        const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/materials`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title, raw_text, content_type: 'TEXT'})
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            alert('Falha ao forjar novo pergaminho.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Erro ao comunicar com o servidor.');
+    }
+}
+
+async function deleteNodeMaterial(materialId) {
+    if (!confirm('Deseja dissipar este pergaminho permanentemente?')) return;
+    try {
+        const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/materials/${materialId}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            const item = document.getElementById(`material-item-${materialId}`);
+            if (item) item.remove();
+        } else {
+            alert('Falha ao dissipar pergaminho.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Erro ao comunicar com o servidor.');
+    }
+}
+
+async function createNodeQuestion() {
+    const prompt = document.getElementById('question-prompt-input').value;
+    const expected_answer = document.getElementById('question-answer-input').value;
+    try {
+        const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({prompt, expected_answer})
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            alert('Falha ao selar nova provação.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Erro ao comunicar com o servidor.');
+    }
+}
+
+async function deleteNodeQuestion(questionId) {
+    if (!confirm('Deseja dissipar esta provação permanentemente?')) return;
+    try {
+        const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions/${questionId}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            const item = document.getElementById(`question-card-item-${questionId}`);
+            if (item) item.remove();
+            QUESTIONS = QUESTIONS.filter(q => q.id !== questionId);
+            if (activeIndex >= QUESTIONS.length) activeIndex = Math.max(0, QUESTIONS.length - 1);
+            updateArena();
+        } else {
+            alert('Falha ao dissipar provação.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Erro ao comunicar com o servidor.');
+    }
+}
+
+function updateArena() {
+    if (!QUESTIONS || QUESTIONS.length === 0) {
+        const arena = document.getElementById('active-srs-arena');
+        if (arena) arena.innerHTML = '<p class="text-[#a39276] italic text-sm text-center py-6">Nenhuma provação SRS cadastrada para este nó.</p>';
+        return;
+    }
+    const q = QUESTIONS[activeIndex];
+    const counterEl = document.getElementById('arena-question-counter');
+    const rankEl = document.getElementById('arena-question-rank');
+    const dueEl = document.getElementById('arena-question-due');
+    const promptEl = document.getElementById('arena-prompt');
+    const answerEl = document.getElementById('arena-expected-answer');
+
+    if (counterEl) counterEl.textContent = `Provação ${activeIndex + 1} de ${QUESTIONS.length}`;
+    if (rankEl) rankEl.textContent = `RANK ${q.current_level}`;
+    if (dueEl) dueEl.textContent = q.is_due ? '🔥 VENCIDA' : `Próxima: ${q.next_review_date}`;
+    if (promptEl) promptEl.textContent = q.statement || q.prompt;
+    if (answerEl) answerEl.textContent = q.expected_answer;
+
+    // Reseta estado de revelação
+    const ansBox = document.getElementById('active-expected-answer-box');
+    const revBtn = document.getElementById('reveal-btn-container');
+    if (ansBox) ansBox.classList.add('hidden');
+    if (revBtn) revBtn.classList.remove('hidden');
+
+    const conjureBox = document.getElementById('conjure-feedback-box');
+    if (conjureBox) conjureBox.classList.add('hidden');
+    const voiceBox = document.getElementById('voice-feedback-box');
+    if (voiceBox) voiceBox.classList.add('hidden');
+}
+
+function navigateQuestion(delta) {
+    if (!QUESTIONS || QUESTIONS.length === 0) return;
+    activeIndex = (activeIndex + delta + QUESTIONS.length) % QUESTIONS.length;
+    updateArena();
+}
+
+function selectArenaMode(mode) {
+    currentMode = mode;
+    const tabRev = document.getElementById('tab-reveal');
+    const tabConj = document.getElementById('tab-conjure');
+    const tabVoice = document.getElementById('tab-voice');
+    const pRev = document.getElementById('panel-reveal');
+    const pConj = document.getElementById('panel-conjure');
+    const pVoice = document.getElementById('panel-voice');
+
+    [tabRev, tabConj, tabVoice].forEach(t => {
+        if (!t) return;
+        t.className = 'py-2 px-2 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all';
+    });
+    [pRev, pConj, pVoice].forEach(p => {
+        if (p) p.classList.add('hidden');
+    });
+
+    if (mode === 'reveal') {
+        if (tabRev) tabRev.className = 'py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow';
+        if (pRev) pRev.classList.remove('hidden');
+    } else if (mode === 'conjure') {
+        if (tabConj) tabConj.className = 'py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow';
+        if (pConj) pConj.classList.remove('hidden');
+    } else if (mode === 'voice') {
+        if (tabVoice) tabVoice.className = 'py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow';
+        if (pVoice) pVoice.classList.remove('hidden');
+    }
+}
+
+function revealActiveRunes() {
+    const ansBox = document.getElementById('active-expected-answer-box');
+    const revBtn = document.getElementById('reveal-btn-container');
+    if (ansBox) ansBox.classList.remove('hidden');
+    if (revBtn) revBtn.classList.add('hidden');
+}
+
+async function submitNodeReview(questionId, difficulty, score) {
+    const qid = questionId || (QUESTIONS[activeIndex] ? QUESTIONS[activeIndex].id : null);
+    if (!qid) return;
+
+    try {
+        const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions/${qid}/review`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({score, difficulty})
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+
+            // Atualiza objeto em memória
+            if (QUESTIONS[activeIndex] && QUESTIONS[activeIndex].id === qid) {
+                QUESTIONS[activeIndex].current_level = data.new_level;
+                QUESTIONS[activeIndex].next_review_date = data.next_review_date;
+                QUESTIONS[activeIndex].is_due = false;
+            }
+
+            // Banner Treino Livre
+            const trainBanner = document.getElementById('training-mode-banner');
+            const trainText = document.getElementById('training-mode-banner-text');
+            if (data.is_training_only) {
+                if (trainText) trainText.textContent = `Modo Treino Livre — Provação já agendada para ${data.next_review_date}. Nível mantido sem penalidade.`;
+                if (trainBanner) trainBanner.classList.remove('hidden');
+            } else if (trainBanner) {
+                trainBanner.classList.add('hidden');
+            }
+
+            // Banner Rank Up
+            const rankBanner = document.getElementById('rankup-banner');
+            const rankText = document.getElementById('rankup-banner-text');
+            if (data.leveled_up || data.new_node_level >= 1) {
+                if (rankText) {
+                    rankText.textContent = `Nó ascendeu ao Nível ${data.new_node_level}! Novos caminhos foram destrancados na Árvore de Conhecimento!`;
+                }
+                if (rankBanner) rankBanner.classList.remove('hidden');
+            }
+
+            // Atualiza progresso do nó no HUD
+            const summaryEl = document.getElementById('node-progress-summary');
+            const barEl = document.getElementById('node-progress-bar');
+            if (barEl) barEl.style.width = `${data.node_progress_percent}%`;
+
+            updateArena();
+        } else {
+            alert('Falha ao submeter revisão SRS.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Erro ao comunicar com o servidor.');
+    }
+}
+
+async function evaluateTextAnswer() {
+    const q = QUESTIONS[activeIndex];
+    if (!q) return;
+    const answer = document.getElementById('conjure-textarea').value;
+    if (!answer.trim()) {
+        alert('Digite sua resposta antes de avaliar.');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/v1/questions/${q.id}/evaluate-text`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({student_answer: answer})
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            const box = document.getElementById('conjure-feedback-box');
+            const scoreEl = document.getElementById('conjure-score');
+            const feedEl = document.getElementById('conjure-feedback');
+            if (scoreEl) scoreEl.textContent = `${data.score}%`;
+            if (feedEl) feedEl.textContent = data.feedback || 'Resposta avaliada com sucesso.';
+            if (box) box.classList.remove('hidden');
+
+            // Atualiza maestria no nó
+            await submitNodeReview(q.id, null, data.score);
+        } else {
+            // Fallback direto
+            revealActiveRunes();
+            selectArenaMode('reveal');
+        }
+    } catch (err) {
+        console.error(err);
+        revealActiveRunes();
+        selectArenaMode('reveal');
+    }
+}
+
+async function toggleAudioRecording() {
+    const statusEl = document.getElementById('voice-status');
+    const labelEl = document.getElementById('audio-rec-label');
+    const iconEl = document.getElementById('audio-rec-icon');
+
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        if (statusEl) statusEl.classList.add('hidden');
+        if (labelEl) labelEl.textContent = 'Iniciar Gravação de Voz';
+        if (iconEl) iconEl.textContent = '🔴';
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = async () => {
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            await submitAudioForEvaluation(blob);
+        };
+        mediaRecorder.start();
+        if (statusEl) statusEl.classList.remove('hidden');
+        if (labelEl) labelEl.textContent = 'Parar Gravação';
+        if (iconEl) iconEl.textContent = '⏹️';
+    } catch (err) {
+        console.warn('Microfone não acessível ou sem permissão:', err);
+        alert('Permissão de microfone não concedida ou dispositivo indisponível.');
+    }
+}
+
+async function submitAudioForEvaluation(audioBlob) {
+    const q = QUESTIONS[activeIndex];
+    if (!q) return;
+    const formData = new FormData();
+    formData.append('audio_file', audioBlob, 'answer.webm');
+
+    try {
+        const res = await fetch(`/api/v1/questions/${q.id}/evaluate-audio`, {
+            method: 'POST',
+            body: formData
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const box = document.getElementById('voice-feedback-box');
+            const scoreEl = document.getElementById('voice-score');
+            const feedEl = document.getElementById('voice-feedback');
+            if (scoreEl) scoreEl.textContent = `${data.score}%`;
+            if (feedEl) feedEl.textContent = data.feedback || 'Áudio avaliado com sucesso.';
+            if (box) box.classList.remove('hidden');
+
+            await submitNodeReview(q.id, null, data.score);
+        } else {
+            revealActiveRunes();
+            selectArenaMode('reveal');
+        }
+    } catch (err) {
+        console.error(err);
+        revealActiveRunes();
+        selectArenaMode('reveal');
+    }
+}
+</script>
+{% endblock %}

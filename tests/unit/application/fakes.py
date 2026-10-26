@@ -292,6 +292,13 @@ class FakeQuestionRepository(IQuestionRepository):
             if q.topic_id == topic_id
         ]
 
+    def list_by_node(self, node_id: UUID) -> list[Question]:
+        return [
+            q
+            for q in sorted(self._questions.values(), key=lambda x: x.created_at)
+            if q.node_id == node_id or node_id in q.topic_ids
+        ]
+
     def delete(self, question_id: UUID) -> None:
         self._questions.pop(question_id, None)
 
@@ -405,6 +412,15 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
 
     def list_by_user(self, user_id: UUID) -> list[UserQuestionProgress]:
         return [p for (u_id, _), p in self._progress.items() if u_id == user_id]
+
+    def get_by_questions(
+        self, user_id: UUID, question_ids: list[UUID]
+    ) -> dict[UUID, UserQuestionProgress]:
+        return {
+            q_id: p
+            for (u_id, q_id), p in self._progress.items()
+            if u_id == user_id and q_id in question_ids
+        }
 
 
 class FakeReviewAuditRepository(IReviewAuditRepository):

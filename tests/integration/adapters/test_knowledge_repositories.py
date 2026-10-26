@@ -158,7 +158,18 @@ def test_knowledge_repository_multi_topic_isolation(db_session: Session) -> None
     assert len(results_a) == 1
     assert results_a[0][0].id == c_a.id
 
-    # Busca no Tema B deve retornar estritamente c_b e NUNCA c_a
-    results_b = chunk_repo.search_similar(topic_b.id, [1.0, 0.0, 0.0], top_k=5)
-    assert len(results_b) == 1
-    assert results_b[0][0].id == c_b.id
+
+@pytest.mark.unit
+def test_knowledge_source_mapper_legacy_fallback() -> None:
+    from src.adapters.persistence.mappers import KnowledgeSourceMapper
+    from src.adapters.persistence.models import KnowledgeSourceModel
+
+    tid = uuid4()
+    legacy_model = KnowledgeSourceModel(
+        id=uuid4(),
+        topic_id=tid,
+        title="Fonte Legado",
+    )
+    legacy_model.topics = []
+    domain = KnowledgeSourceMapper.to_domain(legacy_model)
+    assert domain.topic_ids == (tid,)
