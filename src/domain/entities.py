@@ -251,6 +251,7 @@ class Question:
     prompt: str = ""
     expected_answer: str = ""
     topic_ids: tuple[UUID, ...] = field(default_factory=tuple)
+    node_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: date = field(default_factory=date.today)
 
@@ -264,6 +265,7 @@ class Question:
         topic_id: UUID | None = None,
         prompt: str | None = None,
         expected_answer: str | None = None,
+        node_id: UUID | None = None,
     ) -> None:
         actual_prompt: str = ""
         actual_answer: str = ""
@@ -287,12 +289,15 @@ class Question:
         self.expected_answer = actual_answer.strip() if actual_answer is not None else ""
         self.id = id if id is not None else uuid4()
         self.created_at = created_at if created_at is not None else date.today()
+        self.node_id = node_id
 
         resolved_topics: tuple[UUID, ...]
         if topic_ids is not None:
             resolved_topics = tuple(topic_ids)
         elif actual_topic_id is not None:
             resolved_topics = (actual_topic_id,)
+        elif node_id is not None:
+            resolved_topics = (node_id,)
         else:
             resolved_topics = ()
 
@@ -304,6 +309,8 @@ class Question:
         self.expected_answer = (
             self.expected_answer.strip() if self.expected_answer is not None else ""
         )
+        if not self.topic_ids and self.node_id is not None:
+            object.__setattr__(self, "topic_ids", (self.node_id,))
 
         if not self.topic_ids or len(self.topic_ids) < 1:
             raise DomainValidationError("Pergunta deve estar associada a pelo menos 1 tema.")
@@ -412,6 +419,8 @@ class KnowledgeSource:
     content_type: str = "TEXT"  # TEXT, SUMMARY, BOOK_CHAPTER, PDF, DOCX
     total_chunks: int = 0
     char_count: int = 0
+    raw_text: str = ""
+    node_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: date = field(default_factory=date.today)
 
@@ -425,6 +434,8 @@ class KnowledgeSource:
         id: UUID | None = None,
         created_at: date | None = None,
         topic_id: UUID | None = None,
+        raw_text: str = "",
+        node_id: UUID | None = None,
     ) -> None:
         if isinstance(title, UUID):
             # Compatibilidade com chamada posicional legada: KnowledgeSource(topic_id, title)
@@ -438,6 +449,8 @@ class KnowledgeSource:
         self.content_type = content_type or "TEXT"
         self.total_chunks = total_chunks if total_chunks is not None else 0
         self.char_count = char_count if char_count is not None else 0
+        self.raw_text = raw_text.strip() if raw_text else ""
+        self.node_id = node_id
         self.id = id if id is not None else uuid4()
         self.created_at = created_at if created_at is not None else date.today()
 
@@ -446,10 +459,17 @@ class KnowledgeSource:
             resolved_topics = tuple(topic_ids)
         elif topic_id is not None:
             resolved_topics = (topic_id,)
+        elif node_id is not None:
+            resolved_topics = (node_id,)
         else:
             resolved_topics = ()
 
         self.topic_ids = resolved_topics
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        if not self.topic_ids and self.node_id is not None:
+            object.__setattr__(self, "topic_ids", (self.node_id,))
 
         if len(self.title) < 2 or len(self.title) > 200:
             raise DomainValidationError("Título do material deve ter entre 2 e 200 caracteres.")
@@ -685,6 +705,7 @@ class StudyNode:
     map_id: UUID
     title: str
     description: str | None = None
+    theory_content: str = ""
     pos_x: float = 0.0
     pos_y: float = 0.0
     icon: str = "brain"
@@ -697,6 +718,7 @@ class StudyNode:
         if self.description is not None:
             cleaned = self.description.strip()
             self.description = cleaned if cleaned else None
+        self.theory_content = self.theory_content.strip() if self.theory_content else ""
         self.icon = self.icon.strip() if self.icon else "brain"
 
         if not self.title:
@@ -707,6 +729,10 @@ class StudyNode:
     def update_position(self, x: float, y: float) -> None:
         self.pos_x = float(x)
         self.pos_y = float(y)
+        self.updated_at = datetime.now(UTC)
+
+    def update_theory(self, content: str) -> None:
+        self.theory_content = content.strip() if content else ""
         self.updated_at = datetime.now(UTC)
 
 

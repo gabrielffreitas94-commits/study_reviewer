@@ -79,6 +79,9 @@ class FakeSourceRepository(IKnowledgeSourceRepository):
     def list_by_topics(self, topic_ids: list[UUID]) -> list[KnowledgeSource]:
         return list(self.sources.values())
 
+    def list_by_node(self, node_id: UUID) -> list[KnowledgeSource]:
+        return [s for s in self.sources.values() if s.node_id == node_id or node_id in s.topic_ids]
+
     def save(self, source: KnowledgeSource) -> KnowledgeSource:
         self.sources[source.id] = source
         return source
@@ -99,6 +102,9 @@ class FakeQuestionRepo(IQuestionRepository):
 
     def list_by_topics(self, topic_ids: list[UUID]) -> list[Question]:
         return list(self.questions.values())
+
+    def list_by_node(self, node_id: UUID) -> list[Question]:
+        return [q for q in self.questions.values() if q.node_id == node_id or node_id in q.topic_ids]
 
     def count_by_topic(self, topic_id: UUID) -> int:
         return len(self.questions)

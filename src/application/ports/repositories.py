@@ -197,6 +197,10 @@ class IQuestionRepository(Protocol):
         """Lista todas as perguntas pertencentes a um determinado tema."""
         ...
 
+    def list_by_node(self, node_id: UUID) -> list[Question]:
+        """Lista todas as perguntas vinculadas a um determinado nó da árvore."""
+        ...
+
     def delete(self, question_id: UUID) -> None:
         """Exclui permanentemente uma pergunta do catálogo."""
         ...
@@ -318,6 +322,10 @@ class IKnowledgeSourceRepository(Protocol):
 
     def list_by_topic(self, topic_id: UUID) -> list[KnowledgeSource]:
         """Lista todas as fontes de conhecimento vinculadas a um tema."""
+        ...
+
+    def list_by_node(self, node_id: UUID) -> list[KnowledgeSource]:
+        """Lista todas as fontes de conhecimento vinculadas a um nó da árvore."""
         ...
 
     def delete(self, source_id: UUID) -> bool:

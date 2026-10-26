@@ -492,6 +492,8 @@ class SqlAlchemyQuestionRepository(IQuestionRepository):
         ).delete(synchronize_session=False)
 
         for t_id in question.topic_ids:
+            if not self._session.get(TopicModel, t_id):
+                continue
             assoc = QuestionTopicModel(question_id=question.id, topic_id=t_id)
             self._session.add(assoc)
 
@@ -510,6 +512,22 @@ class SqlAlchemyQuestionRepository(IQuestionRepository):
                 or_(
                     QuestionTopicModel.topic_id == topic_id,
                     QuestionModel.topic_id == topic_id,
+                )
+            )
+            .distinct()
+            .order_by(QuestionModel.created_at.asc(), QuestionModel.id.asc())
+        )
+        models = self._session.scalars(stmt).all()
+        return [QuestionMapper.to_domain(m) for m in models]
+
+    def list_by_node(self, node_id: UUID) -> list[Question]:
+        stmt = (
+            select(QuestionModel)
+            .outerjoin(NodeQuestionModel, NodeQuestionModel.question_id == QuestionModel.id)
+            .where(
+                or_(
+                    QuestionModel.node_id == node_id,
+                    NodeQuestionModel.node_id == node_id,
                 )
             )
             .distinct()
@@ -802,8 +820,10 @@ class SqlAlchemyKnowledgeSourceRepository(IKnowledgeSourceRepository):
             existing.content_type = source.content_type
             existing.total_chunks = source.total_chunks
             existing.char_count = source.char_count
-            if source.topic_ids:
-                existing.topic_id = source.topic_ids[0]
+            existing.raw_text = source.raw_text
+            existing.node_id = source.node_id
+            real_topics = [tid for tid in source.topic_ids if tid != source.node_id]
+            existing.topic_id = real_topics[0] if real_topics else None
             model = existing
         else:
             model = KnowledgeSourceMapper.to_model(source)
@@ -816,6 +836,8 @@ class SqlAlchemyKnowledgeSourceRepository(IKnowledgeSourceRepository):
         ).delete()
 
         for t_id in source.topic_ids:
+            if not self._session.get(TopicModel, t_id):
+                continue
             assoc = KnowledgeSourceTopicModel(source_id=source.id, topic_id=t_id)
             self._session.add(assoc)
 
@@ -844,6 +866,25 @@ class SqlAlchemyKnowledgeSourceRepository(IKnowledgeSourceRepository):
                 or_(
                     KnowledgeSourceTopicModel.topic_id == topic_id,
                     KnowledgeSourceModel.topic_id == topic_id,
+                )
+            )
+            .distinct()
+            .order_by(KnowledgeSourceModel.created_at.desc(), KnowledgeSourceModel.id.desc())
+        )
+        return [KnowledgeSourceMapper.to_domain(m) for m in self._session.scalars(stmt)]
+
+    def list_by_node(self, node_id: UUID) -> list[KnowledgeSource]:
+        stmt = (
+            select(KnowledgeSourceModel)
+            .options(selectinload(KnowledgeSourceModel.topics))
+            .outerjoin(
+                NodeKnowledgeSourceModel,
+                NodeKnowledgeSourceModel.source_id == KnowledgeSourceModel.id,
+            )
+            .where(
+                or_(
+                    KnowledgeSourceModel.node_id == node_id,
+                    NodeKnowledgeSourceModel.node_id == node_id,
                 )
             )
             .distinct()
@@ -1025,6 +1066,7 @@ class SqlAlchemyStudyNodeRepository(IStudyNodeRepository):
         if model:
             model.title = node.title
             model.description = node.description
+            model.theory_content = node.theory_content
             model.pos_x = node.pos_x
             model.pos_y = node.pos_y
             model.icon = node.icon

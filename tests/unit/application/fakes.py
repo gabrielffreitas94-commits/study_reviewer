@@ -292,6 +292,13 @@ class FakeQuestionRepository(IQuestionRepository):
             if q.topic_id == topic_id
         ]
 
+    def list_by_node(self, node_id: UUID) -> list[Question]:
+        return [
+            q
+            for q in sorted(self._questions.values(), key=lambda x: x.created_at)
+            if q.node_id == node_id or node_id in q.topic_ids
+        ]
+
     def delete(self, question_id: UUID) -> None:
         self._questions.pop(question_id, None)
 

@@ -233,6 +233,9 @@ class QuestionModel(Base):
     topic_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    node_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     expected_answer: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
@@ -362,10 +365,14 @@ class KnowledgeSourceModel(Base):
     topic_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    node_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content_type: Mapped[str] = mapped_column(String(50), nullable=False, default="TEXT")
     total_chunks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     char_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    raw_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
     topic: Mapped["TopicModel | None"] = relationship("TopicModel", foreign_keys=[topic_id])
@@ -546,6 +553,7 @@ class StudyNodeModel(Base):
     )
     title: Mapped[str] = mapped_column(String(150), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    theory_content: Mapped[str] = mapped_column(Text, default="", nullable=False)
     pos_x: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     pos_y: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     icon: Mapped[str] = mapped_column(String(50), nullable=False, default="brain")

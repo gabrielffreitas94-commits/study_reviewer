@@ -204,3 +204,103 @@ def test_node_content_attachment(db_session: Session) -> None:
     # Testa get_by_questions vazio
     prog_repo = SqlAlchemyQuestionProgressRepository(db_session)
     assert prog_repo.get_by_questions(user.id, []) == {}
+
+@pytest.mark.integration
+def test_rpg_grimoire_repository_direct_bindings(db_session: Session) -> None:
+    user_repo = SqlAlchemyUserRepository(db_session)
+    map_repo = SqlAlchemyStudyMapRepository(db_session)
+    node_repo = SqlAlchemyStudyNodeRepository(db_session)
+    q_repo = SqlAlchemyQuestionRepository(db_session)
+    k_repo = SqlAlchemyKnowledgeSourceRepository(db_session)
+    content_repo = SqlAlchemyNodeContentRepository(db_session)
+
+    user = User(google_sub="sub-grimoire-1", email="grimoire1@test.com", name="Grimoire Mage")
+    user_repo.save(user)
+    s_map = map_repo.save(StudyMap(owner_id=user.id, title="Álgebra Abstrata"))
+
+    # 1. StudyNode with theory_content
+    node = StudyNode(
+        map_id=s_map.id,
+        title="Teoria dos Grupos",
+        theory_content="Um grupo (G, *) satisfaz fechamento, associatividade, elemento neutro e inverso.",
+    )
+    saved_node = node_repo.save(node)
+    assert (
+        saved_node.theory_content
+        == "Um grupo (G, *) satisfaz fechamento, associatividade, elemento neutro e inverso."
+    )
+
+    fetched_node = node_repo.get_by_id(node.id)
+    assert fetched_node is not None
+    assert fetched_node.theory_content == saved_node.theory_content
+
+    # Update theory_content
+    node.update_theory("Teoria dos Grupos de Lie e álgebras associadas.")
+    node_repo.save(node)
+    refetched_node = node_repo.get_by_id(node.id)
+    assert refetched_node is not None
+    assert refetched_node.theory_content == "Teoria dos Grupos de Lie e álgebras associadas."
+
+    # 2. Question with direct node_id (no legacy Topic created in database)
+    q_direct = Question(
+        prompt="O que é o teorema de Lagrange para grupos finitos?",
+        expected_answer="A ordem de um subgrupo divide a ordem do grupo.",
+        node_id=node.id,
+    )
+    q_repo.save(q_direct)
+
+    fetched_q = q_repo.get_by_id(q_direct.id)
+    assert fetched_q is not None
+    assert fetched_q.node_id == node.id
+    assert fetched_q.prompt == q_direct.prompt
+
+    # Also test Question attached via NodeQuestionModel
+    q_attached = Question(
+        prompt="O que é um subgrupo normal?",
+        expected_answer="Um subgrupo N tal que gNg^-1 = N para todo g em G.",
+        node_id=node.id,
+    )
+    q_repo.save(q_attached)
+    content_repo.attach_question(node.id, q_attached.id)
+
+    node_questions = q_repo.list_by_node(node.id)
+    node_question_ids = {q.id for q in node_questions}
+    assert q_direct.id in node_question_ids
+    assert q_attached.id in node_question_ids
+
+    # 3. KnowledgeSource with direct node_id and raw_text (no legacy Topic created)
+    src_direct = KnowledgeSource(
+        title="Tomo de Homomorfismos",
+        node_id=node.id,
+        raw_text="Homomorfismos preservam a operação de grupo: f(a*b) = f(a)*f(b).",
+        content_type="TEXT",
+    )
+    k_repo.save(src_direct)
+
+    fetched_src = k_repo.get_by_id(src_direct.id)
+    assert fetched_src is not None
+    assert fetched_src.node_id == node.id
+    assert fetched_src.raw_text == src_direct.raw_text
+
+    # Update KnowledgeSource
+    src_direct.raw_text = "Texto atualizado com Primeiro Teorema do Isomorfismo."
+    k_repo.save(src_direct)
+    refetched_src = k_repo.get_by_id(src_direct.id)
+    assert refetched_src is not None
+    assert refetched_src.raw_text == "Texto atualizado com Primeiro Teorema do Isomorfismo."
+
+    # KnowledgeSource attached via NodeKnowledgeSourceModel
+    src_attached = KnowledgeSource(
+        title="Pergaminho dos Isomorfismos",
+        node_id=node.id,
+        raw_text="G / ker(phi) eh isomorfo a Im(phi).",
+        content_type="TEXT",
+    )
+    k_repo.save(src_attached)
+    content_repo.attach_knowledge_source(node.id, src_attached.id)
+
+    node_sources = k_repo.list_by_node(node.id)
+    node_source_ids = {s.id for s in node_sources}
+    assert src_direct.id in node_source_ids
+    assert src_attached.id in node_source_ids
+

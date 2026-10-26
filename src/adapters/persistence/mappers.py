@@ -176,11 +176,15 @@ class QuestionMapper:
     @staticmethod
     def to_domain(model: QuestionModel) -> Question:
         topic_ids = tuple(t.id for t in model.topics) if getattr(model, "topics", None) else ()
-        if not topic_ids and model.topic_id:
+        if not topic_ids and getattr(model, "topic_id", None):
             topic_ids = (model.topic_id,)
+        node_id = getattr(model, "node_id", None)
+        if not topic_ids and node_id is not None:
+            topic_ids = (node_id,)
         return Question(
             id=model.id,
             topic_ids=topic_ids,
+            node_id=node_id,
             prompt=str(model.prompt),
             expected_answer=str(model.expected_answer),
             created_at=model.created_at,
@@ -188,9 +192,15 @@ class QuestionMapper:
 
     @staticmethod
     def to_model(entity: Question) -> QuestionModel:
+        topic_id = None
+        if entity.topic_ids:
+            real_topics = [tid for tid in entity.topic_ids if tid != entity.node_id]
+            if real_topics:
+                topic_id = real_topics[0]
         return QuestionModel(
             id=entity.id,
-            topic_id=entity.topic_id if entity.topic_ids else None,
+            topic_id=topic_id,
+            node_id=entity.node_id,
             prompt=entity.prompt,
             expected_answer=entity.expected_answer,
             created_at=entity.created_at,
@@ -269,12 +279,17 @@ class KnowledgeSourceMapper:
     @staticmethod
     def to_domain(model: KnowledgeSourceModel) -> KnowledgeSource:
         topic_ids = tuple(t.id for t in model.topics) if getattr(model, "topics", None) else ()
-        if not topic_ids and model.topic_id:
+        if not topic_ids and getattr(model, "topic_id", None):
             topic_ids = (model.topic_id,)
+        node_id = getattr(model, "node_id", None)
+        if not topic_ids and node_id is not None:
+            topic_ids = (node_id,)
         return KnowledgeSource(
             id=model.id,
             title=model.title,
             topic_ids=topic_ids,
+            node_id=node_id,
+            raw_text=getattr(model, "raw_text", "") or "",
             content_type=model.content_type,
             total_chunks=model.total_chunks,
             char_count=model.char_count,
@@ -283,13 +298,20 @@ class KnowledgeSourceMapper:
 
     @staticmethod
     def to_model(entity: KnowledgeSource) -> KnowledgeSourceModel:
+        topic_id = None
+        if entity.topic_ids:
+            real_topics = [tid for tid in entity.topic_ids if tid != entity.node_id]
+            if real_topics:
+                topic_id = real_topics[0]
         return KnowledgeSourceModel(
             id=entity.id,
-            topic_id=entity.topic_id if entity.topic_ids else None,
+            topic_id=topic_id,
+            node_id=entity.node_id,
             title=entity.title,
             content_type=entity.content_type,
             total_chunks=entity.total_chunks,
             char_count=entity.char_count,
+            raw_text=entity.raw_text,
             created_at=entity.created_at,
         )
 
@@ -412,6 +434,7 @@ class StudyNodeMapper:
             map_id=model.map_id,
             title=model.title,
             description=model.description,
+            theory_content=getattr(model, "theory_content", "") or "",
             pos_x=model.pos_x,
             pos_y=model.pos_y,
             icon=model.icon,
@@ -426,6 +449,7 @@ class StudyNodeMapper:
             map_id=entity.map_id,
             title=entity.title,
             description=entity.description,
+            theory_content=entity.theory_content,
             pos_x=entity.pos_x,
             pos_y=entity.pos_y,
             icon=entity.icon,
