@@ -20,30 +20,41 @@ on:
         description: 'Período retroativo de logs (ex: 30m, 1h, 3h, 24h)'
         required: false
         default: '3h'
-  push:
+  pull_request:
+    types:
+      - closed
     branches:
       - main
       - staging
 
 concurrency:
-  group: deploy-aws-${{ github.ref_name }}
+  group: deploy-aws-${{ github.event.pull_request.base.ref || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   deploy-aws-serverless:
     name: Deploy to AWS Lambda & DynamoDB (R$ 0,00)
     runs-on: ubuntu-latest
-    if: ${{ !github.event.repository.fork }}
+    if: >
+      !github.event.repository.fork &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.merged == true))
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
 
       - name: Resolve Target Environment
         id: env-resolver
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TARGET_ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+            TARGET_ENV="production"
+          elif [ "${{ github.event.pull_request.base.ref }}" = "staging" ]; then
+            TARGET_ENV="staging"
           elif [ "${{ github.ref_name }}" = "main" ]; then
             TARGET_ENV="production"
           else
@@ -53,7 +64,7 @@ jobs:
           echo "TARGET_ENV=$TARGET_ENV" >> $GITHUB_ENV
           echo "=========================================================="
           echo "🎯 AMBIENTE DE DEPLOY ALVO: $TARGET_ENV"
-          echo "📌 GATILHO: ${{ github.event_name }} (${{ github.ref_name }})"
+          echo "📌 GATILHO: ${{ github.event_name }} (base: ${{ github.event.pull_request.base.ref || github.ref_name }})"
           echo "=========================================================="
 
       - name: Configure AWS Credentials
