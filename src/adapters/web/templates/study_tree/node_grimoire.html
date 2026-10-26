@@ -3,34 +3,6 @@
 {% block title %}{{ node.title }} — Grimório de Habilidades — Study Reviewer{% endblock %}
 
 {% block content %}
-{% set icon_map = {
-    'calculator': '📐',
-    'trending-up': '📈',
-    'dice': '🎲',
-    'activity': '⚡',
-    'brain': '🧠',
-    'book': '📖',
-    'code': '💻',
-    'cpu': '⚙️',
-    'database': '🗄️',
-    'globe': '🌐',
-    'layers': '📚',
-    'shield': '🛡️',
-    'terminal': '🖥️',
-    'zap': '⚡',
-    'award': '🏆',
-    'compass': '🧭',
-    'feather': '🪶',
-    'flame': '🔥',
-    'key': '🗝️',
-    'scroll': '📜',
-    'sword': '⚔️',
-    'fire': '🔥',
-    'flask': '🧪',
-    'gem': '💎',
-    'rune': '🔮'
-} %}
-
 <div class="space-y-6 w-full max-w-7xl mx-auto py-2">
 
     <!-- Top Navigation / Breadcrumbs -->
@@ -68,8 +40,8 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
             <div class="flex items-center space-x-5">
                 <!-- Medalhão com Ícone Rúnico -->
-                <div class="w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center text-3xl shadow-xl border-2 transition-transform hover:scale-105 {% if not node.is_unlocked %}bg-[#14100d] border-[#3b322c] opacity-75 grayscale{% elif node.effective_level >= 3 %}bg-[#251c14] border-[#f0c869] shadow-[#f0c869]/30 text-[#f0c869]{% elif node.effective_level >= 1 %}bg-[#1f1813] border-[#785a28] shadow-[#c89b3c]/20 text-[#c89b3c]{% else %}bg-[#1c1612] border-[#574737] text-[#a39276]{% endif %}">
-                    {{ icon_map.get(node.icon, '⚔️') }}
+                <div class="w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center p-2.5 shadow-xl border-2 transition-transform hover:scale-105 {% if not node.is_unlocked %}bg-[#14100d] border-[#3b322c] opacity-75 grayscale{% elif node.effective_level >= 3 %}bg-[#251c14] border-[#f0c869] shadow-[#f0c869]/30 text-[#f0c869]{% elif node.effective_level >= 1 %}bg-[#1f1813] border-[#785a28] shadow-[#c89b3c]/20 text-[#c89b3c]{% else %}bg-[#1c1612] border-[#574737] text-[#a39276]{% endif %}">
+                    {{ get_rpg_icon_svg(node.icon, "w-10 h-10") | safe }}
                 </div>
                 <div>
                     <h1 class="text-2xl sm:text-3xl font-extrabold text-[#f0c869] tracking-wider font-cinzel">
@@ -1004,4 +976,5 @@ async function submitAudioForEvaluation(audioBlob) {
     }
 }
 </script>
+<script src="/static/js/rpg_icons.js"></script>
 {% endblock %}

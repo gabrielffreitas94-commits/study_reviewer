@@ -18,6 +18,7 @@ from src.adapters.persistence.repositories import (
     SqlAlchemyStudyMapRepository,
     SqlAlchemyStudyNodeRepository,
 )
+from src.adapters.web.rpg_icons import get_rpg_icon_svg
 from src.application.use_cases.study_tree_use_cases import GetNodeStudyHubUseCase
 from src.domain.entities import User
 from src.domain.services import StudyTreeProgressionService
@@ -26,6 +27,7 @@ from src.infrastructure.security.dependencies import get_current_user
 
 templates_dir = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
+templates.env.globals["get_rpg_icon_svg"] = get_rpg_icon_svg
 
 web_study_tree_router = APIRouter()
 

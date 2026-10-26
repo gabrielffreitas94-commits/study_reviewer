@@ -164,7 +164,9 @@
 
             const isLocked = !node.is_unlocked;
             const isOverdue = node.overdue_questions_count > 0;
-            const iconGlyph = ICON_MAP[node.icon] || '🧠';
+            const svgIconMarkup = (typeof window.getRpgIconSvg === 'function')
+                ? window.getRpgIconSvg(node.icon, 'w-8 h-8 text-[#f0c869] drop-shadow')
+                : `<span class="text-3xl filter drop-shadow">${ICON_MAP[node.icon] || '📜'}</span>`;
 
             // Aura e estilização conforme patente SRS
             let ringClass = 'border-[#574737] bg-[#1c1612] text-[#a39276]';
@@ -196,7 +198,7 @@
 
             el.innerHTML = `
                 <div class="relative w-20 h-20 rounded-full border-2 ${ringClass} ${glowEffect} ${overduePulse} flex items-center justify-center transition-all duration-200 group-hover:scale-110">
-                    <span class="text-3xl filter drop-shadow">${iconGlyph}</span>
+                    <div class="w-9 h-9 flex items-center justify-center">${svgIconMarkup}</div>
 
                     ${isLocked ? `
                         <div class="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-[#14100d] border border-[#3b322c] flex items-center justify-center text-xs shadow-md">
