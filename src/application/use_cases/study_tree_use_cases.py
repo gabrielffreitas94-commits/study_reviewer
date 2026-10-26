@@ -1,6 +1,7 @@
 """Casos de uso para a Árvore de Estudos RPG (Clean Architecture - Camada 2)."""
 
-from datetime import date
+from datetime import UTC, date, datetime
+from typing import Any
 from uuid import UUID
 
 from src.application.dto.study_tree_dto import (
@@ -16,22 +17,31 @@ from src.application.dto.study_tree_dto import (
     UpdateStudyNodeDTO,
 )
 from src.application.ports.repositories import (
+    IClockService,
     IFlashcardRepository,
     IKnowledgeSourceRepository,
     INodeContentRepository,
     IQuestionProgressRepository,
     IQuestionRepository,
+    IReviewAuditRepository,
     IStudyEdgeRepository,
     IStudyMapRepository,
     IStudyNodeRepository,
+    IUnitOfWork,
 )
 from src.domain.entities import (
+    KnowledgeSource,
+    Question,
+    ReviewAuditLog,
     StudyEdge,
     StudyMap,
     StudyNode,
+    UserQuestionProgress,
 )
 from src.domain.exceptions import (
     DomainValidationError,
+    EntityNotFoundError,
+    QuestionNotFoundError,
     ResourceOwnershipError,
     StudyEdgeNotFoundError,
     StudyMapNotFoundError,
@@ -39,6 +49,7 @@ from src.domain.exceptions import (
 )
 from src.domain.services import (
     DAGValidatorService,
+    SpacingPolicyService,
     StudyTreeProgressionService,
 )
 
@@ -168,6 +179,7 @@ class GetStudyMapGraphUseCase:
                     materials_count=len(mat_ids),
                     questions_count=len(q_ids),
                     flashcards_count=len(f_ids),
+                    theory_content=node.theory_content,
                 )
             )
 
@@ -217,6 +229,7 @@ class CreateStudyNodeUseCase:
             map_id=map_id,
             title=dto.title,
             description=dto.description,
+            theory_content=dto.theory_content,
             pos_x=dto.pos_x,
             pos_y=dto.pos_y,
             icon=dto.icon,
@@ -237,11 +250,12 @@ class CreateStudyNodeUseCase:
             materials_count=0,
             questions_count=0,
             flashcards_count=0,
+            theory_content=saved.theory_content,
         )
 
 
 class UpdateStudyNodeUseCase:
-    """Caso de uso para atualização de dados (título, descrição, ícone) de um nó."""
+    """Caso de uso para atualização de dados (título, descrição, ícone, teoria) de um nó."""
 
     def __init__(
         self,
@@ -270,6 +284,8 @@ class UpdateStudyNodeUseCase:
             node.description = dto.description
         if dto.icon is not None:
             node.icon = dto.icon
+        if dto.theory_content is not None:
+            node.update_theory(dto.theory_content)
 
         node.__post_init__()
         saved = self.node_repo.save(node)
@@ -288,6 +304,52 @@ class UpdateStudyNodeUseCase:
             materials_count=0,
             questions_count=0,
             flashcards_count=0,
+            theory_content=saved.theory_content,
+        )
+
+
+class UpdateNodeTheoryUseCase:
+    """Caso de uso para atualizar o texto do Tomo de Sabedoria de um nó."""
+
+    def __init__(
+        self,
+        map_repo: IStudyMapRepository,
+        node_repo: IStudyNodeRepository,
+    ) -> None:
+        self.map_repo = map_repo
+        self.node_repo = node_repo
+
+    def execute(
+        self, map_id: UUID, node_id: UUID, user_id: UUID, theory_content: str
+    ) -> StudyNodeDTO:
+        study_map = self.map_repo.get_by_id(map_id)
+        if study_map is None:
+            raise StudyMapNotFoundError(f"Mapa de estudo '{map_id}' não encontrado.")
+        if study_map.owner_id != user_id:
+            raise ResourceOwnershipError("Apenas o proprietário do mapa pode alterar o tomo do nó.")
+
+        node = self.node_repo.get_by_id(node_id)
+        if node is None or node.map_id != map_id:
+            raise StudyNodeNotFoundError(f"Nó '{node_id}' não encontrado no mapa.")
+
+        node.update_theory(theory_content)
+        saved = self.node_repo.save(node)
+        return StudyNodeDTO(
+            id=saved.id,
+            map_id=saved.map_id,
+            title=saved.title,
+            description=saved.description,
+            pos_x=saved.pos_x,
+            pos_y=saved.pos_y,
+            icon=saved.icon,
+            effective_level=0,
+            is_unlocked=True,
+            overdue_questions_count=0,
+            has_submap=False,
+            materials_count=0,
+            questions_count=0,
+            flashcards_count=0,
+            theory_content=saved.theory_content,
         )
 
 
@@ -500,6 +562,489 @@ class DetachContentFromNodeUseCase:
             )
 
 
+class CreateNodeQuestionUseCase:
+    """Caso de uso para criação inline de uma pergunta SRS associada a um nó da árvore."""
+
+    def __init__(
+        self,
+        map_repo: IStudyMapRepository,
+        node_repo: IStudyNodeRepository,
+        question_repo: IQuestionRepository,
+        progress_repo: IQuestionProgressRepository,
+        content_repo: INodeContentRepository,
+        clock: IClockService | None = None,
+        uow: IUnitOfWork | None = None,
+    ) -> None:
+        self.map_repo = map_repo
+        self.node_repo = node_repo
+        self.question_repo = question_repo
+        self.progress_repo = progress_repo
+        self.content_repo = content_repo
+        self.clock = clock
+        self.uow = uow
+
+    def execute(
+        self,
+        map_id: UUID,
+        node_id: UUID,
+        user_id: UUID,
+        prompt: str,
+        expected_answer: str,
+    ) -> dict[str, Any]:
+        study_map = self.map_repo.get_by_id(map_id)
+        if study_map is None:
+            raise StudyMapNotFoundError(f"Mapa de estudo '{map_id}' não encontrado.")
+        if study_map.owner_id != user_id:
+            raise ResourceOwnershipError(
+                "Apenas o proprietário do mapa pode criar perguntas neste nó."
+            )
+
+        node = self.node_repo.get_by_id(node_id)
+        if node is None or node.map_id != map_id:
+            raise StudyNodeNotFoundError(f"Nó '{node_id}' não encontrado no mapa.")
+
+        today = self.clock.today() if self.clock is not None else date.today()
+
+        question = Question(
+            prompt=prompt,
+            expected_answer=expected_answer,
+            node_id=node.id,
+            topic_ids=(node.id,),
+            created_at=today,
+        )
+
+        initial_progress = UserQuestionProgress(
+            user_id=user_id,
+            question_id=question.id,
+            current_level=0,
+            next_review_date=today,
+        )
+
+        try:
+            self.question_repo.save(question)
+            self.content_repo.attach_question(node.id, question.id)
+            self.progress_repo.save(initial_progress)
+            if self.uow is not None:
+                self.uow.commit()
+        except Exception:
+            if self.uow is not None:
+                self.uow.rollback()
+            raise
+
+        return {
+            "id": question.id,
+            "question_id": str(question.id),
+            "node_id": node.id,
+            "prompt": question.prompt,
+            "statement": question.prompt,
+            "expected_answer": question.expected_answer,
+            "current_level": 0,
+            "next_review_date": today.isoformat(),
+            "created_at": today.isoformat(),
+        }
+
+
+class DeleteNodeQuestionUseCase:
+    """Caso de uso para exclusão de pergunta associada a um nó da árvore."""
+
+    def __init__(
+        self,
+        map_repo: IStudyMapRepository,
+        node_repo: IStudyNodeRepository,
+        question_repo: IQuestionRepository,
+        content_repo: INodeContentRepository,
+        uow: IUnitOfWork | None = None,
+    ) -> None:
+        self.map_repo = map_repo
+        self.node_repo = node_repo
+        self.question_repo = question_repo
+        self.content_repo = content_repo
+        self.uow = uow
+
+    def execute(
+        self,
+        map_id: UUID,
+        node_id: UUID,
+        user_id: UUID,
+        question_id: UUID,
+    ) -> None:
+        study_map = self.map_repo.get_by_id(map_id)
+        if study_map is None:
+            raise StudyMapNotFoundError(f"Mapa de estudo '{map_id}' não encontrado.")
+        if study_map.owner_id != user_id:
+            raise ResourceOwnershipError(
+                "Apenas o proprietário do mapa pode excluir perguntas deste nó."
+            )
+
+        node = self.node_repo.get_by_id(node_id)
+        if node is None or node.map_id != map_id:
+            raise StudyNodeNotFoundError(f"Nó '{node_id}' não encontrado no mapa.")
+
+        question = self.question_repo.get_by_id(question_id)
+        if question is None:
+            raise QuestionNotFoundError(f"Pergunta '{question_id}' não encontrada.")
+
+        try:
+            self.content_repo.detach_question(node.id, question_id)
+            self.question_repo.delete(question_id)
+            if self.uow is not None:
+                self.uow.commit()
+        except Exception:
+            if self.uow is not None:
+                self.uow.rollback()
+            raise
+
+
+class CreateNodeMaterialUseCase:
+    """Caso de uso para criação inline de material (pergaminho) no nó da árvore."""
+
+    def __init__(
+        self,
+        map_repo: IStudyMapRepository,
+        node_repo: IStudyNodeRepository,
+        source_repo: IKnowledgeSourceRepository,
+        content_repo: INodeContentRepository,
+        clock: IClockService | None = None,
+        uow: IUnitOfWork | None = None,
+    ) -> None:
+        self.map_repo = map_repo
+        self.node_repo = node_repo
+        self.source_repo = source_repo
+        self.content_repo = content_repo
+        self.clock = clock
+        self.uow = uow
+
+    def execute(
+        self,
+        map_id: UUID,
+        node_id: UUID,
+        user_id: UUID,
+        title: str,
+        raw_text: str,
+        content_type: str = "TEXT",
+    ) -> dict[str, Any]:
+        study_map = self.map_repo.get_by_id(map_id)
+        if study_map is None:
+            raise StudyMapNotFoundError(f"Mapa de estudo '{map_id}' não encontrado.")
+        if study_map.owner_id != user_id:
+            raise ResourceOwnershipError(
+                "Apenas o proprietário do mapa pode adicionar materiais a este nó."
+            )
+
+        node = self.node_repo.get_by_id(node_id)
+        if node is None or node.map_id != map_id:
+            raise StudyNodeNotFoundError(f"Nó '{node_id}' não encontrado no mapa.")
+
+        today = self.clock.today() if self.clock is not None else date.today()
+        clean_text = raw_text.strip() if raw_text else ""
+
+        source = KnowledgeSource(
+            title=title,
+            content_type=content_type or "TEXT",
+            raw_text=clean_text,
+            node_id=node.id,
+            topic_ids=(node.id,),
+            char_count=len(clean_text),
+            total_chunks=1 if clean_text else 0,
+            created_at=today,
+        )
+
+        try:
+            saved = self.source_repo.save(source)
+            self.content_repo.attach_knowledge_source(node.id, saved.id)
+            if self.uow is not None:
+                self.uow.commit()
+        except Exception:
+            if self.uow is not None:
+                self.uow.rollback()
+            raise
+
+        return {
+            "id": saved.id,
+            "material_id": str(saved.id),
+            "node_id": node.id,
+            "title": saved.title,
+            "content_type": saved.content_type,
+            "raw_text": saved.raw_text,
+            "char_count": saved.char_count,
+            "created_at": today.isoformat(),
+        }
+
+
+class DeleteNodeMaterialUseCase:
+    """Caso de uso para remoção de material do nó da árvore."""
+
+    def __init__(
+        self,
+        map_repo: IStudyMapRepository,
+        node_repo: IStudyNodeRepository,
+        source_repo: IKnowledgeSourceRepository,
+        content_repo: INodeContentRepository,
+        uow: IUnitOfWork | None = None,
+    ) -> None:
+        self.map_repo = map_repo
+        self.node_repo = node_repo
+        self.source_repo = source_repo
+        self.content_repo = content_repo
+        self.uow = uow
+
+    def execute(
+        self,
+        map_id: UUID,
+        node_id: UUID,
+        user_id: UUID,
+        material_id: UUID,
+    ) -> None:
+        study_map = self.map_repo.get_by_id(map_id)
+        if study_map is None:
+            raise StudyMapNotFoundError(f"Mapa de estudo '{map_id}' não encontrado.")
+        if study_map.owner_id != user_id:
+            raise ResourceOwnershipError(
+                "Apenas o proprietário do mapa pode excluir materiais deste nó."
+            )
+
+        node = self.node_repo.get_by_id(node_id)
+        if node is None or node.map_id != map_id:
+            raise StudyNodeNotFoundError(f"Nó '{node_id}' não encontrado no mapa.")
+
+        source = self.source_repo.get_by_id(material_id)
+        if source is None:
+            raise EntityNotFoundError(f"Material '{material_id}' não encontrado.")
+
+        try:
+            self.content_repo.detach_knowledge_source(node.id, material_id)
+            self.source_repo.delete(material_id)
+            if self.uow is not None:
+                self.uow.commit()
+        except Exception:
+            if self.uow is not None:
+                self.uow.rollback()
+            raise
+
+
+class ReviewNodeQuestionUseCase:
+    """Caso de uso para submissão de revisão SRS ancorada no nó com Modo Treino Livre."""
+
+    def __init__(
+        self,
+        map_repo: IStudyMapRepository,
+        node_repo: IStudyNodeRepository,
+        question_repo: IQuestionRepository,
+        progress_repo: IQuestionProgressRepository,
+        content_repo: INodeContentRepository,
+        edge_repo: IStudyEdgeRepository | None = None,
+        audit_repo: IReviewAuditRepository | None = None,
+        clock: IClockService | None = None,
+        uow: IUnitOfWork | None = None,
+    ) -> None:
+        self.map_repo = map_repo
+        self.node_repo = node_repo
+        self.question_repo = question_repo
+        self.progress_repo = progress_repo
+        self.content_repo = content_repo
+        self.edge_repo = edge_repo
+        self.audit_repo = audit_repo
+        self.clock = clock
+        self.uow = uow
+
+    def execute(
+        self,
+        map_id: UUID,
+        node_id: UUID,
+        user_id: UUID,
+        question_id: UUID,
+        score: int = 100,
+        difficulty: str | None = None,
+    ) -> dict[str, Any]:
+        study_map = self.map_repo.get_by_id(map_id)
+        if study_map is None:
+            raise StudyMapNotFoundError(f"Mapa de estudo '{map_id}' não encontrado.")
+        if study_map.owner_id != user_id and not study_map.is_public:
+            raise ResourceOwnershipError("Sem permissão para revisar provações deste mapa.")
+
+        node = self.node_repo.get_by_id(node_id)
+        if node is None or node.map_id != map_id:
+            raise StudyNodeNotFoundError(f"Nó '{node_id}' não encontrado no mapa.")
+
+        question = self.question_repo.get_by_id(question_id)
+        if question is None:
+            raise QuestionNotFoundError(f"Pergunta '{question_id}' não encontrada.")
+
+        today = self.clock.today() if self.clock is not None else date.today()
+        now = self.clock.now() if self.clock is not None else datetime.now(UTC)
+
+        effective_score = score
+        if difficulty is not None and score == 100:
+            diff_upper = difficulty.upper().strip()
+            if diff_upper in ("EASY", "GOOD", "PERFECT"):
+                effective_score = 100
+            elif diff_upper == "HARD":
+                effective_score = 50
+            elif diff_upper == "AGAIN":
+                effective_score = 0
+
+        # Coleta todas as perguntas do nó
+        _, q_ids, _ = self.content_repo.get_attached_ids(node_id)
+        all_node_q_ids = set(q_ids)
+        if hasattr(self.question_repo, "list_by_node"):
+            for nq in self.question_repo.list_by_node(node_id):
+                all_node_q_ids.add(nq.id)
+        all_node_q_ids.add(question_id)
+
+        all_q_list = list(all_node_q_ids)
+        progress_map = self.progress_repo.get_by_questions(user_id, all_q_list)
+
+        # Nível inicial do nó antes da revisão
+        old_levels = [
+            progress_map[qid].current_level if qid in progress_map else 0
+            for qid in all_q_list
+        ]
+        old_node_level = StudyTreeProgressionService.calculate_node_level(old_levels)
+
+        progress = progress_map.get(question_id)
+        if progress is None:
+            progress = UserQuestionProgress(
+                user_id=user_id,
+                question_id=question_id,
+                current_level=0,
+                next_review_date=today,
+            )
+
+        old_q_level = progress.current_level
+
+        # MODO TREINO LIVRE: Quando progress.current_level > 0 e progress.next_review_date > today,
+        # nunca lança QuestionNotDueError, não altera progress no banco e retorna is_training_only=True
+        is_training_only = progress.current_level > 0 and progress.next_review_date > today
+
+        if is_training_only:
+            new_q_level = progress.current_level
+            next_date = progress.next_review_date
+            interval_days = SpacingPolicyService.get_interval(progress.current_level)
+            new_node_level = old_node_level
+            leveled_up = False
+            unlocked_node_ids: list[UUID] = []
+        else:
+            new_q_level, next_date = SpacingPolicyService.calculate_next_schedule(
+                current_level=progress.current_level,
+                score=effective_score,
+                review_date=today,
+            )
+            interval_days = SpacingPolicyService.get_interval(new_q_level)
+            progress.apply_review(new_level=new_q_level, next_date=next_date, reviewed_at=now)
+
+            try:
+                self.progress_repo.save(progress)
+                if self.audit_repo is not None:
+                    audit_log = ReviewAuditLog(
+                        user_id=user_id,
+                        question_id=question_id,
+                        subject_id=None,
+                        topic_id=None,
+                        historical_subject_name=study_map.title,
+                        historical_topic_name=node.title,
+                        review_date=today,
+                        score=effective_score,
+                        level_before=old_q_level,
+                        level_after=new_q_level,
+                        evaluation_mode="MANUAL",
+                        logged_at=now,
+                    )
+                    self.audit_repo.save(audit_log)
+                if self.uow is not None:
+                    self.uow.commit()
+            except Exception:
+                if self.uow is not None:
+                    self.uow.rollback()
+                raise
+
+            # Recalcula níveis das questões do nó
+            updated_levels = [
+                new_q_level
+                if qid == question_id
+                else (progress_map[qid].current_level if qid in progress_map else 0)
+                for qid in all_q_list
+            ]
+            new_node_level = StudyTreeProgressionService.calculate_node_level(updated_levels)
+            leveled_up = new_node_level > old_node_level
+
+            # Verifica destrancamento de nós dependentes a jusante
+            unlocked_node_ids = []
+            if self.edge_repo is not None:
+                map_edges = self.edge_repo.list_by_map(map_id)
+                target_node_ids = [
+                    e.target_node_id for e in map_edges if e.source_node_id == node_id
+                ]
+                if target_node_ids:
+                    all_nodes = self.node_repo.list_by_map(map_id)
+                    node_levels_before: dict[UUID, int] = {}
+                    node_levels_after: dict[UUID, int] = {}
+                    for n in all_nodes:
+                        if n.id == node_id:
+                            node_levels_before[n.id] = old_node_level
+                            node_levels_after[n.id] = new_node_level
+                        else:
+                            _, n_q_ids, _ = self.content_repo.get_attached_ids(n.id)
+                            if n_q_ids:
+                                n_prog_map = self.progress_repo.get_by_questions(user_id, n_q_ids)
+                                lvl = StudyTreeProgressionService.calculate_node_level(
+                                    [
+                                        n_prog_map[qid].current_level
+                                        if qid in n_prog_map
+                                        else 0
+                                        for qid in n_q_ids
+                                    ]
+                                )
+                            else:
+                                lvl = 0
+                            node_levels_before[n.id] = lvl
+                            node_levels_after[n.id] = lvl
+
+                    for tid in target_node_ids:
+                        inc_edges = [e for e in map_edges if e.target_node_id == tid]
+                        unlocked_before = StudyTreeProgressionService.evaluate_unlock_status(
+                            inc_edges, node_levels_before
+                        )
+                        unlocked_after = StudyTreeProgressionService.evaluate_unlock_status(
+                            inc_edges, node_levels_after
+                        )
+                        if not unlocked_before and unlocked_after:
+                            unlocked_node_ids.append(tid)
+
+        current_levels_for_percent = [
+            new_q_level
+            if qid == question_id
+            else (progress_map[qid].current_level if qid in progress_map else 0)
+            for qid in all_q_list
+        ]
+        mastered_count = sum(1 for lvl in current_levels_for_percent if lvl >= 1)
+        node_progress_percent = (
+            round((mastered_count / len(current_levels_for_percent)) * 100, 1)
+            if current_levels_for_percent
+            else 0.0
+        )
+
+        return {
+            "question_id": str(question_id),
+            "id": question_id,
+            "previous_level": old_q_level,
+            "new_level": new_q_level,
+            "current_question_level": new_q_level,
+            "next_review_date": (
+                next_date.isoformat() if hasattr(next_date, "isoformat") else str(next_date)
+            ),
+            "interval_days": interval_days,
+            "is_promoted": new_q_level > old_q_level,
+            "is_training_only": is_training_only,
+            "old_node_level": old_node_level,
+            "new_node_level": new_node_level,
+            "node_effective_level": new_node_level,
+            "leveled_up": leveled_up,
+            "node_is_mastered": new_node_level >= 1,
+            "node_progress_percent": node_progress_percent,
+            "unlocked_node_ids": [str(uid) for uid in unlocked_node_ids],
+        }
+
+
 class GetNodeStudyHubUseCase:
     """Caso de uso para carregar os conteúdos de estudo de um nó."""
 
@@ -535,14 +1080,30 @@ class GetNodeStudyHubUseCase:
         mat_ids, q_ids, f_ids = self.content_repo.get_attached_ids(node_id)
         today = date.today()
 
-        progress_map = self.progress_repo.get_by_questions(user_id, q_ids) if q_ids else {}
+        # Coleta todas as perguntas (content_repo + vinculação direta) sem duplicatas
+        all_q_ids_set = set(q_ids)
+        if self.question_repo is not None and hasattr(self.question_repo, "list_by_node"):
+            for q in self.question_repo.list_by_node(node_id):
+                all_q_ids_set.add(q.id)
+        all_q_ids = list(all_q_ids_set)
+
+        # Coleta todos os materiais (content_repo + vinculação direta) sem duplicatas
+        all_mat_ids_set = set(mat_ids)
+        if self.knowledge_repo is not None and hasattr(self.knowledge_repo, "list_by_node"):
+            for m in self.knowledge_repo.list_by_node(node_id):
+                all_mat_ids_set.add(m.id)
+        all_mat_ids = list(all_mat_ids_set)
+
+        progress_map = (
+            self.progress_repo.get_by_questions(user_id, all_q_ids) if all_q_ids else {}
+        )
         srs_levels = [
-            progress_map[qid].current_level if qid in progress_map else 0 for qid in q_ids
+            progress_map[qid].current_level if qid in progress_map else 0 for qid in all_q_ids
         ]
         effective_level = StudyTreeProgressionService.calculate_node_level(srs_levels)
         overdue_count = sum(
             1
-            for qid in q_ids
+            for qid in all_q_ids
             if qid in progress_map and progress_map[qid].next_review_date <= today
         )
 
@@ -558,34 +1119,39 @@ class GetNodeStudyHubUseCase:
             is_unlocked=True,
             overdue_questions_count=overdue_count,
             has_submap=False,
-            materials_count=len(mat_ids),
-            questions_count=len(q_ids),
+            materials_count=len(all_mat_ids),
+            questions_count=len(all_q_ids),
             flashcards_count=len(f_ids),
+            theory_content=node.theory_content,
         )
 
         all_questions_list: list[dict[str, object]] = []
         due_questions_list: list[dict[str, object]] = []
-        if self.question_repo is not None and q_ids:
-            for qid in q_ids:
+        if self.question_repo is not None and all_q_ids:
+            for qid in all_q_ids:
                 q = self.question_repo.get_by_id(qid)
                 if q:
                     prog = progress_map.get(qid)
                     cur_lvl = prog.current_level if prog else 0
                     nxt_dt = prog.next_review_date.isoformat() if prog else today.isoformat()
+                    is_due = prog is None or prog.next_review_date <= today
                     item = {
                         "id": str(q.id),
                         "prompt": q.prompt,
+                        "statement": q.prompt,
                         "expected_answer": q.expected_answer,
                         "current_level": cur_lvl,
                         "next_review_date": nxt_dt,
+                        "is_due": is_due,
+                        "difficulty": "GOOD",
                     }
                     all_questions_list.append(item)
-                    if prog is None or prog.next_review_date <= today:
+                    if is_due:
                         due_questions_list.append(item)
 
         materials_list: list[dict[str, object]] = []
-        if self.knowledge_repo is not None and mat_ids:
-            for mid in mat_ids:
+        if self.knowledge_repo is not None and all_mat_ids:
+            for mid in all_mat_ids:
                 m = self.knowledge_repo.get_by_id(mid)
                 if m:
                     materials_list.append(
@@ -593,6 +1159,8 @@ class GetNodeStudyHubUseCase:
                             "id": str(m.id),
                             "title": m.title,
                             "content_type": m.content_type,
+                            "raw_text": m.raw_text,
+                            "char_count": m.char_count,
                         }
                     )
 

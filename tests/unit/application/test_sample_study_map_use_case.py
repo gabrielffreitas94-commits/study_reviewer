@@ -104,7 +104,9 @@ class FakeQuestionRepo(IQuestionRepository):
         return list(self.questions.values())
 
     def list_by_node(self, node_id: UUID) -> list[Question]:
-        return [q for q in self.questions.values() if q.node_id == node_id or node_id in q.topic_ids]
+        return [
+            q for q in self.questions.values() if q.node_id == node_id or node_id in q.topic_ids
+        ]
 
     def count_by_topic(self, topic_id: UUID) -> int:
         return len(self.questions)
@@ -182,9 +184,20 @@ def test_create_sample_math_study_map_use_case() -> None:
     edges = edge_repo.list_by_map(s_map.id)
     assert len(edges) == 5
 
-    # Cada nó deve ter 1 material, 3 flashcards e 3 questões
+    # Cada nó deve ter 1 material, 3 flashcards e 3 questões, com theory_content e node_id preenchidos
     for node in nodes:
+        assert len(node.theory_content) > 100
         mats, questions, flashcards = content_repo.get_attached_ids(node.id)
         assert len(mats) == 1
         assert len(questions) == 3
         assert len(flashcards) == 3
+
+        mat = source_repo.get_by_id(mats[0])
+        assert mat is not None
+        assert mat.node_id == node.id
+        assert len(mat.raw_text) > 50
+
+        for qid in questions:
+            q = question_repo.get_by_id(qid)
+            assert q is not None
+            assert q.node_id == node.id

@@ -82,6 +82,24 @@ class CreateSampleMathStudyMapUseCase:
                 "pos_x": 120.0,
                 "pos_y": 260.0,
                 "icon": "calculator",
+                "theory_content": (
+                    "# Álgebra Linear Computacional\n\n"
+                    "A Álgebra Linear Computacional é a espinha dorsal da computação científica moderna e dos "
+                    "motores de Inteligência Artificial. Diferente da abordagem puramente teórica, a vertente computacional "
+                    "investiga a representação vetorial em memória, condicionamento numérico e estabilidade de algoritmos.\n\n"
+                    "## 1. Espaços Vetoriais e Transformações Lineares\n"
+                    "Um espaço vetorial $\\mathbb{R}^n$ fornece o alicerce para armazenar tensores de parâmetros e características. "
+                    "Toda transformação linear $T: \\mathbb{R}^n \\to \\mathbb{R}^m$ é unicamente parametrizada por uma matriz "
+                    "$A \\in \\mathbb{R}^{m \\times n}$. Transformações ortogonais ($Q^T Q = I$) preservam comprimentos e ângulos euclidianos.\n\n"
+                    "## 2. Condicionamento Numérico e Estabilidade\n"
+                    "Ao resolver o sistema linear fundamental $Ax = b$, a sensibilidade da solução a perturbações é descrita pelo "
+                    "**Número de Condição**: $\\kappa(A) = ||A|| \\cdot ||A^{-1}||$. Matrizes mal-condicionadas exigem cuidados "
+                    "com erros de arredondamento e técnicas de regularização.\n\n"
+                    "## 3. Fatorações Matriciais Essenciais\n"
+                    "- **Decomposição LU ($PA = LU$):** Transforma a resolução em etapas de substituição direta e retrosubstituição $\\mathcal{O}(n^2)$.\n"
+                    "- **Fatoração QR ($A = QR$):** Viabiliza problemas de mínimos quadrados com colunas ortonormais.\n"
+                    "- **Decomposição em Valores Singulares (SVD, $A = U \\Sigma V^T$):** Permite aproximações de posto baixo e análise espectral profunda."
+                ),
                 "material": (
                     "Fundamentos de Álgebra Linear Computacional e Fatorações",
                     "A álgebra linear computacional constitui a espinha dorsal da computação científica moderna e do aprendizado de máquina. Aborda a representação de dados em espaços vetoriais euclidianos, condicionamento numérico e resolução eficiente de sistemas lineares Ax = b.",
@@ -122,6 +140,22 @@ class CreateSampleMathStudyMapUseCase:
                 "pos_x": 420.0,
                 "pos_y": 130.0,
                 "icon": "trending-up",
+                "theory_content": (
+                    "# Cálculo Vetorial & Otimização por Gradiente\n\n"
+                    "O Cálculo Multivariado estende noções diferenciais para hipersuperfícies em $\\mathbb{R}^n$, "
+                    "estabelecendo a fundação indispensável para compreender a descida de encosta em modelos de aprendizado profundo.\n\n"
+                    "## 1. O Gradiente e a Direção de Máxima Subida\n"
+                    "Para uma função escalar $f: \\mathbb{R}^n \\to \\mathbb{R}$, o vetor gradiente $\\nabla f(x)$ reúne todas as "
+                    "derivadas parciais de primeira ordem:\n"
+                    "$$\\nabla f(x) = \\left[ \\frac{\\partial f}{\\partial x_1}, \\dots, \\frac{\\partial f}{\\partial x_n} \\right]^T$$\n"
+                    "Ele aponta precisamente na direção de maior taxa de crescimento instantâneo da função escalar.\n\n"
+                    "## 2. A Matriz Hessiana e Curvatura Local\n"
+                    "A análise de segunda ordem emprega a matriz Hessiana simétrica $H(x)$, cujas entradas são $H_{ij} = \\frac{\\partial^2 f}{\\partial x_i \\partial x_j}$. "
+                    "Seus autovalores determinam se um ponto crítico é um mínimo estrito (definida positiva), máximo estrito (definida negativa) ou ponto de sela (indefinida).\n\n"
+                    "## 3. Dinâmica do Gradiente Descendente\n"
+                    "A descida é governada pelo passo iterativo $x^{(k+1)} = x^{(k)} - \\alpha \\nabla f(x^{(k)})$, onde $\\alpha > 0$ é a taxa de aprendizado. "
+                    "Em escala massiva, o Gradiente Estocástico (SGD) calcula estimativas ruidosas e eficientes sobre amostras reduzidas (mini-batches)."
+                ),
                 "material": (
                     "Cálculo Diferencial Multivariado e Métodos de Gradiente",
                     "Estudo de superfícies multidimensionais, aproximações locais de primeira e segunda ordem via Taylor e técnicas de descida de encosta para minimização de funções de perda.",
@@ -162,6 +196,24 @@ class CreateSampleMathStudyMapUseCase:
                 "pos_x": 420.0,
                 "pos_y": 390.0,
                 "icon": "dice",
+                "theory_content": (
+                    "# Probabilidade & Simulação de Monte Carlo\n\n"
+                    "A probabilidade formaliza o raciocínio sob incerteza e fornece os teoremas assintóticos que garantem "
+                    "a convergência de métodos numéricos estocásticos.\n\n"
+                    "## 1. Leis Limite Fundamentais\n"
+                    "- **Lei Forte dos Grandes Números (LFGN):** A média amostral de variáveis i.i.d. converge quase certamente para o valor esperado $\\mu$.\n"
+                    "- **Teorema Central do Limite (TCL):** Assegura normalidade assintótica $\\mathcal{N}(0, 1)$ para a soma padronizada de amostras i.i.d., "
+                    "permitindo a derivação de intervalos de confiança empíricos rigorosos.\n\n"
+                    "## 2. Integração Estocástica de Monte Carlo\n"
+                    "O estimador empírico de Monte Carlo aproxima $\\mathbb{E}[g(X)] = \\int g(x)p(x)dx$ via:\n"
+                    "$$\\hat{I}_N = \\frac{1}{N} \\sum_{i=1}^N g(X_i), \\quad X_i \\sim p(x)$$\n"
+                    "Sua taxa de erro padrão converge a $\\mathcal{O}(N^{-1/2})$, sendo estritamente invariante em relação à "
+                    "dimensão $d$ do integrando, superando a maldição da dimensionalidade de métodos de quadratura determinísticos.\n\n"
+                    "## 3. Amostragem Avançada: Importance Sampling e MCMC\n"
+                    "Técnicas de redução de variância concentram amostras nas regiões de maior densidade e impacto do integrando, "
+                    "enquanto algoritmos de Cadeias de Markov Monte Carlo (MCMC, como Metropolis-Hastings) viabilizam a exploração "
+                    "de distribuições com constante de partição desconhecida."
+                ),
                 "material": (
                     "Modelagem Estocástica e Métodos de Monte Carlo",
                     "Fundamentação teórica de processos estocásticos, amostragem pseudoaleatória, métodos de redução de variância e integração numérica em espaços de alta dimensão.",
@@ -202,6 +254,22 @@ class CreateSampleMathStudyMapUseCase:
                 "pos_x": 720.0,
                 "pos_y": 110.0,
                 "icon": "activity",
+                "theory_content": (
+                    "# Equações Diferenciais (EDOs) & Modelagem Numérica\n\n"
+                    "As Equações Diferenciais Ordinárias (EDOs) modelam a evolução temporal de fenômenos físicos, dinâmicas químicas "
+                    "e redes neurais contínuas (Neural ODEs).\n\n"
+                    "## 1. Problemas de Valor Inicial (PVI)\n"
+                    "Um PVI é expresso por $\\frac{dy}{dt} = f(t, y)$ com condição inicial $y(t_0) = y_0$. Sob condições de continuidade "
+                    "Lipschitziana, o Teorema de Picard-Lindelöf assegura a existência e unicidade local da trajetória.\n\n"
+                    "## 2. Métodos de Discretização e Erro de Truncamento\n"
+                    "- **Erro de Truncamento Local (LTE):** Erro gerado em um único passo temporal de tamanho $h$.\n"
+                    "- **Erro de Truncamento Global (GTE):** Discrepância cumulativa ao longo da simulação.\n"
+                    "- **Método de Runge-Kutta 4 (RK4):** Padrão de referência para EDOs não-rígidas com precisão global $\\mathcal{O}(h^4)$, "
+                    "ponderando quatro inclinações intermediárias no intervalo $[t_n, t_n + h]$.\n\n"
+                    "## 3. Rigidez (Stiffness) e Métodos Implícitos\n"
+                    "Sistemas com escalas temporais muito díspares (autovalores do Jacobiano com grande amplitude de magnitudes negativas) "
+                    "exigem esquemas implícitos $A$-estáveis (como Euler Implícito ou BDF), garantindo estabilidade incondicional mesmo para passos temporais expressivos."
+                ),
                 "material": (
                     "Análise Numérica de Equações Diferenciais Ordinárias",
                     "Técnicas de discretização temporal para modelagem de dinâmicas físicas e biológicas, condições de estabilidade e tratamento de sistemas stiff.",
@@ -242,6 +310,22 @@ class CreateSampleMathStudyMapUseCase:
                 "pos_x": 740.0,
                 "pos_y": 350.0,
                 "icon": "brain",
+                "theory_content": (
+                    "# Otimização Numérica & Machine Learning\n\n"
+                    "A otimização matemática constitui o núcleo algorítmico do treinamento de modelos preditivos "
+                    "e redes neurais profundas.\n\n"
+                    "## 1. Otimização Convexa e Garantias Globais\n"
+                    "Em problemas convexos, a propriedade determinante é que **qualquer mínimo local é garantidamente um mínimo global**. "
+                    "Isso confere previsibilidade e estabilidade teórica a algoritmos de convergência.\n\n"
+                    "## 2. Mínimos Quadrados e Regularização Espectral\n"
+                    "A minimização da perda quadrática $||Xw - y||_2^2$ gera a solução analítica via Equações Normais $w^* = (X^T X)^{-1} X^T y$.\n"
+                    "- **Regularização Ridge ($L_2$):** Penaliza $||w||_2^2$, contornando mau-condicionamento de $X^T X$ e estabilizando parâmetros.\n"
+                    "- **Regularização Lasso ($L_1$):** Penaliza $||w||_1$, induzindo esparsidade geométrica exata e operando seleção automática de variáveis.\n\n"
+                    "## 3. Backpropagation e Métodos Adaptativos de Segunda Ordem\n"
+                    "O algoritmo de Backpropagation calcula recursivamente gradientes em redes neurais aplicando a regra da cadeia multivariada "
+                    "com programação dinâmica. Otimizadores modernos como o **Adam** combinam médias móveis de primeiro e segundo momento, "
+                    "ajustando a taxa de aprendizado individualmente por peso e acelerando a convergência em topologias não-convexas."
+                ),
                 "material": (
                     "Otimização Matemática em Inteligência Artificial e Ciência de Dados",
                     "Integração de cálculo vetorial, probabilidade e álgebra matricial para ajuste de modelos estatísticos e treinamento de redes neurais profundas.",
@@ -292,6 +376,7 @@ class CreateSampleMathStudyMapUseCase:
                     map_id=study_map.id,
                     title=str(spec["title"]),
                     description=str(spec["description"]),
+                    theory_content=str(spec["theory_content"]),
                     pos_x=float(spec["pos_x"]),
                     pos_y=float(spec["pos_y"]),
                     icon=str(spec["icon"]),
@@ -299,15 +384,18 @@ class CreateSampleMathStudyMapUseCase:
             )
             nodes_map[str(spec["key"])] = node
 
-            # Material de Conhecimento
+            # Material de Conhecimento com node_id e raw_text
             material_tuple = spec["material"]
             mat_title = material_tuple[0]
+            mat_text = material_tuple[1]
             source = self.source_repo.save(
                 KnowledgeSource(
                     title=str(mat_title),
                     topic_ids=[topic.id],
+                    node_id=node.id,
                     content_type="TEXT",
-                    char_count=1200,
+                    raw_text=str(mat_text),
+                    char_count=len(str(mat_text)),
                     total_chunks=1,
                 )
             )
@@ -320,10 +408,15 @@ class CreateSampleMathStudyMapUseCase:
                 self.flashcard_repo.save(fc)
                 self.content_repo.attach_flashcard(node.id, fc.id)
 
-            # Perguntas SRS
+            # Perguntas SRS com node_id
             questions_list: list[tuple[str, str]] = spec["questions"]
             for prompt, answer in questions_list:
-                q = Question(prompt=prompt, expected_answer=answer, topic_ids=[topic.id])
+                q = Question(
+                    prompt=prompt,
+                    expected_answer=answer,
+                    node_id=node.id,
+                    topic_ids=[topic.id],
+                )
                 self.question_repo.save(q)
                 self.content_repo.attach_question(node.id, q.id)
 

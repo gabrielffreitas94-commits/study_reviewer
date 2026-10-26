@@ -38,6 +38,7 @@ class CreateStudyNodeDTO:
     pos_x: float = 0.0
     pos_y: float = 0.0
     icon: str = "brain"
+    theory_content: str = ""
 
 
 @dataclass(slots=True, frozen=True)
@@ -47,6 +48,7 @@ class UpdateStudyNodeDTO:
     title: str | None = None
     description: str | None = None
     icon: str | None = None
+    theory_content: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -94,6 +96,7 @@ class StudyNodeDTO:
     materials_count: int
     questions_count: int
     flashcards_count: int
+    theory_content: str = ""
 
 
 @dataclass(slots=True, frozen=True)
