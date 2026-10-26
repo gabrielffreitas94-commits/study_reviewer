@@ -1,6 +1,6 @@
 /**
- * study_canvas.js — Motor Interativo do Canvas RPG da Árvore de Estudos
- * Suporta pan, zoom, arrastar nós livres, conexões direcionadas, níveis SRS e gaveta de conteúdos.
+ * study_canvas.js — Motor Interativo do Canvas RPG: Forja Ancestral & Grafo de Maestria
+ * Suporta pan, zoom, arrastar medalhões, traçar vínculos de pré-requisito e navegação direta ao Grimório.
  */
 
 (function () {
@@ -11,13 +11,13 @@
         mapId: window.CURRENT_MAP_ID || null,
         isOwner: window.CURRENT_MAP_IS_OWNER || false,
         graph: { map: null, nodes: [], edges: [] },
-        view: { x: 50, y: 50, scale: 1.0 },
+        view: { x: 80, y: 80, scale: 1.0 },
         isPanning: false,
         panStart: { x: 0, y: 0 },
         activeDragNode: null,
         dragOffset: { x: 0, y: 0 },
         hasDragged: false,
-        interactionMode: 'study', // 'study' ou 'edit'
+        interactionMode: 'study', // 'study' (Modo Jornada) ou 'edit' (Modo Forja)
         connectModeActive: false,
         connectSourceNodeId: null,
         selectedNode: null,
@@ -25,16 +25,33 @@
         pendingPositions: new Map(),
     };
 
+    // Mapeamento Rúnico de Todos os Ícones RPG
     const ICON_MAP = {
+        calculator: '📐',
+        'trending-up': '📈',
+        dice: '🎲',
+        activity: '⚡',
         brain: '🧠',
-        sword: '⚔️',
-        shield: '🛡️',
         book: '📖',
         code: '💻',
-        fire: '🔥',
+        cpu: '⚙️',
+        database: '🗄️',
+        globe: '🌐',
+        layers: '📚',
+        shield: '🛡️',
+        terminal: '🖥️',
+        zap: '⚡',
+        award: '🏆',
+        compass: '🧭',
+        feather: '🪶',
+        flame: '🔥',
+        key: '🗝️',
         scroll: '📜',
+        sword: '⚔️',
+        fire: '🔥',
         flask: '🧪',
         gem: '💎',
+        rune: '🔮',
     };
 
     // Elementos do DOM
@@ -42,7 +59,7 @@
     const container = document.getElementById('canvas-container');
     const edgesGroup = document.getElementById('edges-group');
     const nodesLayer = document.getElementById('nodes-layer');
-    const drawer = document.getElementById('node-drawer');
+    const nodeModal = document.getElementById('node-modal');
 
     // Inicialização ao carregar a página
     document.addEventListener('DOMContentLoaded', () => {
@@ -65,7 +82,7 @@
             state.graph = await res.json();
             renderAll();
         } catch (err) {
-            console.error('Falha ao buscar grafo:', err);
+            console.error('Falha ao buscar grafo da forja:', err);
         }
     }
 
@@ -74,8 +91,9 @@
         renderNodes();
     }
 
-    // Renderiza as arestas no SVG
+    // Renderiza os vínculos de pré-requisito (arestas SVG de energia)
     function renderEdges() {
+        if (!edgesGroup) return;
         edgesGroup.innerHTML = '';
         const nodeMap = new Map(state.graph.nodes.map(n => [n.id, n]));
 
@@ -84,29 +102,29 @@
             const target = nodeMap.get(edge.target_node_id);
             if (!source || !target) return;
 
-            // Centro dos nós (nó tem ~64px de raio total)
-            const sx = source.pos_x + 36;
-            const sy = source.pos_y + 36;
-            const tx = target.pos_x + 36;
-            const ty = target.pos_y + 36;
+            // Centro do medalhão (raio ~40px, centro em 40,40)
+            const sx = source.pos_x + 40;
+            const sy = source.pos_y + 40;
+            const tx = target.pos_x + 40;
+            const ty = target.pos_y + 40;
 
             const isUnlocked = source.effective_level >= 1;
 
-            // Curva Bezier cúbica elegante
+            // Curva Bezier cúbica suave e elegante
             const dx = tx - sx;
             const dy = ty - sy;
-            const cx1 = sx + dx * 0.4;
+            const cx1 = sx + dx * 0.45;
             const cy1 = sy;
-            const cx2 = sx + dx * 0.6;
+            const cx2 = sx + dx * 0.55;
             const cy2 = ty;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', `M ${sx} ${sy} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${tx} ${ty}`);
             path.setAttribute('fill', 'none');
-            path.setAttribute('stroke', isUnlocked ? 'url(#edge-unlocked-grad)' : '#334155');
-            path.setAttribute('stroke-width', isUnlocked ? '3' : '2');
+            path.setAttribute('stroke', isUnlocked ? 'url(#edge-unlocked-grad)' : '#3b322c');
+            path.setAttribute('stroke-width', isUnlocked ? '3.5' : '2');
             if (!isUnlocked) {
-                path.setAttribute('stroke-dasharray', '5,5');
+                path.setAttribute('stroke-dasharray', '6,6');
             }
             path.setAttribute('marker-end', isUnlocked ? 'url(#arrow-unlocked)' : 'url(#arrow-locked)');
 
@@ -114,15 +132,15 @@
                 path.classList.add('transition-all');
             }
 
-            // Exclusão de aresta no modo editor ao clicar na linha
+            // No Modo Forja, clicar na linha permite remover o vínculo
             if (state.interactionMode === 'edit') {
                 path.style.cursor = 'pointer';
                 path.style.pointerEvents = 'stroke';
-                path.setAttribute('stroke-width', '8');
-                path.setAttribute('stroke-opacity', isUnlocked ? '0.8' : '0.4');
+                path.setAttribute('stroke-width', '10');
+                path.setAttribute('stroke-opacity', isUnlocked ? '0.85' : '0.5');
                 path.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (confirm('Deseja remover esta conexão de pré-requisito?')) {
+                    if (confirm('Deseja dissipar este vínculo de pré-requisito?')) {
                         deleteEdge(edge.id);
                     }
                 });
@@ -132,8 +150,9 @@
         });
     }
 
-    // Renderiza os nós no container HTML
+    // Renderiza os medalhões circulares de habilidade
     function renderNodes() {
+        if (!nodesLayer) return;
         nodesLayer.innerHTML = '';
 
         state.graph.nodes.forEach(node => {
@@ -147,53 +166,60 @@
             const isOverdue = node.overdue_questions_count > 0;
             const iconGlyph = ICON_MAP[node.icon] || '🧠';
 
-            // Cores do anel conforme Nível SRS (0 a 6)
-            let ringColorClass = 'border-slate-600 bg-slate-900';
-            let glowEffect = '';
-            if (node.effective_level >= 5) {
-                ringColorClass = 'border-amber-400 bg-slate-900 ring-4 ring-amber-400/30';
-                glowEffect = 'shadow-[0_0_20px_rgba(251,191,36,0.5)]';
-            } else if (node.effective_level >= 1) {
-                ringColorClass = 'border-emerald-500 bg-slate-900 ring-4 ring-emerald-500/20';
-                glowEffect = 'shadow-[0_0_15px_rgba(16,185,129,0.4)]';
-            }
+            // Aura e estilização conforme patente SRS
+            let ringClass = 'border-[#574737] bg-[#1c1612] text-[#a39276]';
+            let glowEffect = 'shadow-[0_4px_16px_rgba(0,0,0,0.7)]';
+            let rankLabel = `Nv. ${node.effective_level || 0}`;
 
             if (isLocked) {
-                ringColorClass = 'border-slate-700 bg-slate-950 opacity-40 grayscale';
+                ringClass = 'border-[#3b322c] bg-[#14100d] opacity-50 grayscale';
+                rankLabel = '🔒 SELADO';
+            } else if (node.effective_level >= 5) {
+                // Ouro Lendário (Rank V - VI)
+                ringClass = 'border-[#f0c869] bg-[#251c14] ring-2 ring-[#f0c869]/50';
+                glowEffect = 'shadow-[0_0_25px_rgba(240,200,105,0.7)]';
+            } else if (node.effective_level >= 3) {
+                // Prata Rúnica / Ouro Intermediário (Rank III - IV)
+                ringClass = 'border-[#c89b3c] bg-[#1f1813] ring-1 ring-[#c89b3c]/40';
+                glowEffect = 'shadow-[0_0_18px_rgba(200,155,60,0.5)]';
+            } else if (node.effective_level >= 1) {
+                // Bronze Forjado (Rank I - II)
+                ringClass = 'border-[#785a28] bg-[#1a1410] ring-1 ring-[#785a28]/40';
+                glowEffect = 'shadow-[0_0_14px_rgba(120,90,40,0.4)]';
             }
 
-            // Pulsação de Alerta se houver revisões atrasadas no SRS
+            // Pulsação Carmesim de Decaimento se houver revisões atrasadas
             let overduePulse = '';
             if (isOverdue && !isLocked) {
-                overduePulse = 'animate-pulse ring-4 ring-rose-500/60 shadow-[0_0_20px_rgba(244,63,94,0.7)]';
+                overduePulse = 'ring-4 ring-[#e11d48]/70 shadow-[0_0_22px_rgba(225,29,72,0.85)] animate-pulse';
             }
 
             el.innerHTML = `
-                <div class="relative w-18 h-18 rounded-2xl border-2 ${ringColorClass} ${glowEffect} ${overduePulse} flex items-center justify-center transition-all duration-200 group-hover:scale-110">
-                    <span class="text-3xl">${iconGlyph}</span>
-                    
+                <div class="relative w-20 h-20 rounded-full border-2 ${ringClass} ${glowEffect} ${overduePulse} flex items-center justify-center transition-all duration-200 group-hover:scale-110">
+                    <span class="text-3xl filter drop-shadow">${iconGlyph}</span>
+
                     ${isLocked ? `
-                        <div class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center text-xs">
+                        <div class="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-[#14100d] border border-[#3b322c] flex items-center justify-center text-xs shadow-md">
                             🔒
                         </div>
                     ` : ''}
 
                     ${isOverdue && !isLocked ? `
-                        <div class="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-rose-600 border border-white text-[10px] font-black text-white shadow-md">
+                        <div class="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-[#e11d48] border border-[#f5ebd6] text-[10px] font-black text-white shadow-lg animate-bounce">
                             ! ${node.overdue_questions_count}
                         </div>
                     ` : ''}
 
-                    <div class="absolute -bottom-2.5 px-2 py-0.5 rounded-md bg-slate-950 border border-slate-700 text-[9px] font-mono font-bold tracking-wider ${node.effective_level >= 1 ? 'text-emerald-400' : 'text-slate-500'}">
-                        LVL ${node.effective_level}
+                    <div class="absolute -bottom-2.5 px-2 py-0.5 rounded-md bg-[#0c0908] border border-[#785a28] text-[9px] font-cinzel font-bold tracking-wider ${node.effective_level >= 1 ? 'text-[#f0c869]' : 'text-[#a39276]'}">
+                        ${rankLabel}
                     </div>
                 </div>
-                <div class="mt-3 px-2 py-1 rounded-lg bg-slate-950/80 backdrop-blur border border-slate-800 text-center max-w-[140px]">
-                    <span class="text-xs font-bold text-slate-200 truncate block">${escapeHtml(node.title)}</span>
+                <div class="mt-3 px-3 py-1 rounded-xl bg-[#14100d]/90 backdrop-blur border border-[#785a28]/60 text-center max-w-[150px] shadow-lg">
+                    <span class="text-xs font-bold font-cinzel text-[#f5ebd6] truncate block">${escapeHtml(node.title)}</span>
                 </div>
             `;
 
-            // Eventos de clique e arrastar
+            // Eventos do mouse e clique
             el.addEventListener('mousedown', (e) => onNodeMouseDown(e, node));
             el.addEventListener('click', (e) => onNodeClick(e, node));
 
@@ -201,9 +227,11 @@
         });
     }
 
-    // --- Pan e Zoom da Câmera Cósmica ---
+    // --- Pan e Zoom da Câmera Ancestral ---
 
     function setupPanAndZoom() {
+        if (!viewport) return;
+
         viewport.addEventListener('mousedown', (e) => {
             if (e.target === viewport || e.target.id === 'canvas-container' || e.target.tagName === 'svg') {
                 state.isPanning = true;
@@ -234,7 +262,6 @@
             const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
             const newScale = Math.min(Math.max(state.view.scale * zoomFactor, 0.4), 2.5);
 
-            // Zoom centrado na posição do cursor
             const rect = viewport.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
@@ -249,7 +276,9 @@
     }
 
     function applyTransform() {
-        container.style.transform = `translate(${state.view.x}px, ${state.view.y}px) scale(${state.view.scale})`;
+        if (container) {
+            container.style.transform = `translate(${state.view.x}px, ${state.view.y}px) scale(${state.view.scale})`;
+        }
     }
 
     function updateZoomLabel() {
@@ -277,11 +306,11 @@
         updateZoomLabel();
     };
 
-    // --- Arrastar Nós no Canvas (Drag & Drop) ---
+    // --- Arrastar Medalhões na Forja (Drag & Drop) ---
 
     function onNodeMouseDown(e, node) {
         if (state.interactionMode !== 'edit' || state.connectModeActive) return;
-        if (e.button !== 0) return; // Apenas botão esquerdo
+        if (e.button !== 0) return;
 
         e.stopPropagation();
         state.activeDragNode = node;
@@ -300,17 +329,14 @@
         state.activeDragNode.pos_x = Math.round(newX);
         state.activeDragNode.pos_y = Math.round(newY);
 
-        // Atualiza posição do elemento no DOM imediatamente (60 FPS)
         const el = nodesLayer.querySelector(`[data-node-id="${state.activeDragNode.id}"]`);
         if (el) {
             el.style.left = `${state.activeDragNode.pos_x}px`;
             el.style.top = `${state.activeDragNode.pos_y}px`;
         }
 
-        // Re-renderiza arestas dinamicamente durante o movimento
         renderEdges();
 
-        // Enfileira posição para salvamento em lote via debounce
         state.pendingPositions.set(state.activeDragNode.id, {
             node_id: state.activeDragNode.id,
             pos_x: state.activeDragNode.pos_x,
@@ -322,7 +348,6 @@
         if (!state.activeDragNode) return;
         state.activeDragNode = null;
 
-        // Dispara salvamento das coordenadas com debounce
         clearTimeout(state.batchSaveTimer);
         state.batchSaveTimer = setTimeout(flushPendingPositions, 500);
     }
@@ -340,11 +365,11 @@
                 body: JSON.stringify({ positions }),
             });
         } catch (err) {
-            console.error('Falha ao salvar coordenadas do nó:', err);
+            console.error('Falha ao salvar coordenadas do medalhão:', err);
         }
     }
 
-    // --- Clique em Nós & Modo Conexão ---
+    // --- Clique em Nós: Modo Jornada vs Modo Forja ---
 
     function onNodeClick(e, node) {
         e.stopPropagation();
@@ -354,15 +379,18 @@
             return;
         }
 
-        // Se estiver em modo conexão de arestas
+        // Se estiver traçando vínculo de dependência no Modo Forja
         if (state.connectModeActive) {
             if (!state.connectSourceNodeId) {
                 state.connectSourceNodeId = node.id;
-                document.getElementById('connect-banner').textContent =
-                    `⚡ ORIGEM SELECIONADA: "${node.title}". Agora clique no nó DEPENDENTE.`;
+                const banner = document.getElementById('connect-banner');
+                if (banner) {
+                    banner.innerHTML = `<span>⚡ PRÉ-REQUISITO SELECIONADO: "${escapeHtml(node.title)}". Agora clique no medalhão DEPENDENTE.</span>
+                    <button type="button" onclick="toggleConnectMode()" class="ml-2 text-xs bg-[#0c0908]/20 px-2 py-0.5 rounded font-sans">Cancelar</button>`;
+                }
             } else {
                 if (state.connectSourceNodeId === node.id) {
-                    alert('Um nó não pode depender de si mesmo!');
+                    alert('Um medalhão não pode depender de si mesmo!');
                     return;
                 }
                 createEdge(state.connectSourceNodeId, node.id);
@@ -371,8 +399,14 @@
             return;
         }
 
-        // Caso normal: abre a gaveta lateral de inspeção do nó
-        openNodeDrawer(node);
+        // NO MODO JORNADA (ESTUDO): Navegação direta à Página Dedicada do Nó (Grimório)!
+        if (state.interactionMode === 'study') {
+            window.location.href = `/study-maps/${state.mapId}/nodes/${node.id}`;
+            return;
+        }
+
+        // NO MODO FORJA (CONSTRUÇÃO): Abre o Inspector Rápido de Edição do Nó
+        openEditNodeModal(node);
     }
 
     window.toggleConnectMode = () => {
@@ -382,12 +416,15 @@
         const btn = document.getElementById('btn-connect-mode');
 
         if (state.connectModeActive) {
-            banner.classList.remove('hidden');
-            banner.textContent = '⚡ MODO CONEXÃO: Clique no nó de pré-requisito e depois no dependente';
-            btn.classList.add('bg-amber-600', 'text-white');
+            if (banner) {
+                banner.classList.remove('hidden');
+                banner.innerHTML = `<span>⚡ TRAÇAR VÍNCULO: Clique no nó de pré-requisito e depois no medalhão dependente</span>
+                <button type="button" onclick="toggleConnectMode()" class="ml-2 text-xs bg-[#0c0908]/20 px-2 py-0.5 rounded font-sans">Cancelar</button>`;
+            }
+            if (btn) btn.className = 'rpg-btn-gold text-xs py-1.5 px-3 flex items-center space-x-1';
         } else {
-            banner.classList.add('hidden');
-            btn.classList.remove('bg-amber-600', 'text-white');
+            if (banner) banner.classList.add('hidden');
+            if (btn) btn.className = 'rpg-btn-bronze text-xs py-1.5 px-3 flex items-center space-x-1';
         }
     };
 
@@ -402,7 +439,7 @@
                 loadGraph();
             } else {
                 const err = await res.json();
-                alert('Erro ao conectar nós: ' + (err.detail || 'Falha de validação'));
+                alert('Erro ao traçar vínculo: ' + (err.detail || 'Falha de validação'));
             }
         } catch (err) {
             alert('Erro de conexão: ' + err.message);
@@ -418,11 +455,11 @@
                 loadGraph();
             }
         } catch (err) {
-            alert('Falha ao remover dependência: ' + err.message);
+            alert('Falha ao dissipar dependência: ' + err.message);
         }
     }
 
-    // --- Alternar Modos: Estudo vs Edição ---
+    // --- Alternar Modos: Modo Jornada vs Modo Forja ---
 
     window.setInteractionMode = (mode) => {
         state.interactionMode = mode;
@@ -431,320 +468,88 @@
         const editorActions = document.getElementById('editor-actions');
 
         if (mode === 'edit') {
-            btnEdit.className = 'px-3 py-1 font-bold rounded-lg transition-all bg-indigo-600 text-white shadow-sm';
-            btnStudy.className = 'px-3 py-1 font-medium rounded-lg text-slate-400 hover:text-white transition-all';
-            editorActions.classList.remove('hidden');
+            if (btnEdit) {
+                btnEdit.className = 'px-3.5 py-1.5 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5';
+            }
+            if (btnStudy) {
+                btnStudy.className = 'px-3.5 py-1.5 font-medium font-cinzel rounded-lg text-[#a39276] hover:text-[#f0c869] transition-all flex items-center space-x-1.5';
+            }
+            if (editorActions) editorActions.classList.remove('hidden');
         } else {
-            btnStudy.className = 'px-3 py-1 font-bold rounded-lg transition-all bg-indigo-600 text-white shadow-sm';
-            btnEdit.className = 'px-3 py-1 font-medium rounded-lg text-slate-400 hover:text-white transition-all';
-            editorActions.classList.add('hidden');
+            if (btnStudy) {
+                btnStudy.className = 'px-3.5 py-1.5 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5';
+            }
+            if (btnEdit) {
+                btnEdit.className = 'px-3.5 py-1.5 font-medium font-cinzel rounded-lg text-[#a39276] hover:text-[#f0c869] transition-all flex items-center space-x-1.5';
+            }
+            if (editorActions) editorActions.classList.add('hidden');
             if (state.connectModeActive) toggleConnectMode();
         }
         renderEdges();
     };
 
-    // --- Drawer de Inspeção do Nó ---
-
-    window.openNodeDrawer = async (node) => {
-        state.selectedNode = node;
-        drawer.classList.remove('hidden');
-
-        document.getElementById('drawer-node-icon').textContent = ICON_MAP[node.icon] || '🧠';
-        document.getElementById('drawer-node-title').textContent = node.title;
-        document.getElementById('drawer-node-desc').textContent = node.description || 'Sem descrição cadastrada.';
-
-        const levelBadge = document.getElementById('drawer-level-badge');
-        levelBadge.textContent = `NÍVEL ${node.effective_level}`;
-
-        const statusLabel = document.getElementById('drawer-unlock-status');
-        statusLabel.textContent = node.is_unlocked ? 'Desbloqueado' : 'Bloqueado (Pré-requisitos pendentes)';
-        statusLabel.className = node.is_unlocked ? 'text-xs text-emerald-400 font-semibold' : 'text-xs text-rose-400 font-semibold';
-
-        const dueBadge = document.getElementById('drawer-due-badge');
-        dueBadge.textContent = `${node.overdue_questions_count} pendentes hoje`;
-
-        // Sub-mapa fractal
-        const submapAction = document.getElementById('drawer-submap-action');
-        submapAction.innerHTML = `
-            <button
-                type="button"
-                onclick="handleSubmapClick('${node.id}', '${escapeHtml(node.title)}')"
-                class="w-full py-2 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 flex items-center justify-center space-x-1.5 transition-colors"
-            >
-                <span>🔮 Abrir / Criar Sub-mapa Fractal ➔</span>
-            </button>
-        `;
-
-        // Carrega hub completo de conteúdos do nó
-        loadNodeHub(node.id);
-    };
-
-    window.closeNodeDrawer = () => {
-        drawer.classList.add('hidden');
-        state.selectedNode = null;
-    };
-
-    async function loadNodeHub(nodeId) {
-        try {
-            const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${nodeId}/hub`);
-            if (!res.ok) return;
-            const hub = await res.json();
-
-            // Atualiza contadores das abas
-            document.getElementById('count-tab-questions').textContent = hub.all_questions.length;
-            document.getElementById('count-tab-materials').textContent = hub.materials.length;
-            document.getElementById('count-tab-flashcards').textContent = hub.flashcards.length;
-
-            renderDrawerQuestions(hub.all_questions);
-            renderDrawerMaterials(hub.materials);
-            renderDrawerFlashcards(hub.flashcards);
-        } catch (err) {
-            console.error('Erro ao carregar hub do nó:', err);
-        }
-    }
-
-    function renderDrawerQuestions(questions) {
-        const list = document.getElementById('drawer-questions-list');
-        if (questions.length === 0) {
-            list.innerHTML = `<p class="text-xs text-slate-500 italic py-2">Nenhuma pergunta aberta vinculada a este nó.</p>`;
-            return;
-        }
-
-        list.innerHTML = questions.map(q => `
-            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start justify-between space-x-2">
-                <div class="flex-1">
-                    <div class="flex items-center space-x-2 mb-1">
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-950 text-indigo-400 border border-indigo-800">
-                            SRS LVL ${q.current_level}
-                        </span>
-                        <span class="text-[10px] text-slate-500">Próx: ${q.next_review_date}</span>
-                    </div>
-                    <p class="text-xs text-slate-200 font-medium">${escapeHtml(q.prompt)}</p>
-                </div>
-                <button
-                    type="button"
-                    onclick="detachContent('question', '${q.id}')"
-                    class="text-xs text-slate-500 hover:text-rose-400 p-1"
-                    title="Desvincular"
-                >✕</button>
-            </div>
-        `).join('');
-    }
-
-    function renderDrawerMaterials(materials) {
-        const list = document.getElementById('drawer-materials-list');
-        if (materials.length === 0) {
-            list.innerHTML = `<p class="text-xs text-slate-500 italic py-2">Nenhum material didático vinculado.</p>`;
-            return;
-        }
-
-        list.innerHTML = materials.map(m => `
-            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                    <span class="text-base">📄</span>
-                    <div>
-                        <p class="text-xs text-slate-200 font-bold">${escapeHtml(m.title)}</p>
-                        <span class="text-[10px] text-slate-500 uppercase">${escapeHtml(m.content_type)}</span>
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    onclick="detachContent('material', '${m.id}')"
-                    class="text-xs text-slate-500 hover:text-rose-400 p-1"
-                    title="Desvincular"
-                >✕</button>
-            </div>
-        `).join('');
-    }
-
-    function renderDrawerFlashcards(flashcards) {
-        const list = document.getElementById('drawer-flashcards-list');
-        if (flashcards.length === 0) {
-            list.innerHTML = `<p class="text-xs text-slate-500 italic py-2">Nenhum flashcard vinculado.</p>`;
-            return;
-        }
-
-        list.innerHTML = flashcards.map(fc => `
-            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start justify-between space-x-2">
-                <div>
-                    <p class="text-xs text-slate-200 font-semibold">${escapeHtml(fc.front)}</p>
-                    <p class="text-[11px] text-slate-400 mt-1 line-clamp-2">${escapeHtml(fc.back)}</p>
-                </div>
-                <button
-                    type="button"
-                    onclick="detachContent('flashcard', '${fc.id}')"
-                    class="text-xs text-slate-500 hover:text-rose-400 p-1"
-                    title="Desvincular"
-                >✕</button>
-            </div>
-        `).join('');
-    }
-
-    window.switchDrawerTab = (tabName) => {
-        ['questions', 'materials', 'flashcards'].forEach(t => {
-            const btn = document.getElementById(`tab-btn-${t}`);
-            const content = document.getElementById(`tab-content-${t}`);
-            if (t === tabName) {
-                btn.className = 'pb-3 border-b-2 border-indigo-500 text-indigo-400 px-3 transition-colors';
-                content.classList.remove('hidden');
-            } else {
-                btn.className = 'pb-3 border-b-2 border-transparent hover:text-slate-200 px-3 transition-colors';
-                content.classList.add('hidden');
-            }
-        });
-    };
-
-    window.startNodeStudySession = () => {
-        if (!state.selectedNode) return;
-        // Redireciona para o estudo de perguntas SRS
-        window.location.href = `/questions/study`;
-    };
-
-    window.handleSubmapClick = async (nodeId, nodeTitle) => {
-        // Tenta encontrar se já existe um sub-mapa apontando para este parent_node_id
-        try {
-            const res = await fetch('/api/v1/study-maps');
-            const maps = await res.json();
-            const existingSubmap = maps.find(m => m.parent_node_id === nodeId);
-
-            if (existingSubmap) {
-                window.location.href = `/study-maps/${existingSubmap.id}/canvas`;
-            } else {
-                if (confirm(`Deseja criar um novo sub-mapa para aprofundar o nó "${nodeTitle}"?`)) {
-                    const createRes = await fetch('/api/v1/study-maps', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            title: `Sub-mapa: ${nodeTitle}`,
-                            description: `Detalhamento do conceito ${nodeTitle}`,
-                            parent_node_id: nodeId,
-                        }),
-                    });
-                    if (createRes.ok) {
-                        const newSubmap = await createRes.json();
-                        window.location.href = `/study-maps/${newSubmap.id}/canvas`;
-                    }
-                }
-            }
-        } catch (err) {
-            alert('Falha ao acessar sub-mapa: ' + err.message);
-        }
-    };
-
-    // --- Vinculação e Desvinculação de Conteúdos ---
-
-    window.openAttachModal = async (contentType) => {
-        const modal = document.getElementById('attach-modal');
-        const titleEl = document.getElementById('attach-modal-title');
-        const container = document.getElementById('attach-modal-items');
-        modal.classList.remove('hidden');
-        container.innerHTML = '<p class="text-xs text-slate-400">Carregando itens da sua biblioteca...</p>';
-
-        let label = 'Perguntas';
-        if (contentType === 'material') label = 'Materiais Didáticos';
-        if (contentType === 'flashcard') label = 'Flashcards';
-        titleEl.textContent = `Vincular ${label}`;
-
-        try {
-            let items = [];
-            if (contentType === 'question') {
-                const res = await fetch('/api/v1/questions/manage');
-                if (res.ok) items = await res.json();
-            } else if (contentType === 'material') {
-                const res = await fetch('/api/v1/knowledge/sources');
-                if (res.ok) items = await res.json();
-            } else if (contentType === 'flashcard') {
-                const res = await fetch('/api/v1/flashcards');
-                if (res.ok) items = await res.json();
-            }
-
-            if (!items || items.length === 0) {
-                container.innerHTML = `<p class="text-xs text-slate-400 py-3 italic">Nenhum item encontrado na biblioteca para vincular.</p>`;
-                return;
-            }
-
-            container.innerHTML = items.map(item => {
-                const itemTitle = item.prompt || item.title || item.front || 'Sem título';
-                return `
-                    <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between">
-                        <span class="text-xs text-slate-200 font-medium truncate max-w-[300px]">${escapeHtml(itemTitle)}</span>
-                        <button
-                            type="button"
-                            onclick="attachContent('${contentType}', '${item.id}')"
-                            class="px-3 py-1 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
-                        >Vincular</button>
-                    </div>
-                `;
-            }).join('');
-        } catch (err) {
-            container.innerHTML = `<p class="text-xs text-rose-400">Erro ao carregar itens da biblioteca.</p>`;
-        }
-    };
-
-    window.closeAttachModal = () => {
-        document.getElementById('attach-modal').classList.add('hidden');
-    };
-
-    window.attachContent = async (contentType, contentId) => {
-        if (!state.selectedNode) return;
-        try {
-            const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${state.selectedNode.id}/contents`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content_type: contentType, content_id: contentId }),
-            });
-            if (res.ok) {
-                closeAttachModal();
-                loadNodeHub(state.selectedNode.id);
-                loadGraph(); // Atualiza contadores no nó
-            } else {
-                alert('Falha ao vincular item ao nó.');
-            }
-        } catch (err) {
-            alert('Erro de conexão: ' + err.message);
-        }
-    };
-
-    window.detachContent = async (contentType, contentId) => {
-        if (!state.selectedNode) return;
-        if (!confirm('Deseja desvincular este item do nó?')) return;
-
-        try {
-            const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${state.selectedNode.id}/contents/${contentType}/${contentId}`, {
-                method: 'DELETE',
-            });
-            if (res.ok) {
-                loadNodeHub(state.selectedNode.id);
-                loadGraph();
-            }
-        } catch (err) {
-            alert('Erro ao desvincular: ' + err.message);
-        }
-    };
-
-    // --- Criação e Edição de Nós ---
+    // --- Inspector da Forja (Criação & Edição de Nós) ---
 
     window.openCreateNodeModal = () => {
-        document.getElementById('node-modal-title').textContent = 'Adicionar Nó';
-        document.getElementById('modal-node-id').value = '';
-        document.getElementById('modal-node-title-input').value = '';
-        document.getElementById('modal-node-desc-input').value = '';
-        document.getElementById('modal-node-icon-select').value = 'brain';
-        document.getElementById('node-modal').classList.remove('hidden');
+        state.selectedNode = null;
+        const titleEl = document.getElementById('node-modal-title');
+        if (titleEl) titleEl.textContent = 'Forjar Novo Medalhão';
+
+        const idInput = document.getElementById('modal-node-id');
+        if (idInput) idInput.value = '';
+
+        const titleInput = document.getElementById('modal-node-title-input');
+        if (titleInput) titleInput.value = '';
+
+        const descInput = document.getElementById('modal-node-desc-input');
+        if (descInput) descInput.value = '';
+
+        const iconSelect = document.getElementById('modal-node-icon-select');
+        if (iconSelect) iconSelect.value = 'brain';
+
+        const deleteBtn = document.getElementById('btn-delete-node');
+        if (deleteBtn) deleteBtn.classList.add('hidden');
+
+        const grimoireBtn = document.getElementById('btn-open-grimoire');
+        if (grimoireBtn) grimoireBtn.classList.add('hidden');
+
+        if (nodeModal) nodeModal.classList.remove('hidden');
     };
 
-    window.openEditNodeModal = () => {
-        if (!state.selectedNode) return;
-        document.getElementById('node-modal-title').textContent = 'Editar Nó';
-        document.getElementById('modal-node-id').value = state.selectedNode.id;
-        document.getElementById('modal-node-title-input').value = state.selectedNode.title;
-        document.getElementById('modal-node-desc-input').value = state.selectedNode.description || '';
-        document.getElementById('modal-node-icon-select').value = state.selectedNode.icon || 'brain';
-        document.getElementById('node-modal').classList.remove('hidden');
+    window.openEditNodeModal = (node) => {
+        state.selectedNode = node;
+        const titleEl = document.getElementById('node-modal-title');
+        if (titleEl) titleEl.textContent = `Editar Medalhão: ${node.title}`;
+
+        const idInput = document.getElementById('modal-node-id');
+        if (idInput) idInput.value = node.id;
+
+        const titleInput = document.getElementById('modal-node-title-input');
+        if (titleInput) titleInput.value = node.title;
+
+        const descInput = document.getElementById('modal-node-desc-input');
+        if (descInput) descInput.value = node.description || '';
+
+        const iconSelect = document.getElementById('modal-node-icon-select');
+        if (iconSelect) iconSelect.value = node.icon || 'brain';
+
+        const deleteBtn = document.getElementById('btn-delete-node');
+        if (deleteBtn) deleteBtn.classList.remove('hidden');
+
+        const grimoireBtn = document.getElementById('btn-open-grimoire');
+        if (grimoireBtn) grimoireBtn.classList.remove('hidden');
+
+        if (nodeModal) nodeModal.classList.remove('hidden');
     };
 
     window.closeNodeModal = () => {
-        document.getElementById('node-modal').classList.add('hidden');
+        if (nodeModal) nodeModal.classList.add('hidden');
+        state.selectedNode = null;
+    };
+
+    window.openSelectedNodeGrimoire = () => {
+        if (!state.selectedNode) return;
+        window.location.href = `/study-maps/${state.mapId}/nodes/${state.selectedNode.id}`;
     };
 
     window.handleSaveNode = async (e) => {
@@ -756,9 +561,9 @@
 
         try {
             if (!nodeId) {
-                // Criação: posiciona no centro do viewport visível
-                const centerX = (-state.view.x + viewport.clientWidth / 2) / state.view.scale - 36;
-                const centerY = (-state.view.y + viewport.clientHeight / 2) / state.view.scale - 36;
+                // Criação do nó posicionado no centro visível
+                const centerX = (-state.view.x + viewport.clientWidth / 2) / state.view.scale - 40;
+                const centerY = (-state.view.y + viewport.clientHeight / 2) / state.view.scale - 40;
 
                 const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes`, {
                     method: 'POST',
@@ -776,10 +581,10 @@
                     loadGraph();
                 } else {
                     const err = await res.json();
-                    alert('Erro ao criar nó: ' + (err.detail || 'Falha de validação'));
+                    alert('Erro ao forjar nó: ' + (err.detail || 'Falha de validação'));
                 }
             } else {
-                // Atualização
+                // Atualização dos metadados do nó
                 const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${nodeId}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
@@ -787,34 +592,33 @@
                 });
                 if (res.ok) {
                     closeNodeModal();
-                    if (state.selectedNode) {
-                        state.selectedNode.title = title;
-                        state.selectedNode.description = description;
-                        state.selectedNode.icon = icon;
-                        openNodeDrawer(state.selectedNode);
-                    }
                     loadGraph();
+                } else {
+                    const err = await res.json();
+                    alert('Erro ao atualizar nó: ' + (err.detail || 'Falha ao salvar'));
                 }
             }
         } catch (err) {
-            alert('Erro ao salvar nó: ' + err.message);
+            alert('Erro de conexão: ' + err.message);
         }
     };
 
     window.deleteCurrentNode = async () => {
         if (!state.selectedNode) return;
-        if (!confirm(`Deseja excluir o nó "${state.selectedNode.title}"?`)) return;
+        if (!confirm(`Deseja dissipar o medalhão "${state.selectedNode.title}" e suas provações?`)) return;
 
         try {
             const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${state.selectedNode.id}`, {
                 method: 'DELETE',
             });
             if (res.ok) {
-                closeNodeDrawer();
+                closeNodeModal();
                 loadGraph();
+            } else {
+                alert('Falha ao dissipar nó.');
             }
         } catch (err) {
-            alert('Falha ao excluir nó: ' + err.message);
+            alert('Erro de rede: ' + err.message);
         }
     };
 

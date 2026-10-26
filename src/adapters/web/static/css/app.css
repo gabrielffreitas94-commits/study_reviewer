@@ -1,16 +1,29 @@
-/* Study Reviewer — Design System & Fallback CSS */
+/* Study Reviewer — Design System: Grimório & Forja Ancestral */
 :root {
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
-  --color-bg-light: #f8fafc;
-  --color-text-light: #0f172a;
-  --color-card-light: #ffffff;
-  --color-border-light: #e2e8f0;
+  /* RPG Design Tokens */
+  --bg-abyss: #0c0908;
+  --bg-obsidian: #14100d;
+  --bg-grimoire: #1c1612;
+  --border-bronze: #785a28;
+  --gold-primary: #c89b3c;
+  --gold-bright: #f0c869;
+  --emerald-rune: #10b981;
+  --crimson-seal: #e11d48;
+  --text-parchment: #f5ebd6;
+  --text-muted-gold: #a39276;
+
+  /* Legacy compatibility colors */
+  --color-primary: #c89b3c;
+  --color-primary-hover: #f0c869;
+  --color-bg-light: #14100d;
+  --color-text-light: #f5ebd6;
+  --color-card-light: #1c1612;
+  --color-border-light: #785a28;
   
-  --color-bg-dark: #0f172a;
-  --color-text-dark: #f8fafc;
-  --color-card-dark: #1e293b;
-  --color-border-dark: #334155;
+  --color-bg-dark: #0c0908;
+  --color-text-dark: #f5ebd6;
+  --color-card-dark: #14100d;
+  --color-border-dark: #785a28;
 }
 
 /* Base Styles */
@@ -20,18 +33,143 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  background-color: var(--bg-abyss);
+  color: var(--text-parchment);
 }
 
-/* Dark Mode Transitions */
-body {
-  background-color: var(--color-bg-light);
-  color: var(--color-text-light);
-  transition: background-color 0.2s ease, color 0.2s ease;
+/* Typography RPG Tokens */
+.font-cinzel, .rpg-font {
+  font-family: 'Cinzel', serif, Georgia;
 }
 
-html.dark body {
-  background-color: var(--color-bg-dark);
-  color: var(--color-text-dark);
+.font-tome, .tome-font {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+
+/* RPG Surfaces & Panels */
+.rpg-panel {
+  background: linear-gradient(135deg, rgba(28, 22, 18, 0.95), rgba(20, 16, 13, 0.98));
+  border: 1px solid var(--border-bronze);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(120, 90, 40, 0.1);
+  border-radius: 1rem;
+}
+
+.rpg-panel-header {
+  border-bottom: 1px solid rgba(120, 90, 40, 0.4);
+}
+
+/* RPG Buttons */
+.rpg-btn-gold {
+  font-family: 'Cinzel', serif, Georgia;
+  font-weight: 700;
+  background: linear-gradient(180deg, #c89b3c 0%, #a17826 100%);
+  color: #0c0908 !important;
+  border: 1px solid #f0c869;
+  box-shadow: 0 4px 15px rgba(200, 155, 60, 0.35);
+  border-radius: 0.75rem;
+  padding: 0.625rem 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.rpg-btn-gold:hover {
+  background: linear-gradient(180deg, #f0c869 0%, #c89b3c 100%);
+  box-shadow: 0 6px 22px rgba(240, 200, 105, 0.55);
+  transform: translateY(-1px);
+}
+
+.rpg-btn-bronze {
+  font-family: 'Cinzel', serif, Georgia;
+  font-weight: 600;
+  background: rgba(28, 22, 18, 0.9);
+  color: var(--text-parchment);
+  border: 1px solid var(--border-bronze);
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.rpg-btn-bronze:hover {
+  border-color: var(--gold-primary);
+  color: var(--gold-bright);
+  background: rgba(45, 34, 27, 0.95);
+}
+
+/* Medalhão de Habilidade do Canvas */
+.rpg-medallion {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.rpg-medallion:hover {
+  transform: scale(1.08);
+}
+
+.rpg-medallion-locked {
+  background: #14100d;
+  border: 2px dashed #3b322c;
+  opacity: 0.6;
+  filter: grayscale(0.85);
+}
+
+.rpg-medallion-rank0 {
+  background: #1c1612;
+  border: 2px solid #574737;
+  box-shadow: 0 0 10px rgba(87, 71, 55, 0.4);
+}
+
+.rpg-medallion-bronze {
+  background: #1f1813;
+  border: 2px solid #785a28;
+  box-shadow: 0 0 15px rgba(200, 155, 60, 0.35);
+}
+
+.rpg-medallion-gold {
+  background: #251c14;
+  border: 2px solid #f0c869;
+  box-shadow: 0 0 22px rgba(240, 200, 105, 0.6), inset 0 0 10px rgba(240, 200, 105, 0.2);
+}
+
+.rpg-medallion-overdue {
+  animation: pulse-crimson 1.8s infinite;
+  border-color: #e11d48 !important;
+}
+
+@keyframes pulse-crimson {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(225, 29, 72, 0.8), inset 0 0 8px rgba(225, 29, 72, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(225, 29, 72, 0.4);
+  }
+}
+
+/* Conexões SVG no Canvas */
+.rpg-edge-unlocked {
+  stroke: var(--gold-primary);
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 5px rgba(240, 200, 105, 0.7));
+  transition: all 0.3s ease;
+}
+
+.rpg-edge-locked {
+  stroke: #3b322c;
+  stroke-width: 2px;
+  stroke-dasharray: 6 6;
 }
 
 /* Layout Utilities */
@@ -67,7 +205,7 @@ html.dark body {
   animation: chip-fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* 3D Flashcard Flip Mechanics (Seção 7.3 e 7.4) */
+/* 3D Flashcard Flip Mechanics */
 .card-container {
   perspective: 1000px;
   contain: layout size;
@@ -105,7 +243,6 @@ html.dark body {
   transform: rotateY(180deg);
 }
 
-/* Redução de movimento para acessibilidade WCAG AA (Seção 7.4) */
 @media (prefers-reduced-motion: reduce) {
   .card-inner {
     transition: opacity 0.15s ease-in-out !important;
@@ -125,7 +262,6 @@ html.dark body {
   }
 }
 
-/* Micro-transição suave acelerada por GPU para Optimistic UI (120ms - 150ms) */
 .card-transition-gpu {
   will-change: transform, opacity;
   transition: transform 0.14s cubic-bezier(0.2, 0, 0, 1), opacity 0.14s ease-out;
@@ -138,12 +274,12 @@ button, input, select, textarea {
 }
 
 .btn-primary {
-  background-color: var(--color-primary);
-  color: #ffffff;
+  background-color: var(--gold-primary);
+  color: #0c0908;
   padding: 0.625rem 1.25rem;
   border-radius: 0.5rem;
-  font-weight: 500;
-  border: none;
+  font-weight: 600;
+  border: 1px solid var(--gold-bright);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -152,5 +288,5 @@ button, input, select, textarea {
 }
 
 .btn-primary:hover {
-  background-color: var(--color-primary-hover);
+  background-color: var(--gold-bright);
 }

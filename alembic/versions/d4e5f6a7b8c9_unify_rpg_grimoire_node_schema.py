@@ -20,7 +20,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    """Adiciona theory_content a study_nodes, raw_text e node_id a knowledge_sources, e node_id a questions."""
+    """Adiciona theory_content, raw_text e node_id a study_nodes, knowledge_sources e questions."""
     bind = op.get_bind()
     insp = sa.inspect(bind)
 

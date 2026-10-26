@@ -1,7 +1,6 @@
 """Testes unitários para casos de uso do Tomo do Nó (Node Grimoire) e Modo Treino Livre."""
 
 from collections.abc import Generator
-from datetime import date
 from uuid import uuid4
 
 import pytest

@@ -90,7 +90,7 @@ def test_performance_hub_empty_state(client: TestClient) -> None:
     assert "Começar Minhas Revisões" in html
     # Verifica a presença da aba Desempenho no menu
     assert 'href="/performance"' in html
-    assert "grid-cols-4" in html
+    assert "grid-cols-3" in html
 
 
 @pytest.mark.integration

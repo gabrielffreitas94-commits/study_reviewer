@@ -1,5 +1,7 @@
-import pytest
 from uuid import uuid4
+
+import pytest
+
 from src.domain.entities import KnowledgeSource, Question, StudyNode
 from src.domain.exceptions import DomainValidationError
 

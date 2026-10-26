@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Árvores de Estudos RPG — Study Reviewer{% endblock %}
+{% block title %}Códice de Habilidades — Study Reviewer{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Header com Atmosfera RPG -->
-    <div class="sm:flex sm:items-center sm:justify-between border-b border-slate-200 dark:border-slate-800 pb-6 mb-8">
+    <!-- Header do Códice de Habilidades com Atmosfera RPG -->
+    <div class="sm:flex sm:items-center sm:justify-between border-b border-[#785a28]/60 pb-6 mb-8">
         <div>
             <div class="flex items-center space-x-3">
                 <span class="text-3xl" aria-hidden="true">🗺️</span>
-                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                    Árvores de Estudos & Conhecimento
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-[#f0c869] font-cinzel tracking-wider">
+                    Códice de Habilidades & Árvores Ancestrais
                 </h1>
             </div>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                Explore seus grafos de aprendizado em estilo RPG. Posicione nós, desbloqueie habilidades e progrida com o motor SRS.
+            <p class="mt-2 text-sm text-[#a39276] font-tome text-base">
+                Explore seus grafos de maestria em estilo RPG. Forje nós, desbloqueie medalhões e progrida com o motor SRS.
             </p>
         </div>
         <div class="mt-4 sm:mt-0 flex items-center space-x-3">
@@ -22,29 +22,19 @@
                 type="button"
                 id="btn-sample-math"
                 onclick="createSampleMathMap()"
-                class="inline-flex items-center px-3.5 py-2.5 rounded-xl text-xs font-semibold text-emerald-800 dark:text-emerald-200 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-800 transition-all cursor-pointer shadow-sm"
-                title="Gera uma árvore didática de Matemática Aplicada com nós, flashcards, perguntas e pré-requisitos"
+                class="rpg-btn-bronze text-xs border-[#10b981]/50 text-[#10b981] hover:text-[#34d399] hover:border-[#10b981]"
+                title="Gera uma árvore didática de Matemática Aplicada com nós, teoria, perguntas e pré-requisitos"
             >
                 <span class="mr-1.5" aria-hidden="true">📐</span>
-                <span>Árvore de Matemática Aplicada</span>
-            </button>
-            <button
-                type="button"
-                id="btn-migrate-legacy"
-                onclick="migrateLegacyTaxonomy()"
-                class="inline-flex items-center px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 transition-all cursor-pointer"
-                title="Converte matérias e tópicos legados em Árvores RPG automaticamente"
-            >
-                <span class="mr-1.5" aria-hidden="true">🔄</span>
-                <span>Importar Matérias Antigas</span>
+                <span>Invocar Árvore Modelo (Matemática Aplicada)</span>
             </button>
             <button
                 type="button"
                 onclick="document.getElementById('new-map-modal').classList.remove('hidden')"
-                class="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                class="rpg-btn-gold text-xs sm:text-sm"
             >
                 <span class="mr-2 text-base" aria-hidden="true">✨</span>
-                <span>Nova Árvore de Estudos</span>
+                <span>Forjar Nova Árvore</span>
             </button>
         </div>
     </div>
@@ -53,39 +43,39 @@
     {% if maps %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for m in maps %}
-        <div class="group relative bg-white dark:bg-slate-800/80 rounded-2xl p-6 border border-slate-200 dark:border-slate-700/80 shadow-sm hover:shadow-xl hover:border-indigo-500/50 dark:hover:border-indigo-500/50 transition-all duration-300 flex flex-col justify-between">
+        <div class="rpg-panel p-6 flex flex-col justify-between hover:border-[#c89b3c] transition-all duration-300">
             <div>
                 <div class="flex items-center justify-between mb-4">
-                    <span class="px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60">
+                    <span class="px-2.5 py-1 text-xs font-bold font-cinzel rounded-lg bg-[#251c14] text-[#f0c869] border border-[#785a28]">
                         {{ m.nodes_count }} nós
                     </span>
-                    <span class="text-xs text-slate-400 dark:text-slate-500">
+                    <span class="text-xs text-[#a39276] font-mono">
                         {{ m.created_at }}
                     </span>
                 </div>
-                <h2 class="text-lg font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                <h2 class="text-lg font-bold text-[#f5ebd6] font-cinzel hover:text-[#f0c869] transition-colors">
                     {{ m.title }}
                 </h2>
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300 line-clamp-3">
-                    {{ m.description }}
+                <p class="mt-2 text-sm text-[#a39276] font-tome text-base line-clamp-3">
+                    {{ m.description or 'Sem descrição registrada no tomo.' }}
                 </p>
             </div>
 
-            <div class="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
+            <div class="mt-6 pt-4 border-t border-[#785a28]/40 flex items-center justify-between">
                 <a
                     href="/study-maps/{{ m.id }}/canvas"
-                    class="inline-flex items-center text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition-colors"
+                    class="rpg-btn-gold text-xs px-3.5 py-1.5"
                 >
-                    <span>Abrir Canvas</span>
-                    <svg class="ml-1.5 w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span>⚔️ Abrir Forja</span>
+                    <svg class="ml-1.5 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                     </svg>
                 </a>
                 <button
                     type="button"
                     onclick="deleteMap('{{ m.id }}', '{{ m.title }}')"
-                    class="text-xs text-rose-500 hover:text-rose-700 dark:hover:text-rose-400 p-1 rounded transition-colors"
-                    title="Excluir Mapa"
+                    class="text-xs text-[#a39276] hover:text-[#e11d48] p-1 font-cinzel transition-colors"
+                    title="Excluir Árvore"
                 >
                     Excluir
                 </button>
@@ -94,59 +84,59 @@
         {% endfor %}
     </div>
     {% else %}
-    <!-- Estado Inicial / Empty State -->
-    <div class="text-center py-16 px-4 bg-white dark:bg-slate-800/50 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700">
-        <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-4xl">
+    <!-- Estado Inicial / Empty State do Grimório -->
+    <div class="rpg-panel text-center py-16 px-4">
+        <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[#251c14] border border-[#785a28] flex items-center justify-center text-4xl shadow-inner">
             🔮
         </div>
-        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Nenhum mapa de estudo criado ainda</h3>
-        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-            Comece criando sua primeira árvore de habilidades. Adicione conceitos, matérias, perguntas e conecte dependências como num jogo de RPG!
+        <h3 class="text-xl font-bold text-[#f0c869] font-cinzel">Nenhum Tomo Forjado Ainda</h3>
+        <p class="mt-2 text-sm text-[#a39276] font-tome text-base max-w-md mx-auto">
+            Comece forjando sua primeira Árvore de Habilidades ou invoque a Árvore Modelo de Matemática Aplicada para dominar provações com repetição espaçada.
         </p>
         <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
                 type="button"
                 onclick="createSampleMathMap()"
-                class="inline-flex items-center px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+                class="rpg-btn-gold text-sm"
             >
                 <span class="mr-2" aria-hidden="true">📐</span>
-                <span>Gerar Árvore Modelo (Matemática Aplicada)</span>
+                <span>Invocar Árvore Modelo (Matemática Aplicada)</span>
             </button>
             <button
                 type="button"
                 onclick="document.getElementById('new-map-modal').classList.remove('hidden')"
-                class="inline-flex items-center px-5 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 transition-all cursor-pointer"
+                class="rpg-btn-bronze text-sm"
             >
                 <span class="mr-2" aria-hidden="true">✨</span>
-                <span>Criar em Branco</span>
+                <span>Forjar em Branco</span>
             </button>
         </div>
     </div>
     {% endif %}
 </div>
 
-<!-- Modal Novo Mapa -->
+<!-- Modal Forjar Nova Árvore -->
 <div id="new-map-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
-    <div class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity" onclick="document.getElementById('new-map-modal').classList.add('hidden')"></div>
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="document.getElementById('new-map-modal').classList.add('hidden')"></div>
     <div class="min-h-full flex items-center justify-center p-4">
-        <div class="relative bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-slate-200 dark:border-slate-700 shadow-2xl">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-700">
-                <div class="flex items-center space-x-2">
+        <div class="relative rpg-panel p-6 sm:p-8 max-w-lg w-full bg-[#14100d] border border-[#785a28] shadow-2xl">
+            <div class="flex items-center justify-between pb-4 border-b border-[#785a28]/50">
+                <div class="flex items-center space-x-2.5">
                     <span class="text-2xl">⚡</span>
-                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">Nova Árvore de Conhecimento</h2>
+                    <h2 class="text-lg font-bold text-[#f0c869] font-cinzel">Forjar Nova Árvore de Habilidades</h2>
                 </div>
                 <button
                     type="button"
                     onclick="document.getElementById('new-map-modal').classList.add('hidden')"
-                    class="text-slate-400 hover:text-slate-500 dark:hover:text-slate-300"
+                    class="text-[#a39276] hover:text-[#f0c869]"
                 >
                     ✕
                 </button>
             </div>
             <form onsubmit="handleCreateMap(event)" class="mt-6 space-y-4">
                 <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-                        Título da Árvore / Matéria
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">
+                        Título da Árvore / Maestria
                     </label>
                     <input
                         type="text"
@@ -154,45 +144,45 @@
                         required
                         maxlength="200"
                         placeholder="Ex: Arquitetura de Software II"
-                        class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm"
                     />
                 </div>
                 <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-                        Descrição / Objetivo (Opcional)
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">
+                        Descrição / Objetivo Ancestral (Opcional)
                     </label>
                     <textarea
                         id="new-map-description"
                         rows="3"
                         maxlength="2000"
                         placeholder="Ex: Trilha completa de Clean Architecture, Ports & Adapters e Design Patterns"
-                        class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm font-tome text-base"
                     ></textarea>
                 </div>
                 <div class="flex items-center pt-2">
                     <input
                         type="checkbox"
                         id="new-map-public"
-                        class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900"
+                        class="h-4 w-4 rounded border-[#785a28] text-[#c89b3c] focus:ring-[#f0c869] bg-[#0c0908]"
                     />
-                    <label for="new-map-public" class="ml-2 text-sm text-slate-700 dark:text-slate-300">
-                        Tornar este mapa público (outros estudantes poderão explorar)
+                    <label for="new-map-public" class="ml-2 text-sm text-[#a39276] font-tome text-base">
+                        Tornar esta árvore pública (outros aventureiros poderão explorar)
                     </label>
                 </div>
-                <div class="flex justify-end space-x-3 pt-6 border-t border-slate-100 dark:border-slate-700">
+                <div class="flex justify-end space-x-3 pt-6 border-t border-[#785a28]/50">
                     <button
                         type="button"
                         onclick="document.getElementById('new-map-modal').classList.add('hidden')"
-                        class="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                        class="px-4 py-2 text-sm font-semibold font-cinzel text-[#a39276] hover:text-[#f5ebd6] rounded-xl transition-colors"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
                         id="submit-create-map-btn"
-                        class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-md shadow-indigo-600/30 transition-all"
+                        class="rpg-btn-gold text-sm px-5 py-2"
                     >
-                        Criar Mapa
+                        ✨ Forjar Árvore
                     </button>
                 </div>
             </form>
@@ -205,7 +195,7 @@ async function handleCreateMap(e) {
     e.preventDefault();
     const btn = document.getElementById('submit-create-map-btn');
     btn.disabled = true;
-    btn.textContent = 'Criando...';
+    btn.textContent = 'Forjando...';
 
     const title = document.getElementById('new-map-title').value.trim();
     const description = document.getElementById('new-map-description').value.trim();
@@ -222,38 +212,13 @@ async function handleCreateMap(e) {
             window.location.href = `/study-maps/${data.id}/canvas`;
         } else {
             const err = await res.json();
-            alert('Erro ao criar mapa: ' + (err.detail || 'Falha inesperada'));
+            alert('Erro ao forjar árvore: ' + (err.detail || 'Falha inesperada'));
         }
     } catch (err) {
         alert('Erro de conexão: ' + err.message);
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Criar Mapa';
-    }
-}
-
-async function migrateLegacyTaxonomy() {
-    if (!confirm('Deseja importar todas as matérias e tópicos legados para Árvores de Estudo RPG?')) return;
-
-    const btn = document.getElementById('btn-migrate-legacy');
-    btn.disabled = true;
-    btn.textContent = 'Importando...';
-
-    try {
-        const res = await fetch('/api/v1/study-maps/migrate-legacy', { method: 'POST' });
-        if (res.ok) {
-            const data = await res.json();
-            alert(`Migração concluída com sucesso!\n• Árvores criadas: ${data.maps_created}\n• Nós criados: ${data.nodes_created}\n• Perguntas vinculadas: ${data.questions_linked}\n• Flashcards vinculados: ${data.flashcards_linked}`);
-            window.location.reload();
-        } else {
-            const err = await res.json();
-            alert('Erro ao migrar matérias: ' + (err.detail || 'Falha inesperada'));
-        }
-    } catch (err) {
-        alert('Erro de conexão: ' + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Importar Matérias Antigas';
+        btn.textContent = '✨ Forjar Árvore';
     }
 }
 
@@ -261,36 +226,36 @@ async function createSampleMathMap() {
     const btn = document.getElementById('btn-sample-math');
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<span>⏳ Gerando árvore...</span>';
+        btn.innerHTML = '<span>⏳ Invocando árvore...</span>';
     }
     try {
         const res = await fetch('/api/v1/study-maps/sample-math', { method: 'POST' });
         if (!res.ok) {
             const err = await res.json();
-            alert('Erro ao gerar árvore modelo: ' + (err.detail || 'Falha na requisição'));
+            alert('Erro ao invocar árvore modelo: ' + (err.detail || 'Falha na requisição'));
             return;
         }
         const data = await res.json();
         window.location.href = `/study-maps/${data.id}/canvas`;
     } catch (e) {
-        alert('Erro de conexão ao gerar árvore modelo.');
+        alert('Erro de conexão ao invocar árvore modelo.');
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<span class="mr-1.5" aria-hidden="true">📐</span><span>Árvore de Matemática Aplicada</span>';
+            btn.innerHTML = '<span class="mr-1.5" aria-hidden="true">📐</span><span>Invocar Árvore Modelo (Matemática Aplicada)</span>';
         }
     }
 }
 
 async function deleteMap(mapId, title) {
-    if (!confirm(`Deseja realmente excluir a árvore "${title}" e todos os seus nós?`)) return;
+    if (!confirm(`Deseja realmente dissipar a árvore ancestral "${title}" e todos os seus nós?`)) return;
 
     try {
         const res = await fetch(`/api/v1/study-maps/${mapId}`, { method: 'DELETE' });
         if (res.ok) {
             window.location.reload();
         } else {
-            alert('Falha ao excluir o mapa.');
+            alert('Falha ao excluir a árvore.');
         }
     } catch (err) {
         alert('Erro de rede: ' + err.message);

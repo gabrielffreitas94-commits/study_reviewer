@@ -464,26 +464,23 @@ def test_create_question_from_manage_view_lifecycle_and_errors(
 @pytest.mark.integration
 def test_navigation_three_tabs_and_active_highlighting(client: TestClient) -> None:
     """Verifica conformidade estrita da navegação com 3 abas principais e 3 colunas mobile."""
-    # 1. Tela /study: "Flashcards" ativo
-    res_study = client.get("/study")
-    assert res_study.status_code == 200
-    assert "Flashcards" in res_study.text
-    assert "Revisão" in res_study.text
-    assert "Desempenho" in res_study.text
-    assert "Cadastros" in res_study.text
-    assert "grid-cols-4" in res_study.text
+    # 1. Tela /study-maps: Códice de Habilidades ativo
+    res_maps = client.get("/study-maps")
+    assert res_maps.status_code == 200
+    assert "Códice de Habilidades" in res_maps.text
+    assert "Provações Diárias" in res_maps.text
+    assert "Crônicas & Atributos" in res_maps.text
+    assert "grid-cols-3" in res_maps.text
 
-    # 2. Tela /questions/study: "Revisão" ativo
+    # 2. Tela /questions/study: Provações Diárias ativo
     res_rev = client.get("/questions/study")
     assert res_rev.status_code == 200
-    assert "Revisão" in res_rev.text
+    assert "Provações Diárias" in res_rev.text
 
-    # 3. Tela /cadastros: "Cadastros" ativo
-    res_cad = client.get("/cadastros")
-    assert res_cad.status_code == 200
-    assert "cadastros-dropdown-menu" in res_cad.text
-    assert "Temas e matérias" in res_cad.text
-    assert "Novo Flashcard" in res_cad.text
+    # 3. Tela /performance: Crônicas ativo
+    res_perf = client.get("/performance")
+    assert res_perf.status_code == 200
+    assert "Crônicas & Atributos" in res_perf.text
 
 
 @pytest.mark.integration

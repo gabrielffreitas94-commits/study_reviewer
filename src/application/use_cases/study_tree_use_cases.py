@@ -913,7 +913,7 @@ class ReviewNodeQuestionUseCase:
         old_q_level = progress.current_level
 
         # MODO TREINO LIVRE: Quando progress.current_level > 0 e progress.next_review_date > today,
-        # nunca lança QuestionNotDueError, não altera progress no banco e retorna is_training_only=True
+        # nunca lança QuestionNotDueError, não altera banco e retorna is_training_only=True
         is_training_only = progress.current_level > 0 and progress.next_review_date > today
 
         if is_training_only:
