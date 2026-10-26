@@ -37,6 +37,50 @@ html, body {
   color: var(--text-parchment);
 }
 
+/* RPG Form Controls (Inputs, Textareas, Selects & Options) */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="url"],
+textarea,
+select {
+  background-color: var(--bg-abyss, #0c0908) !important;
+  color: var(--text-parchment, #f5ebd6) !important;
+  border: 1px solid var(--border-bronze, #785a28) !important;
+  border-radius: 0.75rem;
+}
+
+select option {
+  background-color: #14100d !important;
+  color: #f5ebd6 !important;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="search"]:focus,
+input[type="url"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--gold-bright, #f0c869) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(240, 200, 105, 0.3) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #a39276 !important;
+  opacity: 0.75 !important;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--gold-primary, #c89b3c) !important;
+}
+
+
 /* Typography RPG Tokens */
 .font-cinzel, .rpg-font {
   font-family: 'Cinzel', serif, Georgia;
