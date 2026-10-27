@@ -54,12 +54,12 @@ def _safe_redirect_url(target: str | None, default: str = "/study") -> str:
 @auth_router.get("/login", response_class=HTMLResponse)
 def login_page(
     request: Request,
-    next: str = Query("/study"),
+    next: str = Query("/study-maps"),
     error: str | None = Query(None),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> Response:
     """Renderiza a página de login com botão Google e tratamento de redirecionamento."""
-    safe_next = _safe_redirect_url(next, "/study")
+    safe_next = _safe_redirect_url(next, "/study-maps")
     if current_user is not None:
         return RedirectResponse(url=safe_next, status_code=status.HTTP_303_SEE_OTHER)
 
@@ -107,12 +107,12 @@ def _get_oauth_redirect_uri(request: Request) -> str:
 @auth_router.get("/google")
 def google_login_redirect(
     request: Request,
-    next: str = Query("/study"),
+    next: str = Query("/study-maps"),
     google_client: IGoogleAuthClient = Depends(get_google_client),
     session_service: ISessionTokenService = Depends(get_session_service),
 ) -> Response:
     """Gera state CSRF criptografado e redireciona o usuário para o Google Consent."""
-    safe_next = _safe_redirect_url(next, "/study")
+    safe_next = _safe_redirect_url(next, "/study-maps")
     state = session_service.create_oauth_state(safe_next)
 
     redirect_uri = _get_oauth_redirect_uri(request)
@@ -186,7 +186,7 @@ def google_oauth_callback(
             ),
         )
 
-    next_url = _safe_redirect_url(verified_next, "/study")
+    next_url = _safe_redirect_url(verified_next, "/study-maps")
 
     redirect_uri = _get_oauth_redirect_uri(request)
 

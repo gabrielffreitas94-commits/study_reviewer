@@ -52,7 +52,7 @@
                     </a>
 
                     <!-- Aba 2: Provações Diárias -->
-                    <a href="/questions/study" class="relative inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl text-sm font-semibold font-cinzel transition-all {% if request.url.path.startswith('/questions/study') or request.url.path.startswith('/questions') or request.url.path == '/study' %}text-[#0c0908] bg-[#c89b3c] shadow-md shadow-[#c89b3c]/30 font-bold{% else %}text-[#a39276] hover:text-[#f0c869] hover:bg-[#1c1612]{% endif %}">
+                    <a href="/questions/study" class="relative inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl text-sm font-semibold font-cinzel transition-all {% if request.url.path.startswith('/questions/study') or request.url.path.startswith('/questions') %}text-[#0c0908] bg-[#c89b3c] shadow-md shadow-[#c89b3c]/30 font-bold{% else %}text-[#a39276] hover:text-[#f0c869] hover:bg-[#1c1612]{% endif %}">
                         <span>🔥</span>
                         <span>Provações Diárias</span>
                         <span id="review-badge" class="ml-1.5 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-[#e11d48] rounded-full {% if not pending_questions_count %}hidden{% endif %}">
@@ -128,7 +128,7 @@
             <span class="text-xl" aria-hidden="true">⚔️</span>
             <span>Códice</span>
         </a>
-        <a href="/questions/study" class="relative flex flex-col items-center justify-center py-1 min-h-[48px] text-xs font-cinzel font-semibold {% if request.url.path.startswith('/questions/study') or request.url.path.startswith('/questions') or request.url.path == '/study' %}text-[#f0c869] font-bold{% else %}text-[#a39276]{% endif %}">
+        <a href="/questions/study" class="relative flex flex-col items-center justify-center py-1 min-h-[48px] text-xs font-cinzel font-semibold {% if request.url.path.startswith('/questions/study') or request.url.path.startswith('/questions') %}text-[#f0c869] font-bold{% else %}text-[#a39276]{% endif %}">
             <span class="text-xl relative inline-block" aria-hidden="true">
                 🔥
                 <span id="review-badge-mobile" class="absolute -top-1 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-[#e11d48] rounded-full min-w-[16px] h-4 {% if not pending_questions_count %}hidden{% endif %}">
