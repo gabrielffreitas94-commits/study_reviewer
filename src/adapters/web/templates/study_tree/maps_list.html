@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Códice de Habilidades — Study Reviewer{% endblock %}
+{% block title %}Árvores de Estudo & Conhecimento — Study Reviewer{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Header do Códice de Habilidades com Atmosfera RPG -->
+    <!-- Header com Atmosfera Dark RPG e Linguagem Direta -->
     <div class="sm:flex sm:items-center sm:justify-between border-b border-[#785a28]/60 pb-6 mb-8">
         <div>
             <div class="flex items-center space-x-3">
                 <span class="text-3xl" aria-hidden="true">🗺️</span>
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-[#f0c869] font-cinzel tracking-wider">
-                    Códice de Habilidades & Árvores Ancestrais
+                    Árvores de Estudo & Conhecimento
                 </h1>
             </div>
             <p class="mt-2 text-sm text-[#a39276] font-tome text-base">
-                Explore seus grafos de maestria em estilo RPG. Forje nós, desbloqueie medalhões e progrida com o motor SRS.
+                Organize seus estudos em árvores de tópicos com progressão e repetição espaçada (SRS).
             </p>
         </div>
         <div class="mt-4 sm:mt-0 flex items-center space-x-3">
@@ -23,10 +23,10 @@
                 id="btn-sample-math"
                 onclick="createSampleMathMap()"
                 class="rpg-btn-bronze text-xs border-[#10b981]/50 text-[#10b981] hover:text-[#34d399] hover:border-[#10b981]"
-                title="Gera uma árvore didática de Matemática Aplicada com nós, teoria, perguntas e pré-requisitos"
+                title="Gera uma árvore didática de Matemática Aplicada com nós, resumo, perguntas e pré-requisitos"
             >
                 <span class="mr-1.5" aria-hidden="true">📐</span>
-                <span>Invocar Árvore Modelo (Matemática Aplicada)</span>
+                <span>Carregar Árvore Exemplo (Matemática)</span>
             </button>
             <button
                 type="button"
@@ -34,7 +34,7 @@
                 class="rpg-btn-gold text-xs sm:text-sm"
             >
                 <span class="mr-2 text-base" aria-hidden="true">✨</span>
-                <span>Forjar Nova Árvore</span>
+                <span>+ Nova Árvore</span>
             </button>
         </div>
     </div>
@@ -57,7 +57,7 @@
                     {{ m.title }}
                 </h2>
                 <p class="mt-2 text-sm text-[#a39276] font-tome text-base line-clamp-3">
-                    {{ m.description or 'Sem descrição registrada no tomo.' }}
+                    {{ m.description or 'Sem descrição cadastrada.' }}
                 </p>
             </div>
 
@@ -66,7 +66,7 @@
                     href="/study-maps/{{ m.id }}/canvas"
                     class="rpg-btn-gold text-xs px-3.5 py-1.5"
                 >
-                    <span>⚔️ Abrir Forja</span>
+                    <span>🗺️ Abrir Árvore</span>
                     <svg class="ml-1.5 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                     </svg>
@@ -84,14 +84,14 @@
         {% endfor %}
     </div>
     {% else %}
-    <!-- Estado Inicial / Empty State do Grimório -->
+    <!-- Estado Inicial / Empty State -->
     <div class="rpg-panel text-center py-16 px-4">
         <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[#251c14] border border-[#785a28] flex items-center justify-center text-4xl shadow-inner">
-            🔮
+            🗺️
         </div>
-        <h3 class="text-xl font-bold text-[#f0c869] font-cinzel">Nenhum Tomo Forjado Ainda</h3>
+        <h3 class="text-xl font-bold text-[#f0c869] font-cinzel">Nenhuma Árvore Criada Ainda</h3>
         <p class="mt-2 text-sm text-[#a39276] font-tome text-base max-w-md mx-auto">
-            Comece forjando sua primeira Árvore de Habilidades ou invoque a Árvore Modelo de Matemática Aplicada para dominar provações com repetição espaçada.
+            Comece criando sua primeira Árvore de Estudos ou carregue a Árvore Modelo de Matemática Aplicada para testar o sistema.
         </p>
         <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
@@ -100,7 +100,7 @@
                 class="rpg-btn-gold text-sm"
             >
                 <span class="mr-2" aria-hidden="true">📐</span>
-                <span>Invocar Árvore Modelo (Matemática Aplicada)</span>
+                <span>Carregar Árvore Exemplo (Matemática)</span>
             </button>
             <button
                 type="button"
@@ -108,22 +108,22 @@
                 class="rpg-btn-bronze text-sm"
             >
                 <span class="mr-2" aria-hidden="true">✨</span>
-                <span>Forjar em Branco</span>
+                <span>+ Criar em Branco</span>
             </button>
         </div>
     </div>
     {% endif %}
 </div>
 
-<!-- Modal Forjar Nova Árvore -->
+<!-- Modal Nova Árvore -->
 <div id="new-map-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
     <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="document.getElementById('new-map-modal').classList.add('hidden')"></div>
     <div class="min-h-full flex items-center justify-center p-4">
         <div class="relative rpg-panel p-6 sm:p-8 max-w-lg w-full bg-[#14100d] border border-[#785a28] shadow-2xl">
             <div class="flex items-center justify-between pb-4 border-b border-[#785a28]/50">
                 <div class="flex items-center space-x-2.5">
-                    <span class="text-2xl">⚡</span>
-                    <h2 class="text-lg font-bold text-[#f0c869] font-cinzel">Forjar Nova Árvore de Habilidades</h2>
+                    <span class="text-2xl">✨</span>
+                    <h2 class="text-lg font-bold text-[#f0c869] font-cinzel">Criar Nova Árvore de Estudos</h2>
                 </div>
                 <button
                     type="button"
@@ -136,7 +136,7 @@
             <form onsubmit="handleCreateMap(event)" class="mt-6 space-y-4">
                 <div>
                     <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">
-                        Título da Árvore / Maestria
+                        Título da Árvore / Matéria
                     </label>
                     <input
                         type="text"
@@ -150,7 +150,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">
-                        Descrição / Objetivo Ancestral (Opcional)
+                        Descrição / Objetivo (Opcional)
                     </label>
                     <textarea
                         id="new-map-description"
@@ -168,7 +168,7 @@
                         class="h-4 w-4 rounded border-[#785a28] text-[#c89b3c] focus:ring-[#f0c869] bg-[#0c0908]"
                     />
                     <label for="new-map-public" class="ml-2 text-sm text-[#a39276] font-tome text-base">
-                        Tornar esta árvore pública (outros aventureiros poderão explorar)
+                        Tornar esta árvore pública (visível para outros usuários)
                     </label>
                 </div>
                 <div class="flex justify-end space-x-3 pt-6 border-t border-[#785a28]/50">
@@ -184,7 +184,7 @@
                         id="submit-create-map-btn"
                         class="rpg-btn-gold text-sm px-5 py-2"
                     >
-                        ✨ Forjar Árvore
+                        Criar Árvore
                     </button>
                 </div>
             </form>
@@ -197,7 +197,7 @@ async function handleCreateMap(e) {
     e.preventDefault();
     const btn = document.getElementById('submit-create-map-btn');
     btn.disabled = true;
-    btn.textContent = 'Forjando...';
+    btn.textContent = 'Criando...';
 
     const title = document.getElementById('new-map-title').value.trim();
     const description = document.getElementById('new-map-description').value.trim();
@@ -214,13 +214,13 @@ async function handleCreateMap(e) {
             window.location.href = `/study-maps/${data.id}/canvas`;
         } else {
             const err = await res.json();
-            alert('Erro ao forjar árvore: ' + (err.detail || 'Falha inesperada'));
+            alert('Erro ao criar árvore: ' + (err.detail || 'Falha inesperada'));
         }
     } catch (err) {
         alert('Erro de conexão: ' + err.message);
     } finally {
         btn.disabled = false;
-        btn.textContent = '✨ Forjar Árvore';
+        btn.textContent = 'Criar Árvore';
     }
 }
 
@@ -228,29 +228,29 @@ async function createSampleMathMap() {
     const btn = document.getElementById('btn-sample-math');
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<span>⏳ Invocando árvore...</span>';
+        btn.innerHTML = '<span>⏳ Carregando árvore...</span>';
     }
     try {
         const res = await fetch('/api/v1/study-maps/sample-math', { method: 'POST' });
         if (!res.ok) {
             const err = await res.json();
-            alert('Erro ao invocar árvore modelo: ' + (err.detail || 'Falha na requisição'));
+            alert('Erro ao carregar árvore exemplo: ' + (err.detail || 'Falha na requisição'));
             return;
         }
         const data = await res.json();
         window.location.href = `/study-maps/${data.id}/canvas`;
     } catch (e) {
-        alert('Erro de conexão ao invocar árvore modelo.');
+        alert('Erro de conexão ao carregar árvore exemplo.');
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<span class="mr-1.5" aria-hidden="true">📐</span><span>Invocar Árvore Modelo (Matemática Aplicada)</span>';
+            btn.innerHTML = '<span class="mr-1.5" aria-hidden="true">📐</span><span>Carregar Árvore Exemplo (Matemática)</span>';
         }
     }
 }
 
 async function deleteMap(mapId, title) {
-    if (!confirm(`Deseja realmente dissipar a árvore ancestral "${title}" e todos os seus nós?`)) return;
+    if (!confirm(`Deseja realmente excluir a árvore "${title}" e todos os seus nós?`)) return;
 
     try {
         const res = await fetch(`/api/v1/study-maps/${mapId}`, { method: 'DELETE' });

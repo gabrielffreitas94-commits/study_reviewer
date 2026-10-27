@@ -160,7 +160,7 @@
                 path.setAttribute('stroke-opacity', isUnlocked ? '0.85' : '0.5');
                 path.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (confirm('Deseja dissipar este vínculo de pré-requisito?')) {
+                    if (confirm('Deseja remover esta conexão de pré-requisito?')) {
                         deleteEdge(edge.id);
                     }
                 });
@@ -407,12 +407,12 @@
                 state.connectSourceNodeId = node.id;
                 const banner = document.getElementById('connect-banner');
                 if (banner) {
-                    banner.innerHTML = `<span>⚡ PRÉ-REQUISITO SELECIONADO: "${escapeHtml(node.title)}". Agora clique no medalhão DEPENDENTE.</span>
+                    banner.innerHTML = `<span>⚡ PRÉ-REQUISITO SELECIONADO: "${escapeHtml(node.title)}". Agora clique no nó DEPENDENTE.</span>
                     <button type="button" onclick="toggleConnectMode()" class="ml-2 text-xs bg-[#0c0908]/20 px-2 py-0.5 rounded font-sans">Cancelar</button>`;
                 }
             } else {
                 if (state.connectSourceNodeId === node.id) {
-                    alert('Um medalhão não pode depender de si mesmo!');
+                    alert('Um nó não pode depender de si mesmo!');
                     return;
                 }
                 createEdge(state.connectSourceNodeId, node.id);
@@ -440,7 +440,7 @@
         if (state.connectModeActive) {
             if (banner) {
                 banner.classList.remove('hidden');
-                banner.innerHTML = `<span>⚡ TRAÇAR VÍNCULO: Clique no nó de pré-requisito e depois no medalhão dependente</span>
+                banner.innerHTML = `<span>⚡ CONECTAR NÓS: Clique no nó de pré-requisito e depois no nó dependente</span>
                 <button type="button" onclick="toggleConnectMode()" class="ml-2 text-xs bg-[#0c0908]/20 px-2 py-0.5 rounded font-sans">Cancelar</button>`;
             }
             if (btn) btn.className = 'rpg-btn-gold text-xs py-1.5 px-3 flex items-center space-x-1';
@@ -465,7 +465,7 @@
                 await loadGraph();
             } else {
                 const err = await res.json();
-                alert('Erro ao traçar vínculo: ' + (err.detail || 'Falha de validação'));
+                alert('Erro ao conectar nós: ' + (err.detail || 'Falha de validação'));
             }
         } catch (err) {
             alert('Erro de conexão: ' + err.message);
@@ -499,10 +499,10 @@
                 await loadGraph();
             } else {
                 const err = await res.json();
-                alert('Falha ao dissipar dependência: ' + (err.detail || 'Erro no servidor'));
+                alert('Falha ao remover pré-requisito: ' + (err.detail || 'Erro no servidor'));
             }
         } catch (err) {
-            alert('Falha ao dissipar dependência: ' + err.message);
+            alert('Falha ao remover pré-requisito: ' + err.message);
         }
     }
 
@@ -514,7 +514,7 @@
         const levelEl = document.getElementById('new-prereq-level-select') || document.getElementById('add-prerequisite-level');
 
         if (!selectEl || !selectEl.value) {
-            alert('Selecione um medalhão ancestral para criar o pré-requisito.');
+            alert('Selecione um nó de pré-requisito.');
             return;
         }
 
@@ -533,7 +533,7 @@
         const nodeMap = new Map((state.graph.nodes || []).map(n => [n.id, n]));
 
         if (incomingEdges.length === 0) {
-            listEl.innerHTML = `<div class="p-2.5 rounded-lg bg-[#0c0908] border border-[#785a28]/40 text-xs text-[#a39276] italic text-center">Nenhum selo de bloqueio vinculado a este medalhão.</div>`;
+            listEl.innerHTML = `<div class="p-2.5 rounded-lg bg-[#0c0908] border border-[#785a28]/40 text-xs text-[#a39276] italic text-center">Nenhum pré-requisito vinculado a este nó.</div>`;
         } else {
             listEl.innerHTML = incomingEdges.map(edge => {
                 const srcNode = nodeMap.get(edge.source_node_id);
@@ -583,12 +583,12 @@
             );
 
             if (availableCandidates.length === 0) {
-                selectEl.innerHTML = `<option value="">Nenhum outro medalhão disponível</option>`;
+                selectEl.innerHTML = `<option value="">Nenhum outro nó disponível</option>`;
                 selectEl.disabled = true;
             } else {
                 selectEl.disabled = false;
                 selectEl.innerHTML = `
-                    <option value="">Selecione um medalhão ancestral...</option>
+                    <option value="">Selecione um nó de pré-requisito...</option>
                     ${availableCandidates.map(c => `
                         <option value="${c.id}">${escapeHtml(c.title)} (Nv. ${c.effective_level || 0})</option>
                     `).join('')}
@@ -631,7 +631,7 @@
     window.openCreateNodeModal = () => {
         state.selectedNode = null;
         const titleEl = document.getElementById('node-modal-title');
-        if (titleEl) titleEl.textContent = 'Forjar Novo Medalhão';
+        if (titleEl) titleEl.textContent = 'Criar Novo Nó';
 
         const idInput = document.getElementById('modal-node-id');
         if (idInput) idInput.value = '';
@@ -660,7 +660,7 @@
     window.openEditNodeModal = (node) => {
         state.selectedNode = node;
         const titleEl = document.getElementById('node-modal-title');
-        if (titleEl) titleEl.textContent = `Editar Medalhão: ${node.title}`;
+        if (titleEl) titleEl.textContent = `Editar Nó: ${node.title}`;
 
         const idInput = document.getElementById('modal-node-id');
         if (idInput) idInput.value = node.id;
@@ -728,7 +728,7 @@
                     loadGraph();
                 } else {
                     const err = await res.json();
-                    alert('Erro ao forjar nó: ' + (err.detail || 'Falha de validação'));
+                    alert('Erro ao criar nó: ' + (err.detail || 'Falha de validação'));
                 }
             } else {
                 // Atualização dos metadados do nó
@@ -752,7 +752,7 @@
 
     window.deleteCurrentNode = async () => {
         if (!state.selectedNode) return;
-        if (!confirm(`Deseja dissipar o medalhão "${state.selectedNode.title}" e suas provações?`)) return;
+        if (!confirm(`Deseja excluir o nó "${state.selectedNode.title}" e todas as suas perguntas?`)) return;
 
         try {
             const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${state.selectedNode.id}`, {
@@ -762,7 +762,7 @@
                 closeNodeModal();
                 loadGraph();
             } else {
-                alert('Falha ao dissipar nó.');
+                alert('Falha ao excluir nó.');
             }
         } catch (err) {
             alert('Erro de rede: ' + err.message);
