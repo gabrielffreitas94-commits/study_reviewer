@@ -195,6 +195,21 @@ def study_node_grimoire_page(
 
     is_unlocked = StudyTreeProgressionService.evaluate_unlock_status(incoming_edges, node_levels)
 
+    incoming_requirements = []
+    for edge in incoming_edges:
+        parent_node = next((n for n in all_map_nodes if n.id == edge.source_node_id), None)
+        parent_lvl = node_levels.get(edge.source_node_id, 0)
+        req_lvl = getattr(edge, "required_level", 1) or 1
+        parent_title = parent_node.title if parent_node else "Nó Ancestral"
+        incoming_requirements.append(
+            {
+                "title": parent_title,
+                "required_level": req_lvl,
+                "current_level": parent_lvl,
+                "satisfied": parent_lvl >= req_lvl,
+            }
+        )
+
     mastered_count = 0
     for q_item in hub.all_questions:
         if isinstance(q_item, dict):
@@ -230,6 +245,7 @@ def study_node_grimoire_page(
                 "is_unlocked": is_unlocked,
                 "overdue_questions_count": hub.node.overdue_questions_count,
                 "prereq_titles": prereq_titles,
+                "incoming_requirements": incoming_requirements,
                 "mastered_questions_count": mastered_count,
                 "total_questions_count": total_questions,
                 "progress_percent": progress_percent,

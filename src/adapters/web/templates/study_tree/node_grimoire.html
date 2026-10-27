@@ -21,13 +21,30 @@
             {% if node.is_unlocked %}
             <span class="px-3 py-1 text-xs font-bold uppercase rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-700/60 font-cinzel shadow-sm flex items-center gap-1.5">
                 <span aria-hidden="true">🔓</span>
-                <span>Pré-requisitos cumpridos</span>
+                <span>Selos Arcanos Satisfeitos (Pronto para Estudo)</span>
             </span>
             {% else %}
-            <span class="px-3 py-1 text-xs font-bold uppercase rounded-lg bg-rose-950/80 text-rose-400 border border-rose-700/60 font-cinzel shadow-sm flex items-center gap-1.5">
-                <span aria-hidden="true">🔒</span>
-                <span>Selado — Requer Nv. 1 em: {{ node.prereq_titles | join(', ') if node.prereq_titles else 'nós anteriores' }}</span>
-            </span>
+            <div class="flex flex-wrap items-center gap-1.5">
+                <span class="px-3 py-1 text-xs font-bold uppercase rounded-lg bg-rose-950/80 text-rose-400 border border-rose-700/60 font-cinzel shadow-sm flex items-center gap-1.5">
+                    <span aria-hidden="true">🔒</span>
+                    <span>Selado — Requer:</span>
+                </span>
+                {% if node.incoming_requirements %}
+                    {% for req in node.incoming_requirements %}
+                    <span class="px-2.5 py-0.5 text-xs font-cinzel font-bold rounded-md border {% if req.satisfied %}bg-emerald-950/70 text-emerald-300 border-emerald-600/50{% else %}bg-rose-950/70 text-rose-300 border-rose-600/50{% endif %}">
+                        {{ req.title }} (Nv. {{ req.required_level }})
+                    </span>
+                    {% endfor %}
+                {% elif node.prereq_titles %}
+                    <span class="px-2.5 py-0.5 text-xs font-cinzel font-bold rounded-md bg-rose-950/70 text-rose-300 border border-rose-600/50">
+                        {{ node.prereq_titles | join(', ') }} (Nv. 1)
+                    </span>
+                {% else %}
+                    <span class="px-2.5 py-0.5 text-xs font-cinzel font-bold rounded-md bg-rose-950/70 text-rose-300 border border-rose-600/50">
+                        nós anteriores
+                    </span>
+                {% endif %}
+            </div>
             {% endif %}
             <span class="px-3 py-1 text-xs font-black uppercase rounded-lg bg-[#14100d] text-[#f0c869] border border-[#785a28] font-cinzel shadow-inner tracking-wider">
                 PATENTE ATUAL: Nv. {{ node.effective_level }}

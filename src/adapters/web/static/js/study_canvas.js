@@ -80,6 +80,10 @@
                 return;
             }
             state.graph = await res.json();
+            if (state.selectedNode) {
+                state.selectedNode = state.graph.nodes.find(n => n.id === state.selectedNode.id) || state.selectedNode;
+                renderPrerequisites(state.selectedNode);
+            }
             renderAll();
         } catch (err) {
             console.error('Falha ao buscar grafo da forja:', err);
@@ -107,24 +111,40 @@
             const sy = source.pos_y + 40;
             const tx = target.pos_x + 40;
             const ty = target.pos_y + 40;
-
-            const isUnlocked = source.effective_level >= 1;
-
-            // Curva Bezier cúbica suave e elegante
             const dx = tx - sx;
             const dy = ty - sy;
-            const cx1 = sx + dx * 0.45;
-            const cy1 = sy;
-            const cx2 = sx + dx * 0.55;
-            const cy2 = ty;
+            const dist = Math.hypot(dx, dy);
+            const R = 42; // Medallion outer radius
+
+            let startX = sx, startY = sy, endX = tx, endY = ty;
+            if (dist > R * 2) {
+                const ux = dx / dist;
+                const uy = dy / dist;
+                startX = sx + R * ux;
+                startY = sy + R * uy;
+                endX = tx - R * ux;
+                endY = ty - R * uy;
+            }
+
+            const reqLevel = edge.required_level || 1;
+            const isUnlocked = (source.effective_level || 0) >= reqLevel;
+
+            // Curva Bezier cúbica suave conectando os perímetros externos
+            const spanX = endX - startX;
+            const cx1 = startX + spanX * 0.45;
+            const cy1 = startY;
+            const cx2 = startX + spanX * 0.55;
+            const cy2 = endY;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            path.setAttribute('d', `M ${sx} ${sy} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${tx} ${ty}`);
+            path.setAttribute('d', `M ${startX} ${startY} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${endX} ${endY}`);
             path.setAttribute('fill', 'none');
             path.setAttribute('stroke', isUnlocked ? 'url(#edge-unlocked-grad)' : '#3b322c');
             path.setAttribute('stroke-width', isUnlocked ? '3.5' : '2');
             if (!isUnlocked) {
                 path.setAttribute('stroke-dasharray', '6,6');
+            } else {
+                path.style.filter = 'drop-shadow(0 0 6px rgba(240, 200, 105, 0.7))';
             }
             path.setAttribute('marker-end', isUnlocked ? 'url(#arrow-unlocked)' : 'url(#arrow-locked)');
 
@@ -430,18 +450,40 @@
         }
     };
 
-    async function createEdge(sourceId, targetId) {
+    async function createEdge(sourceId, targetId, requiredLevel = 1) {
         try {
             const res = await fetch(`/api/v1/study-maps/${state.mapId}/edges`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ source_node_id: sourceId, target_node_id: targetId }),
+                body: JSON.stringify({
+                    source_node_id: sourceId,
+                    target_node_id: targetId,
+                    required_level: requiredLevel,
+                }),
             });
             if (res.ok) {
-                loadGraph();
+                await loadGraph();
             } else {
                 const err = await res.json();
                 alert('Erro ao traçar vínculo: ' + (err.detail || 'Falha de validação'));
+            }
+        } catch (err) {
+            alert('Erro de conexão: ' + err.message);
+        }
+    }
+
+    async function updateEdgeRequiredLevel(edgeId, newLevel) {
+        try {
+            const res = await fetch(`/api/v1/study-maps/${state.mapId}/edges/${edgeId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ required_level: parseInt(newLevel, 10) }),
+            });
+            if (res.ok) {
+                await loadGraph();
+            } else {
+                const err = await res.json();
+                alert('Erro ao calibrar nível do pré-requisito: ' + (err.detail || 'Falha ao salvar'));
             }
         } catch (err) {
             alert('Erro de conexão: ' + err.message);
@@ -454,10 +496,104 @@
                 method: 'DELETE',
             });
             if (res.ok) {
-                loadGraph();
+                await loadGraph();
+            } else {
+                const err = await res.json();
+                alert('Falha ao dissipar dependência: ' + (err.detail || 'Erro no servidor'));
             }
         } catch (err) {
             alert('Falha ao dissipar dependência: ' + err.message);
+        }
+    }
+
+    async function addPrerequisiteEdge(event) {
+        if (event) event.preventDefault();
+        if (!state.selectedNode) return;
+
+        const selectEl = document.getElementById('new-prereq-node-select') || document.getElementById('add-prerequisite-select');
+        const levelEl = document.getElementById('new-prereq-level-select') || document.getElementById('add-prerequisite-level');
+
+        if (!selectEl || !selectEl.value) {
+            alert('Selecione um medalhão ancestral para criar o pré-requisito.');
+            return;
+        }
+
+        const sourceId = selectEl.value;
+        const requiredLevel = levelEl ? parseInt(levelEl.value, 10) : 1;
+
+        await createEdge(sourceId, state.selectedNode.id, requiredLevel);
+    }
+
+    function renderPrerequisites(node) {
+        const listEl = document.getElementById('node-prerequisites-list');
+        const selectEl = document.getElementById('new-prereq-node-select') || document.getElementById('add-prerequisite-select');
+        if (!listEl) return;
+
+        const incomingEdges = (state.graph.edges || []).filter(e => e.target_node_id === node.id);
+        const nodeMap = new Map((state.graph.nodes || []).map(n => [n.id, n]));
+
+        if (incomingEdges.length === 0) {
+            listEl.innerHTML = `<div class="p-2.5 rounded-lg bg-[#0c0908] border border-[#785a28]/40 text-xs text-[#a39276] italic text-center">Nenhum selo de bloqueio vinculado a este medalhão.</div>`;
+        } else {
+            listEl.innerHTML = incomingEdges.map(edge => {
+                const srcNode = nodeMap.get(edge.source_node_id);
+                const title = srcNode ? escapeHtml(srcNode.title) : 'Nó Ancestral';
+                const iconName = srcNode ? srcNode.icon : 'scroll';
+                const iconSvg = (typeof window.getRpgIconSvg === 'function')
+                    ? window.getRpgIconSvg(iconName, 'w-4 h-4 text-[#f0c869]')
+                    : '📜';
+                const reqLvl = edge.required_level || 1;
+
+                return `
+                    <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#0c0908] border border-[#785a28]/50 shadow-inner">
+                        <div class="flex items-center space-x-2 min-w-0">
+                            <span class="w-5 h-5 flex items-center justify-center shrink-0">${iconSvg}</span>
+                            <span class="text-xs font-cinzel font-bold text-[#f5ebd6] truncate">${title}</span>
+                        </div>
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <label class="text-[10px] uppercase font-cinzel text-[#a39276]">Exigir:</label>
+                            <select
+                                onchange="updateEdgeRequiredLevel('${edge.id}', this.value)"
+                                class="bg-[#14100d] border border-[#785a28] rounded px-1.5 py-0.5 text-xs text-[#f0c869] font-cinzel font-bold focus:border-[#f0c869] focus:outline-none"
+                            >
+                                <option value="1" ${reqLvl === 1 ? 'selected' : ''}>Nv. 1</option>
+                                <option value="2" ${reqLvl === 2 ? 'selected' : ''}>Nv. 2</option>
+                                <option value="3" ${reqLvl === 3 ? 'selected' : ''}>Nv. 3</option>
+                                <option value="4" ${reqLvl === 4 ? 'selected' : ''}>Nv. 4</option>
+                            </select>
+                            <button
+                                type="button"
+                                onclick="deleteEdge('${edge.id}')"
+                                class="text-[#e11d48] hover:text-red-400 text-xs px-1.5 py-0.5 rounded transition-colors"
+                                title="Remover Pré-requisito"
+                            >
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Atualiza as opções do select de novos pré-requisitos
+        if (selectEl) {
+            const existingSourceIds = new Set(incomingEdges.map(e => e.source_node_id));
+            const availableCandidates = (state.graph.nodes || []).filter(
+                n => n.id !== node.id && !existingSourceIds.has(n.id)
+            );
+
+            if (availableCandidates.length === 0) {
+                selectEl.innerHTML = `<option value="">Nenhum outro medalhão disponível</option>`;
+                selectEl.disabled = true;
+            } else {
+                selectEl.disabled = false;
+                selectEl.innerHTML = `
+                    <option value="">Selecione um medalhão ancestral...</option>
+                    ${availableCandidates.map(c => `
+                        <option value="${c.id}">${escapeHtml(c.title)} (Nv. ${c.effective_level || 0})</option>
+                    `).join('')}
+                `;
+            }
         }
     }
 
@@ -515,6 +651,9 @@
         const grimoireBtn = document.getElementById('btn-open-grimoire');
         if (grimoireBtn) grimoireBtn.classList.add('hidden');
 
+        const prereqSection = document.getElementById('node-prerequisites-section');
+        if (prereqSection) prereqSection.classList.add('hidden');
+
         if (nodeModal) nodeModal.classList.remove('hidden');
     };
 
@@ -540,6 +679,12 @@
 
         const grimoireBtn = document.getElementById('btn-open-grimoire');
         if (grimoireBtn) grimoireBtn.classList.remove('hidden');
+
+        const prereqSection = document.getElementById('node-prerequisites-section');
+        if (prereqSection) {
+            prereqSection.classList.remove('hidden');
+            renderPrerequisites(node);
+        }
 
         if (nodeModal) nodeModal.classList.remove('hidden');
     };
@@ -630,5 +775,12 @@
         div.textContent = str;
         return div.innerHTML;
     }
+
+    // Exposição Global de Comandos da Forja
+    window.updateEdgeRequiredLevel = updateEdgeRequiredLevel;
+    window.deleteEdge = deleteEdge;
+    window.addPrerequisiteEdge = addPrerequisiteEdge;
+    window.selectNode = window.openEditNodeModal;
+    window.fetchGraph = loadGraph;
 
 })();

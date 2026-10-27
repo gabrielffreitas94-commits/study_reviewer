@@ -135,11 +135,17 @@
                         <stop offset="0%" stop-color="#3b322c"/>
                         <stop offset="100%" stop-color="#241c17"/>
                     </linearGradient>
-                    <marker id="arrow-unlocked" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                        <polygon points="0 0, 8 4, 0 8" fill="#f0c869"/>
+                    <marker id="arrow-unlocked" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                        <polygon points="0 1, 7 4.5, 0 8, 2.5 4.5" fill="#f0c869"/>
                     </marker>
-                    <marker id="arrow-locked" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                        <polygon points="0 0, 8 4, 0 8" fill="#4a3b32"/>
+                    <marker id="arrow-locked" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                        <polygon points="0 1, 7 4.5, 0 8, 2.5 4.5" fill="#4a3b32"/>
+                    </marker>
+                    <marker id="diamond-unlocked" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                        <polygon points="1 5, 5 1.5, 9 5, 5 8.5" fill="#f0c869"/>
+                    </marker>
+                    <marker id="diamond-locked" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                        <polygon points="1 5, 5 1.5, 9 5, 5 8.5" fill="#3b322c"/>
                     </marker>
                 </defs>
                 <g id="edges-group"></g>
@@ -221,6 +227,57 @@
                         placeholder="Breve descrição dos conceitos abordados neste medalhão..."
                         class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm font-tome text-base"
                     ></textarea>
+                </div>
+
+                <!-- Seção de Pré-requisitos & Bloqueios do Nó (Modo Forja) -->
+                <div id="node-prerequisites-section" class="pt-4 border-t border-[#785a28]/40 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#f0c869]">
+                            🔗 Pré-requisitos &amp; Bloqueios do Nó
+                        </label>
+                        <span class="text-[10px] font-tome text-[#a39276]">Nível exigido para destrancar</span>
+                    </div>
+
+                    <!-- Lista de Pré-requisitos Atuais -->
+                    <div id="node-prerequisites-list" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                        <!-- Itens renderizados dinamicamente pelo study_canvas.js -->
+                    </div>
+
+                    <!-- Formulário de Adição de Bloqueio Ancestral -->
+                    <div id="add-prerequisite-container" class="pt-1">
+                        <div class="text-[11px] font-cinzel text-[#a39276] mb-1.5 font-bold">+ Adicionar Bloqueio Ancestral</div>
+                        <div id="add-prerequisite-form" class="flex flex-col sm:flex-row items-center gap-2">
+                            <select
+                                id="new-prereq-node-select"
+                                name="add-prerequisite-select"
+                                data-testid="add-prerequisite-select"
+                                class="w-full sm:flex-1 px-3 py-1.5 rounded-lg border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] text-xs focus:border-[#f0c869] focus:outline-none"
+                            >
+                                <option value="">Selecione um medalhão ancestral...</option>
+                            </select>
+
+                            <select
+                                id="new-prereq-level-select"
+                                name="add-prerequisite-level"
+                                data-testid="add-prerequisite-level"
+                                class="w-full sm:w-28 px-2 py-1.5 rounded-lg border border-[#785a28] bg-[#0c0908] text-[#f0c869] font-cinzel font-bold text-xs focus:border-[#f0c869] focus:outline-none"
+                            >
+                                <option value="1">Nv. 1</option>
+                                <option value="2">Nv. 2</option>
+                                <option value="3">Nv. 3</option>
+                                <option value="4">Nv. 4</option>
+                            </select>
+
+                            <button
+                                type="button"
+                                id="btn-add-prerequisite"
+                                onclick="addPrerequisiteEdge(event)"
+                                class="w-full sm:w-auto rpg-btn-bronze text-xs py-1.5 px-3 font-cinzel font-bold whitespace-nowrap"
+                            >
+                                + Conectar Bloqueio
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Ações do Modal -->
