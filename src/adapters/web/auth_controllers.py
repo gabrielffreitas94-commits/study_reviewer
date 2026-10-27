@@ -18,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from src.adapters.persistence.repositories import SqlAlchemyUserRepository
+from src.adapters.web.rpg_icons import get_rpg_icon_svg
 from src.application.dto.auth_dto import GoogleAuthInputDTO
 from src.application.ports.auth import IGoogleAuthClient, ISessionTokenService
 from src.application.use_cases.auth_use_cases import (
@@ -37,11 +38,12 @@ logger = logging.getLogger("study_reviewer.web_auth")
 
 templates_dir = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
+templates.env.globals["get_rpg_icon_svg"] = get_rpg_icon_svg
 
 auth_router = APIRouter(prefix="/auth", tags=["Web Auth"])
 
 
-def _safe_redirect_url(target: str | None, default: str = "/study") -> str:
+def _safe_redirect_url(target: str | None, default: str = "/study-maps") -> str:
     """Valida e sanitiza rotas de redirecionamento prevenindo Open Redirect (CWE-601)."""
     if not target:
         return default
