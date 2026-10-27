@@ -43,7 +43,7 @@ templates.env.globals["get_rpg_icon_svg"] = get_rpg_icon_svg
 auth_router = APIRouter(prefix="/auth", tags=["Web Auth"])
 
 
-def _safe_redirect_url(target: str | None, default: str = "/study-maps") -> str:
+def _safe_redirect_url(target: str | None, default: str = "/questions/study") -> str:
     """Valida e sanitiza rotas de redirecionamento prevenindo Open Redirect (CWE-601)."""
     if not target:
         return default
@@ -56,12 +56,12 @@ def _safe_redirect_url(target: str | None, default: str = "/study-maps") -> str:
 @auth_router.get("/login", response_class=HTMLResponse)
 def login_page(
     request: Request,
-    next: str = Query("/study-maps"),
+    next: str = Query("/questions/study"),
     error: str | None = Query(None),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> Response:
     """Renderiza a página de login com botão Google e tratamento de redirecionamento."""
-    safe_next = _safe_redirect_url(next, "/study-maps")
+    safe_next = _safe_redirect_url(next, "/questions/study")
     if current_user is not None:
         return RedirectResponse(url=safe_next, status_code=status.HTTP_303_SEE_OTHER)
 
@@ -109,12 +109,12 @@ def _get_oauth_redirect_uri(request: Request) -> str:
 @auth_router.get("/google")
 def google_login_redirect(
     request: Request,
-    next: str = Query("/study-maps"),
+    next: str = Query("/questions/study"),
     google_client: IGoogleAuthClient = Depends(get_google_client),
     session_service: ISessionTokenService = Depends(get_session_service),
 ) -> Response:
     """Gera state CSRF criptografado e redireciona o usuário para o Google Consent."""
-    safe_next = _safe_redirect_url(next, "/study-maps")
+    safe_next = _safe_redirect_url(next, "/questions/study")
     state = session_service.create_oauth_state(safe_next)
 
     redirect_uri = _get_oauth_redirect_uri(request)
@@ -188,7 +188,7 @@ def google_oauth_callback(
             ),
         )
 
-    next_url = _safe_redirect_url(verified_next, "/study-maps")
+    next_url = _safe_redirect_url(verified_next, "/questions/study")
 
     redirect_uri = _get_oauth_redirect_uri(request)
 

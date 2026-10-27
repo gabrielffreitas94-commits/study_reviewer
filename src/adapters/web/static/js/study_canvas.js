@@ -1,6 +1,6 @@
 /**
  * study_canvas.js — Motor Interativo do Canvas RPG: Forja Ancestral & Grafo de Maestria
- * Suporta pan, zoom, arrastar medalhões, traçar vínculos de pré-requisito e navegação direta ao Grimório.
+ * Suporta pan, zoom, arrastar medalhões, traçar vínculos de pré-requisito, criação rápida de nó filho (1-click) e Side Drawer interativo.
  */
 
 (function () {
@@ -21,6 +21,8 @@
         connectModeActive: false,
         connectSourceNodeId: null,
         selectedNode: null,
+        quickAddParentNode: null,
+        currentDrawerTab: 'content',
         batchSaveTimer: null,
         pendingPositions: new Map(),
     };
@@ -83,6 +85,7 @@
             if (state.selectedNode) {
                 state.selectedNode = state.graph.nodes.find(n => n.id === state.selectedNode.id) || state.selectedNode;
                 renderPrerequisites(state.selectedNode);
+                renderDrawerPrerequisites(state.selectedNode);
             }
             renderAll();
         } catch (err) {
@@ -235,13 +238,33 @@
                     <div class="absolute -bottom-2.5 px-2 py-0.5 rounded-md bg-[#0c0908] border border-[#785a28] text-[9px] font-cinzel font-bold tracking-wider ${node.effective_level >= 1 ? 'text-[#f0c869]' : 'text-[#a39276]'}">
                         ${rankLabel}
                     </div>
+
+                    <button
+                        type="button"
+                        data-quick-add-parent="${node.id}"
+                        title="Criar nó filho conectado a ${escapeHtml(node.title)}"
+                        class="quick-add-child-btn absolute -right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-[#c89b3c] hover:bg-[#f0c869] text-[#0c0908] border-2 border-[#0c0908] font-bold text-sm flex items-center justify-center shadow-lg hover:scale-125 transition-all z-20"
+                    >
+                        +
+                    </button>
                 </div>
                 <div class="mt-3 px-3 py-1 rounded-xl bg-[#14100d]/90 backdrop-blur border border-[#785a28]/60 text-center max-w-[150px] shadow-lg">
                     <span class="text-xs font-bold font-cinzel text-[#f5ebd6] truncate block">${escapeHtml(node.title)}</span>
                 </div>
             `;
 
-            // Eventos do mouse e clique
+            // Botão de criação rápida de nó filho (1-click)
+            const quickAddBtn = el.querySelector('.quick-add-child-btn');
+            if (quickAddBtn) {
+                quickAddBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+                quickAddBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    quickAddChildNode(node);
+                });
+            }
+
+            // Eventos do mouse e clique no medalhão
             el.addEventListener('mousedown', (e) => onNodeMouseDown(e, node));
             el.addEventListener('click', (e) => onNodeClick(e, node));
 
@@ -391,7 +414,7 @@
         }
     }
 
-    // --- Clique em Nós: Modo Jornada vs Modo Forja ---
+    // --- Clique em Nós: Abertura do Side Drawer Interativo ---
 
     function onNodeClick(e, node) {
         e.stopPropagation();
@@ -421,14 +444,8 @@
             return;
         }
 
-        // NO MODO JORNADA (ESTUDO): Navegação direta à Página Dedicada do Nó (Grimório)!
-        if (state.interactionMode === 'study') {
-            window.location.href = `/study-maps/${state.mapId}/nodes/${node.id}`;
-            return;
-        }
-
-        // NO MODO FORJA (CONSTRUÇÃO): Abre o Inspector Rápido de Edição do Nó
-        openEditNodeModal(node);
+        // Abre o Slide-Over Side Drawer para estudo dual-screen / anotações / IA
+        openNodeSideDrawer(node);
     }
 
     window.toggleConnectMode = () => {
@@ -626,7 +643,7 @@
         renderEdges();
     };
 
-    // --- Inspector da Forja (Criação & Edição de Nós) ---
+    // --- Inspector da Forja (Criação & Edição de Nós Raiz / Metadados) ---
 
     window.openCreateNodeModal = () => {
         state.selectedNode = null;
@@ -658,21 +675,24 @@
     };
 
     window.openEditNodeModal = (node) => {
-        state.selectedNode = node;
+        const targetNode = node || state.selectedNode;
+        if (!targetNode) return;
+        state.selectedNode = targetNode;
+
         const titleEl = document.getElementById('node-modal-title');
-        if (titleEl) titleEl.textContent = `Editar Nó: ${node.title}`;
+        if (titleEl) titleEl.textContent = `Editar Nó: ${targetNode.title}`;
 
         const idInput = document.getElementById('modal-node-id');
-        if (idInput) idInput.value = node.id;
+        if (idInput) idInput.value = targetNode.id;
 
         const titleInput = document.getElementById('modal-node-title-input');
-        if (titleInput) titleInput.value = node.title;
+        if (titleInput) titleInput.value = targetNode.title;
 
         const descInput = document.getElementById('modal-node-desc-input');
-        if (descInput) descInput.value = node.description || '';
+        if (descInput) descInput.value = targetNode.description || '';
 
         const iconSelect = document.getElementById('modal-node-icon-select');
-        if (iconSelect) iconSelect.value = node.icon || 'brain';
+        if (iconSelect) iconSelect.value = targetNode.icon || 'brain';
 
         const deleteBtn = document.getElementById('btn-delete-node');
         if (deleteBtn) deleteBtn.classList.remove('hidden');
@@ -683,7 +703,7 @@
         const prereqSection = document.getElementById('node-prerequisites-section');
         if (prereqSection) {
             prereqSection.classList.remove('hidden');
-            renderPrerequisites(node);
+            renderPrerequisites(targetNode);
         }
 
         if (nodeModal) nodeModal.classList.remove('hidden');
@@ -691,12 +711,13 @@
 
     window.closeNodeModal = () => {
         if (nodeModal) nodeModal.classList.add('hidden');
-        state.selectedNode = null;
     };
 
     window.openSelectedNodeGrimoire = () => {
         if (!state.selectedNode) return;
-        window.location.href = `/study-maps/${state.mapId}/nodes/${state.selectedNode.id}`;
+        const node = state.selectedNode;
+        // Navegação direta à página completa do Grimório do nó
+        window.location.href = `/study-maps/${state.mapId}/nodes/${node.id}`;
     };
 
     window.handleSaveNode = async (e) => {
@@ -725,7 +746,7 @@
                 });
                 if (res.ok) {
                     closeNodeModal();
-                    loadGraph();
+                    await loadGraph();
                 } else {
                     const err = await res.json();
                     alert('Erro ao criar nó: ' + (err.detail || 'Falha de validação'));
@@ -739,7 +760,7 @@
                 });
                 if (res.ok) {
                     closeNodeModal();
-                    loadGraph();
+                    await loadGraph();
                 } else {
                     const err = await res.json();
                     alert('Erro ao atualizar nó: ' + (err.detail || 'Falha ao salvar'));
@@ -760,7 +781,8 @@
             });
             if (res.ok) {
                 closeNodeModal();
-                loadGraph();
+                closeNodeSideDrawer();
+                await loadGraph();
             } else {
                 alert('Falha ao excluir nó.');
             }
@@ -769,6 +791,533 @@
         }
     };
 
+    // --- 1-Click Quick Add Connected Child Node (+) ---
+
+    window.quickAddChildNode = async function (parentNode, optionalTitle) {
+        if (!parentNode) return;
+
+        if (optionalTitle && optionalTitle.trim()) {
+            await executeCreateConnectedChild(parentNode, optionalTitle.trim());
+            return;
+        }
+
+        const modal = document.getElementById('quick-child-modal');
+        if (modal) {
+            state.quickAddParentNode = parentNode;
+            const parentNameEl = document.getElementById('quick-child-parent-name');
+            if (parentNameEl) parentNameEl.textContent = parentNode.title;
+            const titleInput = document.getElementById('quick-child-title-input');
+            if (titleInput) {
+                titleInput.value = '';
+                modal.classList.remove('hidden');
+                setTimeout(() => titleInput.focus(), 50);
+            } else {
+                modal.classList.remove('hidden');
+            }
+        } else {
+            const promptTitle = window.prompt(`Criar nó filho conectado a "${parentNode.title}":`);
+            if (promptTitle && promptTitle.trim()) {
+                await executeCreateConnectedChild(parentNode, promptTitle.trim());
+            }
+        }
+    };
+
+    window.closeQuickChildModal = function () {
+        const modal = document.getElementById('quick-child-modal');
+        if (modal) modal.classList.add('hidden');
+        state.quickAddParentNode = null;
+    };
+
+    window.handleQuickChildSubmit = async function (event) {
+        if (event) event.preventDefault();
+        const input = document.getElementById('quick-child-title-input');
+        const title = input ? input.value.trim() : '';
+        const parentNode = state.quickAddParentNode;
+        if (!title || !parentNode) return;
+
+        closeQuickChildModal();
+        await executeCreateConnectedChild(parentNode, title);
+    };
+
+    async function executeCreateConnectedChild(parentNode, title) {
+        try {
+            const childEdges = (state.graph.edges || []).filter(e => e.source_node_id === parentNode.id);
+            const childCount = childEdges.length;
+            const posX = Math.round(parentNode.pos_x + 200);
+            const posY = Math.round(parentNode.pos_y + (childCount * 110) - (childCount > 0 ? 55 : 0));
+
+            // 1. Criação do nó filho
+            const nodeRes = await fetch(`/api/v1/study-maps/${state.mapId}/nodes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: title.trim(),
+                    description: '',
+                    icon: parentNode.icon || 'brain',
+                    pos_x: posX,
+                    pos_y: posY,
+                }),
+            });
+
+            if (!nodeRes.ok) {
+                const err = await nodeRes.json();
+                alert('Erro ao criar nó filho: ' + (err.detail || 'Falha na validação'));
+                return;
+            }
+
+            const newNode = await nodeRes.json();
+
+            // 2. Conectar nó pai ao nó filho via POST /edges
+            const edgeRes = await fetch(`/api/v1/study-maps/${state.mapId}/edges`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    source_node_id: parentNode.id,
+                    target_node_id: newNode.id,
+                    required_level: 1,
+                }),
+            });
+
+            if (!edgeRes.ok) {
+                console.warn('Nó criado, mas falhou ao conectar aresta:', await edgeRes.text());
+            }
+
+            // 3. Recarregar grafo e abrir Side Drawer para o nó recém-criado
+            await loadGraph();
+            const created = (state.graph.nodes || []).find(n => n.id === newNode.id) || newNode;
+            openNodeSideDrawer(created);
+        } catch (err) {
+            console.error('Erro na criação de nó filho:', err);
+            alert('Erro ao criar nó conectado: ' + err.message);
+        }
+    }
+
+    // --- Side Drawer Interativo do Nó (Dual-Screen com IA) ---
+
+    window.openNodeSideDrawer = async function (node) {
+        if (!node) return;
+        state.selectedNode = node;
+
+        const drawer = document.getElementById('node-side-drawer');
+        if (!drawer) return;
+
+        // Revela o drawer
+        drawer.classList.remove('translate-x-full');
+        drawer.classList.remove('hidden');
+
+        // Atualiza cabeçalho do drawer
+        const titleEl = document.getElementById('drawer-node-title');
+        if (titleEl) titleEl.textContent = node.title;
+
+        const rankEl = document.getElementById('drawer-node-rank');
+        if (rankEl) {
+            if (!node.is_unlocked) {
+                rankEl.textContent = '🔒 SELADO';
+                rankEl.className = 'px-2 py-0.5 rounded text-[10px] font-cinzel font-bold bg-[#14100d] border border-[#3b322c] text-[#a39276]';
+            } else {
+                rankEl.textContent = `Nv. ${node.effective_level || 0}`;
+                rankEl.className = 'px-2 py-0.5 rounded text-[10px] font-cinzel font-bold bg-[#0c0908] border border-[#785a28] text-[#f0c869]';
+            }
+        }
+
+        const iconEl = document.getElementById('drawer-node-icon');
+        if (iconEl) {
+            const iconSvg = (typeof window.getRpgIconSvg === 'function')
+                ? window.getRpgIconSvg(node.icon, 'w-6 h-6 text-[#f0c869]')
+                : `<span>${ICON_MAP[node.icon] || '📜'}</span>`;
+            iconEl.innerHTML = iconSvg;
+        }
+
+        // Sub-aba ativa padrão
+        switchDrawerTab(state.currentDrawerTab || 'content');
+
+        // Renderiza lista de bloqueios com dados atuais do grafo
+        renderDrawerPrerequisites(node);
+
+        // Busca dados detalhados do hub do nó (/hub) para teoria e questões
+        try {
+            const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${node.id}/hub`);
+            if (res.ok) {
+                const data = await res.json();
+                const hubNode = data.node || node;
+                const theoryInput = document.getElementById('drawer-theory-input');
+                if (theoryInput) {
+                    theoryInput.value = hubNode.theory_content || '';
+                }
+                const questions = data.all_questions || [];
+                renderDrawerQuestionsList(questions);
+            }
+        } catch (err) {
+            console.error('Falha ao carregar hub do nó no side drawer:', err);
+        }
+    };
+
+    window.closeNodeSideDrawer = function () {
+        const drawer = document.getElementById('node-side-drawer');
+        if (drawer) {
+            drawer.classList.add('translate-x-full');
+        }
+    };
+
+    window.openNodeDrawer = window.openNodeSideDrawer;
+    window.closeNodeDrawer = window.closeNodeSideDrawer;
+
+    window.switchDrawerTab = function (tabName) {
+        state.currentDrawerTab = tabName;
+
+        const tabs = ['content', 'questions', 'prereqs'];
+        tabs.forEach(t => {
+            const panel = document.getElementById(`drawer-tab-${t}`);
+            const btn = document.getElementById(`drawer-tab-btn-${t}`);
+            if (panel) {
+                if (t === tabName) {
+                    panel.classList.remove('hidden');
+                } else {
+                    panel.classList.add('hidden');
+                }
+            }
+            if (btn) {
+                if (t === tabName) {
+                    btn.className = 'flex-1 py-2.5 text-xs font-cinzel font-bold border-b-2 border-[#f0c869] text-[#f0c869] bg-[#1a1410] transition-colors';
+                } else {
+                    btn.className = 'flex-1 py-2.5 text-xs font-cinzel font-medium border-b-2 border-transparent text-[#a39276] hover:text-[#f5ebd6] hover:bg-[#14100d] transition-colors';
+                }
+            }
+        });
+
+        if (tabName === 'prereqs' && state.selectedNode) {
+            renderDrawerPrerequisites(state.selectedNode);
+        }
+    };
+
+    window.saveDrawerTheory = async function () {
+        if (!state.selectedNode) return;
+        const nodeId = state.selectedNode.id;
+        const textarea = document.getElementById('drawer-theory-input');
+        const statusEl = document.getElementById('drawer-theory-status');
+        const theory_content = textarea ? textarea.value : '';
+
+        try {
+            // PUT / PATCH /theory — Atualiza o resumo teórico do nó
+            const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${nodeId}/theory`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theory_content }),
+            });
+
+            if (res.ok) {
+                state.selectedNode.theory_content = theory_content;
+                if (statusEl) {
+                    statusEl.classList.remove('hidden');
+                    setTimeout(() => statusEl.classList.add('hidden'), 3000);
+                }
+            } else {
+                const err = await res.json();
+                alert('Erro ao salvar resumo: ' + (err.detail || 'Falha no servidor'));
+            }
+        } catch (err) {
+            console.error('Erro ao salvar teoria:', err);
+            alert('Erro ao salvar resumo: ' + err.message);
+        }
+    };
+
+    window.submitDrawerBulkQuestions = async function () {
+        if (!state.selectedNode) return;
+        const nodeId = state.selectedNode.id;
+        const textarea = document.getElementById('drawer-bulk-questions-input');
+        const statusEl = document.getElementById('drawer-bulk-status');
+        const rawText = textarea ? textarea.value.trim() : '';
+
+        if (!rawText) {
+            alert('Cole pelo menos uma pergunta com resposta no campo de texto.');
+            return;
+        }
+
+        const parsedQuestions = parseBulkQuestions(rawText);
+        if (!parsedQuestions || parsedQuestions.length === 0) {
+            alert('Não foi possível identificar perguntas e respostas no formato inserido. Use "P: Pergunta\\nR: Resposta" ou "Pergunta | Resposta".');
+            return;
+        }
+
+        try {
+            // POST /questions/batch — Importação em lote de perguntas SRS
+            const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${nodeId}/questions/batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ questions: parsedQuestions }),
+            });
+
+            if (res.ok) {
+                const createdList = await res.json();
+                if (textarea) textarea.value = '';
+                if (statusEl) {
+                    statusEl.textContent = `✓ ${createdList.length} questões importadas!`;
+                    statusEl.className = 'text-xs font-cinzel font-bold text-emerald-400 ml-2';
+                    statusEl.classList.remove('hidden');
+                    setTimeout(() => statusEl.classList.add('hidden'), 3500);
+                }
+                await reloadDrawerQuestions(nodeId);
+                await loadGraph();
+            } else {
+                const err = await res.json();
+                alert('Erro ao importar questões em lote: ' + (err.detail || 'Falha de validação'));
+            }
+        } catch (err) {
+            console.error('Erro na importação em lote:', err);
+            alert('Erro ao importar questões: ' + err.message);
+        }
+    };
+    window.submitDrawerBatchQuestions = window.submitDrawerBulkQuestions;
+
+    window.submitDrawerSingleQuestion = async function (event) {
+        if (event) event.preventDefault();
+        if (!state.selectedNode) return;
+        const nodeId = state.selectedNode.id;
+        const promptInput = document.getElementById('drawer-single-prompt');
+        const answerInput = document.getElementById('drawer-single-answer');
+        const prompt = promptInput ? promptInput.value.trim() : '';
+        const expected_answer = answerInput ? answerInput.value.trim() : '';
+
+        if (!prompt) {
+            alert('O enunciado da pergunta é obrigatório.');
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${nodeId}/questions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, expected_answer }),
+            });
+
+            if (res.ok) {
+                if (promptInput) promptInput.value = '';
+                if (answerInput) answerInput.value = '';
+                await reloadDrawerQuestions(nodeId);
+                await loadGraph();
+            } else {
+                const err = await res.json();
+                alert('Erro ao adicionar questão: ' + (err.detail || 'Falha de validação'));
+            }
+        } catch (err) {
+            console.error('Erro ao adicionar questão:', err);
+            alert('Erro ao adicionar questão: ' + err.message);
+        }
+    };
+
+    window.deleteDrawerQuestion = async function (questionId) {
+        if (!state.selectedNode) return;
+        if (!confirm('Deseja realmente excluir esta questão do nó?')) return;
+
+        try {
+            const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${state.selectedNode.id}/questions/${questionId}`, {
+                method: 'DELETE',
+            });
+
+            if (res.ok) {
+                await reloadDrawerQuestions(state.selectedNode.id);
+                await loadGraph();
+            } else {
+                alert('Falha ao excluir questão.');
+            }
+        } catch (err) {
+            console.error('Erro ao excluir questão:', err);
+            alert('Erro ao excluir questão: ' + err.message);
+        }
+    };
+
+    async function reloadDrawerQuestions(nodeId) {
+        try {
+            const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes/${nodeId}/hub`);
+            if (res.ok) {
+                const data = await res.json();
+                renderDrawerQuestionsList(data.all_questions || []);
+            }
+        } catch (err) {
+            console.error('Erro ao recarregar questões do drawer:', err);
+        }
+    }
+
+    function renderDrawerQuestionsList(questions) {
+        const listEl = document.getElementById('drawer-questions-list');
+        const countEl = document.getElementById('drawer-questions-count');
+        if (countEl) countEl.textContent = `${questions ? questions.length : 0}`;
+
+        if (!listEl) return;
+
+        if (!questions || questions.length === 0) {
+            listEl.innerHTML = `<div class="p-4 rounded-xl bg-[#0c0908] border border-[#785a28]/40 text-xs text-[#a39276] italic text-center">Nenhuma provação SRS cadastrada neste nó. Use o campo acima para importar em lote!</div>`;
+            return;
+        }
+
+        listEl.innerHTML = questions.map((q, idx) => {
+            const promptText = escapeHtml(q.prompt || q.statement || '');
+            const ansText = escapeHtml(q.expected_answer || '');
+            const lvl = q.current_level || 0;
+            return `
+                <div class="p-3 rounded-xl bg-[#0c0908] border border-[#785a28]/50 shadow-inner flex flex-col space-y-1.5 group">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1c1612] text-[#a39276]">#${idx + 1}</span>
+                            <span class="text-[10px] font-cinzel font-bold px-1.5 py-0.5 rounded bg-[#c89b3c]/20 text-[#f0c869] border border-[#c89b3c]/30">Nv. ${lvl}</span>
+                        </div>
+                        <button
+                            type="button"
+                            onclick="deleteDrawerQuestion('${q.id}')"
+                            class="text-[#e11d48] hover:text-red-400 text-xs p-1 rounded transition-colors"
+                            title="Excluir Questão"
+                        >
+                            🗑️
+                        </button>
+                    </div>
+                    <div class="text-xs font-bold font-tome text-[#f5ebd6] leading-snug">${promptText}</div>
+                    ${ansText ? `<div class="text-[11px] font-tome text-[#a39276] italic border-l-2 border-[#785a28]/50 pl-2 mt-1 leading-snug">${ansText}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderDrawerPrerequisites(node) {
+        const listEl = document.getElementById('drawer-prerequisites-list');
+        const selectEl = document.getElementById('drawer-prereq-node-select');
+        if (!listEl) return;
+
+        const incomingEdges = (state.graph.edges || []).filter(e => e.target_node_id === node.id);
+        const nodeMap = new Map((state.graph.nodes || []).map(n => [n.id, n]));
+
+        if (incomingEdges.length === 0) {
+            listEl.innerHTML = `<div class="p-3 rounded-xl bg-[#0c0908] border border-[#785a28]/40 text-xs text-[#a39276] italic text-center">Nenhum pré-requisito bloqueando este nó.</div>`;
+        } else {
+            listEl.innerHTML = incomingEdges.map(edge => {
+                const srcNode = nodeMap.get(edge.source_node_id);
+                const title = srcNode ? escapeHtml(srcNode.title) : 'Nó Ancestral';
+                const iconName = srcNode ? srcNode.icon : 'scroll';
+                const iconSvg = (typeof window.getRpgIconSvg === 'function')
+                    ? window.getRpgIconSvg(iconName, 'w-4 h-4 text-[#f0c869]')
+                    : '📜';
+                const reqLvl = edge.required_level || 1;
+
+                return `
+                    <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[#0c0908] border border-[#785a28]/50 shadow-inner">
+                        <div class="flex items-center space-x-2 min-w-0">
+                            <span class="w-5 h-5 flex items-center justify-center shrink-0">${iconSvg}</span>
+                            <span class="text-xs font-cinzel font-bold text-[#f5ebd6] truncate">${title}</span>
+                        </div>
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <label class="text-[10px] uppercase font-cinzel text-[#a39276]">Exigir:</label>
+                            <select
+                                onchange="updateEdgeRequiredLevel('${edge.id}', this.value)"
+                                class="bg-[#14100d] border border-[#785a28] rounded px-1.5 py-0.5 text-xs text-[#f0c869] font-cinzel font-bold focus:border-[#f0c869] focus:outline-none"
+                            >
+                                <option value="1" ${reqLvl === 1 ? 'selected' : ''}>Nv. 1</option>
+                                <option value="2" ${reqLvl === 2 ? 'selected' : ''}>Nv. 2</option>
+                                <option value="3" ${reqLvl === 3 ? 'selected' : ''}>Nv. 3</option>
+                                <option value="4" ${reqLvl === 4 ? 'selected' : ''}>Nv. 4</option>
+                            </select>
+                            <button
+                                type="button"
+                                onclick="deleteEdge('${edge.id}')"
+                                class="text-[#e11d48] hover:text-red-400 text-xs px-1.5 py-0.5 rounded transition-colors"
+                                title="Remover Bloqueio"
+                            >
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        if (selectEl) {
+            const existingSourceIds = new Set(incomingEdges.map(e => e.source_node_id));
+            const availableCandidates = (state.graph.nodes || []).filter(
+                n => n.id !== node.id && !existingSourceIds.has(n.id)
+            );
+
+            if (availableCandidates.length === 0) {
+                selectEl.innerHTML = `<option value="">Nenhum outro nó disponível</option>`;
+                selectEl.disabled = true;
+            } else {
+                selectEl.disabled = false;
+                selectEl.innerHTML = `
+                    <option value="">Selecione um nó de pré-requisito...</option>
+                    ${availableCandidates.map(c => `
+                        <option value="${c.id}">${escapeHtml(c.title)} (Nv. ${c.effective_level || 0})</option>
+                    `).join('')}
+                `;
+            }
+        }
+    }
+
+    window.addDrawerPrerequisiteEdge = async function (event) {
+        if (event) event.preventDefault();
+        if (!state.selectedNode) return;
+
+        const selectEl = document.getElementById('drawer-prereq-node-select');
+        const levelEl = document.getElementById('drawer-prereq-level-select');
+
+        if (!selectEl || !selectEl.value) {
+            alert('Selecione um nó de pré-requisito.');
+            return;
+        }
+
+        const sourceId = selectEl.value;
+        const requiredLevel = levelEl ? parseInt(levelEl.value, 10) : 1;
+
+        await createEdge(sourceId, state.selectedNode.id, requiredLevel);
+        renderDrawerPrerequisites(state.selectedNode);
+    };
+
+    function parseBulkQuestions(text) {
+        if (!text || !text.trim()) return [];
+        const questions = [];
+        const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+
+        // Regex para blocos P: ... R: ... / Pergunta: ... Resposta: ... / Q: ... A: ...
+        const prRegex = /(?:^|\n)\s*(?:P|Pergunta|Q|Question)\s*[:\-]\s*([\s\S]*?)\n\s*(?:R|Resposta|A|Answer)\s*[:\-]\s*([\s\S]*?)(?=(?:\n\s*(?:P|Pergunta|Q|Question)\s*[:\-])|\n\s*---\s*\n|$)/gi;
+        let match;
+        while ((match = prRegex.exec(normalized)) !== null) {
+            const prompt = match[1].trim();
+            const answer = match[2].trim();
+            if (prompt && answer) {
+                questions.push({ prompt, expected_answer: answer });
+            }
+        }
+        if (questions.length > 0) {
+            return questions;
+        }
+
+        // Divide por blocos separados por '---' ou por linhas em branco duplas
+        const blocks = normalized.split(/\n\s*---\s*\n|\n\s*\n+/);
+        for (const block of blocks) {
+            const trimmed = block.trim();
+            if (!trimmed) continue;
+
+            // Formato separado por barra vertical |
+            if (trimmed.includes('|')) {
+                const parts = trimmed.split('|');
+                const prompt = parts[0].trim();
+                const answer = parts.slice(1).join('|').trim();
+                if (prompt && answer) {
+                    questions.push({ prompt, expected_answer: answer });
+                    continue;
+                }
+            }
+
+            // Formato linha 1: pergunta, linha 2+: resposta
+            const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
+            if (lines.length >= 2) {
+                const prompt = lines[0].replace(/^(?:P|Pergunta|Q|\d+[\.\)])\s*[:\-]\s*/i, '').trim();
+                const answer = lines.slice(1).join('\n').replace(/^(?:R|Resposta|A)\s*[:\-]\s*/i, '').trim();
+                if (prompt && answer) {
+                    questions.push({ prompt, expected_answer: answer });
+                }
+            }
+        }
+
+        return questions;
+    }
+
     function escapeHtml(str) {
         if (!str) return '';
         const div = document.createElement('div');
@@ -776,11 +1325,29 @@
         return div.innerHTML;
     }
 
-    // Exposição Global de Comandos da Forja
+    // Exposição Global de Comandos da Forja e Side Drawer
     window.updateEdgeRequiredLevel = updateEdgeRequiredLevel;
     window.deleteEdge = deleteEdge;
     window.addPrerequisiteEdge = addPrerequisiteEdge;
     window.selectNode = window.openEditNodeModal;
     window.fetchGraph = loadGraph;
+    window.parseBulkQuestions = parseBulkQuestions;
+
+    // Métodos exportados para o Side Drawer & Quick Add
+    window.quickAddChildNode = quickAddChildNode;
+    window.closeQuickChildModal = closeQuickChildModal;
+    window.handleQuickChildSubmit = handleQuickChildSubmit;
+    window.openNodeSideDrawer = openNodeSideDrawer;
+    window.openNodeDrawer = openNodeSideDrawer;
+    window.closeNodeSideDrawer = closeNodeSideDrawer;
+    window.closeNodeDrawer = closeNodeSideDrawer;
+    window.switchDrawerTab = switchDrawerTab;
+    window.saveDrawerTheory = saveDrawerTheory;
+    window.submitDrawerBulkQuestions = submitDrawerBulkQuestions;
+    window.submitDrawerBatchQuestions = submitDrawerBulkQuestions;
+    window.submitDrawerSingleQuestion = submitDrawerSingleQuestion;
+    window.deleteDrawerQuestion = deleteDrawerQuestion;
+    window.addDrawerPrerequisiteEdge = addDrawerPrerequisiteEdge;
+    window.renderDrawerPrerequisites = renderDrawerPrerequisites;
 
 })();

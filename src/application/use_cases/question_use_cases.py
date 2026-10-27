@@ -324,13 +324,16 @@ class ReviewQuestionUseCase:
         if not question:
             raise QuestionNotFoundError("Pergunta não encontrada.")
 
-        topic = self._topic_repo.get_by_id(question.topic_id)
-        if not topic:
-            raise EntityNotFoundError("Tema não encontrado.")
+        topic = None
+        subject = None
+        if question.node_id is None:
+            topic = self._topic_repo.get_by_id(question.topic_id)
+            if not topic:
+                raise EntityNotFoundError("Tema não encontrado.")
 
-        subject = self._subject_repo.get_by_id(topic.subject_id)
-        if not subject or not subject.can_be_studied_by(user_id):
-            raise ResourceOwnershipError("Acesso negado para estudar esta pergunta.")
+            subject = self._subject_repo.get_by_id(topic.subject_id)
+            if not subject or not subject.can_be_studied_by(user_id):
+                raise ResourceOwnershipError("Acesso negado para estudar esta pergunta.")
 
         progress = self._progress_repo.get_by_user_and_question(user_id, dto.question_id)
         if progress is None:
@@ -384,10 +387,12 @@ class ReviewQuestionUseCase:
                 audit_log = ReviewAuditLog(
                     user_id=user_id,
                     question_id=dto.question_id,
-                    subject_id=subject.id,
-                    topic_id=topic.id,
-                    historical_subject_name=subject.name,
-                    historical_topic_name=topic.name,
+                    subject_id=subject.id if subject is not None else None,
+                    topic_id=topic.id if topic is not None else None,
+                    historical_subject_name=(
+                        subject.name if subject is not None else "Árvore de Conhecimento"
+                    ),
+                    historical_topic_name=(topic.name if topic is not None else "Nó de Estudo"),
                     review_date=today,
                     score=dto.score,
                     level_before=previous_level,

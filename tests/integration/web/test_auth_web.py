@@ -330,17 +330,17 @@ def test_login_page_open_redirect_sanitized(
     # 1. Tentativa com URL externa absoluta
     res1 = auth_client.get("/auth/login?next=https://evil.com/phishing", follow_redirects=False)
     assert res1.status_code == 303
-    assert res1.headers["location"] == "/study-maps"
+    assert res1.headers["location"] == "/questions/study"
 
     # 2. Tentativa com protocolo relativo (//evil.com)
     res2 = auth_client.get("/auth/login?next=//evil.com", follow_redirects=False)
     assert res2.status_code == 303
-    assert res2.headers["location"] == "/study-maps"
+    assert res2.headers["location"] == "/questions/study"
 
     # 3. Tentativa com barra invertida (/\\evil.com)
     res3 = auth_client.get("/auth/login?next=/\\evil.com", follow_redirects=False)
     assert res3.status_code == 303
-    assert res3.headers["location"] == "/study-maps"
+    assert res3.headers["location"] == "/questions/study"
 
     # 4. Rota relativa legítima é aceita
     res4 = auth_client.get("/auth/login?next=/subjects", follow_redirects=False)
@@ -350,7 +350,7 @@ def test_login_page_open_redirect_sanitized(
     # 5. Tentativa com parâmetro next vazio (deve cair no fallback seguro default)
     res5 = auth_client.get("/auth/login?next=", follow_redirects=False)
     assert res5.status_code == 303
-    assert res5.headers["location"] == "/study-maps"
+    assert res5.headers["location"] == "/questions/study"
 
 
 @pytest.mark.integration

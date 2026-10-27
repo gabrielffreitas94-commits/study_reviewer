@@ -576,16 +576,22 @@ class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
         stmt = (
             select(
                 QuestionModel.id,
-                SubjectModel.name.label("subject_name"),
-                TopicModel.name.label("topic_name"),
+                func.coalesce(
+                    SubjectModel.name, StudyMapModel.title, "Árvore de Conhecimento"
+                ).label("subject_name"),
+                func.coalesce(TopicModel.name, StudyNodeModel.title, "Nó de Estudo").label(
+                    "topic_name"
+                ),
                 QuestionModel.prompt,
                 QuestionModel.expected_answer,
                 UserQuestionProgressModel.current_level,
                 UserQuestionProgressModel.next_review_date,
             )
             .join(QuestionModel, UserQuestionProgressModel.question_id == QuestionModel.id)
-            .join(TopicModel, QuestionModel.topic_id == TopicModel.id)
-            .join(SubjectModel, TopicModel.subject_id == SubjectModel.id)
+            .outerjoin(TopicModel, QuestionModel.topic_id == TopicModel.id)
+            .outerjoin(SubjectModel, TopicModel.subject_id == SubjectModel.id)
+            .outerjoin(StudyNodeModel, QuestionModel.node_id == StudyNodeModel.id)
+            .outerjoin(StudyMapModel, StudyNodeModel.map_id == StudyMapModel.id)
             .where(
                 UserQuestionProgressModel.user_id == user_id,
                 UserQuestionProgressModel.next_review_date <= reference_date,
