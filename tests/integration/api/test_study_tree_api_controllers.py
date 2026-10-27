@@ -592,3 +592,66 @@ def test_create_sample_math_study_map_endpoint(
     graph_data = graph_resp.json()
     assert len(graph_data["nodes"]) == 5
     assert len(graph_data["edges"]) == 5
+
+
+@pytest.mark.integration
+def test_create_node_questions_batch_endpoint(
+    client: TestClient, db_session: Session, test_user: User
+) -> None:
+    user_repo = SqlAlchemyUserRepository(db_session)
+    map_repo = SqlAlchemyStudyMapRepository(db_session)
+    node_repo = SqlAlchemyStudyNodeRepository(db_session)
+
+    user_repo.save(test_user)
+    s_map = map_repo.save(StudyMap(owner_id=test_user.id, title="Mapa Batch Perguntas"))
+    node = node_repo.save(StudyNode(map_id=s_map.id, title="Nó Álgebra"))
+
+    # Sucesso com lote de 2 perguntas
+    resp = client.post(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/questions/batch",
+        json={
+            "questions": [
+                {
+                    "prompt": "O que é um autovalor?",
+                    "expected_answer": "Escalar lambda tal que Av = lambda v",
+                },
+                {"prompt": "O que é matriz ortogonal?", "expected_answer": "Q^T Q = I"},
+            ]
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert len(data) == 2
+    assert data[0]["prompt"] == "O que é um autovalor?"
+    assert data[1]["prompt"] == "O que é matriz ortogonal?"
+
+    # Erro 422 se lote vazio ou apenas enunciados vazios
+    resp_empty = client.post(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/questions/batch",
+        json={"questions": [{"prompt": "   ", "expected_answer": "Gabarito"}]},
+    )
+    assert resp_empty.status_code == 422
+
+    # 404 quando mapa ou nó não existe
+    fake_map_id = uuid4()
+    resp_404 = client.post(
+        f"/api/v1/study-maps/{fake_map_id}/nodes/{node.id}/questions/batch",
+        json={"questions": [{"prompt": "Pergunta?", "expected_answer": "Resposta"}]},
+    )
+    assert resp_404.status_code == 404
+
+    # 403 quando outro usuário tenta criar perguntas no mapa alheio
+    other_user = User(
+        id=uuid4(),
+        google_sub="sub-other-tree",
+        email="other@test.com",
+        name="Outro Usuário",
+    )
+    user_repo.save(other_user)
+    app.dependency_overrides[get_current_user] = lambda: other_user
+    resp_403 = client.post(
+        f"/api/v1/study-maps/{s_map.id}/nodes/{node.id}/questions/batch",
+        json={"questions": [{"prompt": "Pergunta?", "expected_answer": "Resposta"}]},
+    )
+    assert resp_403.status_code == 403
+    app.dependency_overrides[get_current_user] = lambda: test_user

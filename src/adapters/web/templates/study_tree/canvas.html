@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}{{ map.title }} — Árvore de Conhecimento{% endblock %}
+{% block title %}{{ map.title }} — Árvore de Conhecimento & Forja{% endblock %}
 
 {% block content %}
 <div class="relative w-full h-[calc(100vh-4rem)] bg-[#0c0908] overflow-hidden flex flex-col select-none text-[#f5ebd6]">
 
-    <!-- Topbar do Canvas RPG -->
+    <!-- Topbar do Canvas RPG (HUD da Forja) -->
     <div class="h-16 bg-[#14100d]/95 border-b border-[#785a28]/60 backdrop-blur px-4 sm:px-6 flex items-center justify-between z-20 shadow-lg shadow-black/50">
         <div class="flex items-center space-x-4">
             {% if map.is_submap and map.parent_map_id %}
@@ -21,14 +21,14 @@
                 href="/study-maps"
                 class="rpg-btn-bronze text-xs py-1.5 px-3 font-cinzel"
             >
-                <span class="mr-1">←</span> Todas as Árvores
+                <span class="mr-1">←</span> Códice de Habilidades
             </a>
             {% endif %}
 
             <div class="flex items-center space-x-3 border-l border-[#785a28]/50 pl-4">
                 <span class="text-2xl" aria-hidden="true">🌌</span>
                 <div>
-                    <div class="text-[10px] font-bold font-cinzel uppercase tracking-widest text-[#a39276]">Árvore de Estudos</div>
+                    <div class="text-[10px] font-bold font-cinzel uppercase tracking-widest text-[#a39276]">Tomo de Habilidades &bull; Árvore de Estudos</div>
                     <h1 class="text-sm sm:text-base font-bold font-cinzel text-[#f0c869] flex items-center space-x-2 leading-none">
                         <span>{{ map.title }}</span>
                         {% if map.is_submap %}
@@ -43,7 +43,7 @@
 
         <!-- Ferramentas e Modos -->
         <div class="flex items-center space-x-3">
-            <!-- Alternância: Modo Estudo vs Modo Edição -->
+            <!-- Alternância: Modo Estudo (Jornada) vs Modo Edição (Forja) -->
             <div class="flex items-center bg-[#0c0908] p-1 rounded-xl border border-[#785a28]/60 text-xs shadow-inner">
                 <button
                     type="button"
@@ -52,7 +52,7 @@
                     class="px-3.5 py-1.5 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5"
                 >
                     <span>⚔️</span>
-                    <span>Modo Estudo</span>
+                    <span>Modo Jornada (Estudo)</span>
                 </button>
                 <button
                     type="button"
@@ -61,7 +61,7 @@
                     class="px-3.5 py-1.5 font-medium font-cinzel rounded-lg text-[#a39276] hover:text-[#f0c869] transition-all flex items-center space-x-1.5"
                 >
                     <span>🔨</span>
-                    <span>Modo Edição</span>
+                    <span>Modo Forja (Edição)</span>
                 </button>
             </div>
 
@@ -115,11 +115,9 @@
         </div>
     </div>
 
-    <!-- Área do Canvas Infinito com Vinheta e Grade de Runas -->
+    <!-- Área do Canvas Infinito com Vinheta e Grade -->
     <div id="canvas-viewport" class="relative flex-1 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing bg-[#0c0908]">
-        <!-- Grade Sutil de Pontos -->
         <div class="absolute inset-0 bg-[radial-gradient(#785a28_1px,transparent_1px)] [background-size:32px_32px] pointer-events-none opacity-20"></div>
-        <!-- Vinheta Dramática de Bordas -->
         <div class="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.95)]"></div>
 
         <!-- Container Transformável (Pan & Zoom) -->
@@ -151,7 +149,7 @@
                 <g id="edges-group"></g>
             </svg>
 
-            <!-- Camada de Nós / Medalhões de Habilidade -->
+            <!-- Camada de Medalhões de Habilidade (DOM interativo) -->
             <div id="nodes-layer" class="absolute inset-0 w-[6000px] h-[6000px] pointer-events-auto"></div>
         </div>
     </div>
@@ -164,7 +162,7 @@
 
 </div>
 
-<!-- Modal: Criar ou Editar Nó -->
+<!-- Modal da Forja: Criar ou Editar Nó / Medalhão -->
 <div id="node-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeNodeModal()"></div>
     <div class="min-h-full flex items-center justify-center p-4">
@@ -195,27 +193,27 @@
                         style="background-color: #0c0908 !important; color: #f5ebd6 !important; border: 1px solid #785a28 !important;"
                         class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm"
                     >
-                        <option value="brain">🧠 Cérebro / Conhecimento (brain)</option>
-                        <option value="book">📖 Livro / Teoria (book)</option>
-                        <option value="sword">⚔️ Espada / Combate (sword)</option>
-                        <option value="shield">🛡️ Escudo / Defesa (shield)</option>
-                        <option value="scroll">📜 Pergaminho (scroll)</option>
-                        <option value="calculator">📐 Cálculo / Matemática (calculator)</option>
-                        <option value="code">💻 Código / Programação (code)</option>
-                        <option value="database">🗄️ Banco de Dados (database)</option>
-                        <option value="cpu">⚙️ Processador / Hardware (cpu)</option>
-                        <option value="terminal">🖥️ Terminal (terminal)</option>
-                        <option value="globe">🌐 Rede / Global (globe)</option>
-                        <option value="layers">📚 Camadas / Módulos (layers)</option>
-                        <option value="zap">⚡ Energia / Raio (zap)</option>
-                        <option value="award">🏆 Troféu / Conquista (award)</option>
+                        <option value="sword">⚔️ Espada Rúnica (sword)</option>
+                        <option value="scroll">📜 Pergaminho Selado (scroll)</option>
+                        <option value="shield">🛡️ Égide de Cavaleiro (shield)</option>
                         <option value="dice">🎲 Dado D20 (dice)</option>
-                        <option value="compass">🧭 Bússola (compass)</option>
-                        <option value="feather">🪶 Pena / Escrita (feather)</option>
-                        <option value="flame">🔥 Fogo / Foco (flame)</option>
-                        <option value="key">🗝️ Chave / Acesso (key)</option>
-                        <option value="trending-up">📈 Gráfico / Evolução (trending-up)</option>
-                        <option value="activity">⚡ Pulso / Atividade (activity)</option>
+                        <option value="book">📖 Grimório Ancestral (book)</option>
+                        <option value="calculator">📐 Ábaco Arcano (calculator)</option>
+                        <option value="trending-up">📈 Flecha de Ascensão (trending-up)</option>
+                        <option value="activity">⚡ Pulso de Éter (activity)</option>
+                        <option value="brain">🧠 Runa da Mente (brain)</option>
+                        <option value="code">💻 Matriz Rúnica (code)</option>
+                        <option value="cpu">⚙️ Núcleo de Golem (cpu)</option>
+                        <option value="database">🗄️ Cofre de Cristais (database)</option>
+                        <option value="globe">🌐 Orbe Planar (globe)</option>
+                        <option value="layers">📚 Estratos Elementais (layers)</option>
+                        <option value="terminal">🖥️ Espelho de Vidência (terminal)</option>
+                        <option value="zap">⚡ Raio Sagrado (zap)</option>
+                        <option value="award">🏆 Medalhão de Láurea (award)</option>
+                        <option value="compass">🧭 Astrolábio Arcano (compass)</option>
+                        <option value="feather">🪶 Pena de Fênix (feather)</option>
+                        <option value="flame">🔥 Tocha Alquímica (flame)</option>
+                        <option value="key">🗝️ Chave Esqueleto (key)</option>
                     </select>
                 </div>
                 <div>
@@ -233,7 +231,7 @@
                 <div id="node-prerequisites-section" class="pt-4 border-t border-[#785a28]/40 space-y-3">
                     <div class="flex items-center justify-between">
                         <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#f0c869]">
-                            🔗 Pré-requisitos de Desbloqueio
+                            🔗 Pré-requisitos &amp; Bloqueios do Nó
                         </label>
                         <span class="text-[10px] font-tome text-[#a39276]">Nível exigido para liberar este nó</span>
                     </div>
@@ -245,7 +243,7 @@
 
                     <!-- Formulário de Adição de Pré-requisito -->
                     <div id="add-prerequisite-container" class="pt-1">
-                        <div class="text-[11px] font-cinzel text-[#a39276] mb-1.5 font-bold">+ Adicionar Pré-requisito</div>
+                        <div class="text-[11px] font-cinzel text-[#a39276] mb-1.5 font-bold">+ Adicionar Pré-requisito de Desbloqueio</div>
                         <div id="add-prerequisite-form" class="flex flex-col sm:flex-row items-center gap-2">
                             <select
                                 id="new-prereq-node-select"
@@ -274,7 +272,7 @@
                                 onclick="addPrerequisiteEdge(event)"
                                 class="w-full sm:w-auto rpg-btn-bronze text-xs py-1.5 px-3 font-cinzel font-bold whitespace-nowrap"
                             >
-                                + Adicionar Pré-requisito
+                                + Conectar Bloqueio
                             </button>
                         </div>
                     </div>

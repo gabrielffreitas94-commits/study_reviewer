@@ -99,6 +99,10 @@ class CreateNodeQuestionRequest(BaseModel):
     expected_answer: str = Field(..., min_length=1, max_length=5000)
 
 
+class BatchCreateNodeQuestionsRequest(BaseModel):
+    questions: list[CreateNodeQuestionRequest] = Field(..., min_length=1)
+
+
 class ReviewNodeQuestionRequest(BaseModel):
     score: int = Field(default=100, ge=0, le=100)
     difficulty: str | None = Field(default=None, max_length=20)
@@ -535,6 +539,63 @@ def create_node_question(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
+@_study_tree_base_router.post(
+    "/study-maps/{map_id}/nodes/{node_id}/questions/batch",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_node_questions_batch(
+    map_id: UUID,
+    node_id: UUID,
+    payload: BatchCreateNodeQuestionsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Cria múltiplas perguntas SRS em lote diretamente no nó."""
+    use_case = CreateNodeQuestionUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+        question_repo=SqlAlchemyQuestionRepository(db),
+        progress_repo=SqlAlchemyQuestionProgressRepository(db),
+        content_repo=SqlAlchemyNodeContentRepository(db),
+    )
+    results: list[dict[str, Any]] = []
+    try:
+        for q_req in payload.questions:
+            effective_prompt = (q_req.prompt or q_req.statement).strip()
+            if not effective_prompt:
+                continue
+            res = use_case.execute(
+                map_id=map_id,
+                node_id=node_id,
+                user_id=current_user.id,
+                prompt=effective_prompt,
+                expected_answer=q_req.expected_answer.strip(),
+            )
+            results.append(
+                {
+                    "id": str(res["id"]),
+                    "question_id": str(res["id"]),
+                    "node_id": str(res["node_id"]),
+                    "prompt": res["prompt"],
+                    "statement": res["statement"],
+                    "expected_answer": res["expected_answer"],
+                    "current_level": res["current_level"],
+                    "next_review_date": res["next_review_date"],
+                    "created_at": res["created_at"],
+                }
+            )
+        if not results:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Nenhuma pergunta com enunciado válido foi enviada no lote.",
+            )
+        return results
+    except (StudyMapNotFoundError, StudyNodeNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
 @_study_tree_base_router.delete(
     "/study-maps/{map_id}/nodes/{node_id}/questions/{question_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -873,4 +934,5 @@ __all__ = [
     "_serialize_node",
     "_serialize_edge",
     "UpdateStudyEdgeRequest",
+    "BatchCreateNodeQuestionsRequest",
 ]
