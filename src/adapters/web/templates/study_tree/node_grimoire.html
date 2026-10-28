@@ -123,7 +123,7 @@
                     {% endif %}
                 </div>
 
-                <div id="study-theory-content" class="text-[#f5ebd6] font-tome text-base leading-relaxed whitespace-pre-line min-h-[120px]">
+                <div id="theory-display-area" class="text-[#f5ebd6] font-tome text-base leading-relaxed whitespace-pre-line min-h-[120px] rpg-markdown" data-rpg-markdown="true">
                     {% if node.theory_content %}
                         {{ node.theory_content }}
                     {% else %}
@@ -289,7 +289,7 @@
                         <div class="text-xs uppercase font-bold text-[#a39276] font-cinzel tracking-wider">
                             Desafio / Questão
                         </div>
-                        <div class="text-base sm:text-lg font-semibold text-[#f5ebd6] leading-relaxed" id="arena-prompt">
+                        <div class="text-base sm:text-lg font-semibold text-[#f5ebd6] leading-relaxed rpg-markdown" id="arena-question-prompt" data-testid="arena-prompt" data-rpg-markdown="true">
                             {{ questions[0].statement or questions[0].prompt }}
                         </div>
 
@@ -339,7 +339,7 @@
                                     <span class="font-cinzel text-xs font-bold text-[#c89b3c] block uppercase tracking-wider mb-1">
                                         Gabarito / Resposta Esperada:
                                     </span>
-                                    <span id="arena-expected-answer">{{ questions[0].expected_answer }}</span>
+                                    <div id="arena-expected-answer" class="rpg-markdown" data-rpg-markdown="true">{{ questions[0].expected_answer }}</div>
                                 </div>
 
                                 <!-- 4 Botões Oficiais de Avaliação SRS -->
@@ -804,18 +804,36 @@
                     </div>
                 </div>
 
-                <!-- FORM 3: Colar em Bloco (Parser de Texto com Separador) -->
+                <!-- FORM 3: Colar em Bloco (JSON com Markdown ou Separador) -->
                 <div id="form-paste-questions" class="hidden space-y-3">
-                    <label for="paste-questions-textarea" class="block text-xs font-cinzel font-bold text-[#a39276] uppercase">
-                        Cole suas perguntas abaixo (formato: <code class="text-[#f0c869]">Pergunta | Resposta</code>, uma por linha):
-                    </label>
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <label for="paste-questions-textarea" class="block text-xs font-cinzel font-bold text-[#a39276] uppercase">
+                            Cole suas perguntas em JSON ou texto (formato: <code class="text-[#f0c869]">JSON</code> ou <code class="text-[#f0c869]">Pergunta | Resposta</code>):
+                        </label>
+                        <div class="flex items-center space-x-2">
+                            <button
+                                type="button"
+                                id="btn-grimoire-copy-ai-json"
+                                onclick="copyGrimoireAiJsonPrompt()"
+                                class="px-2.5 py-1 rounded-lg bg-[#251c14] hover:bg-[#c89b3c] text-[#f0c869] hover:text-[#0c0908] border border-[#c89b3c]/60 text-[11px] font-cinzel font-bold transition-all flex items-center gap-1 shadow-sm"
+                                title="Copia um comando pronto para você colar no ChatGPT/Claude e gerar questões em JSON com Markdown"
+                            >
+                                <span>📋 Copiar Prompt JSON para IA</span>
+                            </button>
+                            <span id="grimoire-copy-prompt-status" class="hidden text-[11px] text-emerald-400 font-bold">✓ Prompt copiado!</span>
+                        </div>
+                    </div>
                     <textarea
                         id="paste-questions-textarea"
-                        rows="6"
+                        rows="7"
                         class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3 text-xs text-[#f5ebd6] font-mono focus:border-[#f0c869] focus:outline-none"
-                        placeholder="Ex:
-O que é polimorfismo? | Capacidade de um objeto assumir diferentes formas em tempo de execução
-Qual a diferença entre pilha e fila? | Pilha é LIFO e fila é FIFO"
+                        placeholder='Cole aqui o JSON gerado pela IA (ou use Pergunta | Resposta):
+[
+  {
+    "prompt": "Como funciona o algoritmo **Dijkstra**?\n```python\n# Exemplo...\n```",
+    "expected_answer": "### Pontos Essenciais:\n- Usa fila de prioridades\n- Custo mínimo a partir da origem"
+  }
+]'
                     ></textarea>
                     <div class="flex justify-end">
                         <button
@@ -861,12 +879,12 @@ Qual a diferença entre pilha e fila? | Pilha é LIFO e fila é FIFO"
                                     🗑️ Excluir
                                 </button>
                             </div>
-                            <h4 class="font-semibold text-[#f5ebd6] text-xs sm:text-sm">
+                            <h4 class="font-semibold text-[#f5ebd6] text-xs sm:text-sm rpg-markdown" data-rpg-markdown="true">
                                 {{ q.statement or q.prompt }}
                             </h4>
                             <div class="text-xs text-[#a39276] font-tome text-sm bg-[#14100d] p-2.5 rounded border border-[#785a28]/20">
                                 <strong class="font-cinzel text-[10px] text-[#c89b3c] block uppercase mb-0.5">Gabarito:</strong>
-                                {{ q.expected_answer }}
+                                <div class="rpg-markdown" data-rpg-markdown="true">{{ q.expected_answer }}</div>
                             </div>
                         </div>
                         {% endfor %}
@@ -981,9 +999,13 @@ async function saveNodeTheory() {
 
         if (res.ok) {
             // Atualiza a visualização do Modo Estudo em tempo real
-            const studyTheory = document.getElementById('study-theory-content');
+            const studyTheory = document.getElementById('theory-display-area') || document.getElementById('study-theory-content');
             if (studyTheory) {
-                studyTheory.textContent = text || 'Nenhum resumo cadastrado.';
+                if (window.renderRpgMarkdown && text) {
+                    studyTheory.innerHTML = window.renderRpgMarkdown(text);
+                } else {
+                    studyTheory.textContent = text || 'Nenhum resumo cadastrado.';
+                }
             }
             if (statusEl) {
                 statusEl.classList.remove('hidden');
@@ -1318,33 +1340,88 @@ async function submitBatchQuestions() {
     }
 }
 
+window.copyGrimoireAiJsonPrompt = async function () {
+    const nodeTitle = (typeof NODE_TITLE !== 'undefined' && NODE_TITLE) ? NODE_TITLE : '{{ node.title }}';
+    const promptText = `Gere questões de estudo aprofundadas sobre "${nodeTitle}" para revisão espaçada ativa.\nRetorne EXCLUSIVAMENTE um array JSON válido no formato abaixo, usando formatação Markdown rica (**negrito** para conceitos-chave, listas com "-", blocos de código com \`\`\`linguagem, tabelas ou citações ">") tanto no "prompt" quanto no "expected_answer":\n\n[\n  {\n    "prompt": "Enunciado contextualizado ou problema prático em Markdown...",\n    "expected_answer": "### Pontos Essenciais:\\n- **Conceito 1:** Explicação objetiva.\\n- **Conceito 2:** Critério técnico ou exemplo de código."\n  }\n]`;
+
+    const statusEl = document.getElementById('grimoire-copy-prompt-status');
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(promptText);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = promptText;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        if (statusEl) {
+            statusEl.classList.remove('hidden');
+            setTimeout(() => statusEl.classList.add('hidden'), 3000);
+        }
+    } catch (err) {
+        console.error('Erro ao copiar prompt:', err);
+        prompt('Copie o prompt abaixo:', promptText);
+    }
+};
+
 async function importPastedQuestions() {
     const textarea = document.getElementById('paste-questions-textarea');
-    const text = textarea ? textarea.value.trim() : '';
-    if (!text) return;
+    const rawText = textarea ? textarea.value.trim() : '';
+    if (!rawText) return;
 
-    const lines = text.split('\n');
-    const parsed = [];
+    let parsed = [];
+    const trimmed = rawText.trim();
+    const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    const candidateJson = fenceMatch ? fenceMatch[1].trim() : trimmed;
 
-    lines.forEach(line => {
-        const parts = line.split('|');
-        if (parts.length >= 2) {
-            const p = parts[0].trim();
-            const a = parts.slice(1).join('|').trim();
-            if (p && a) parsed.push({prompt: p, expected_answer: a});
+    if (candidateJson.startsWith('[') || candidateJson.startsWith('{')) {
+        try {
+            const parsedJson = JSON.parse(candidateJson);
+            const arr = Array.isArray(parsedJson)
+                ? parsedJson
+                : (parsedJson.questions || parsedJson.items || [parsedJson]);
+
+            if (Array.isArray(arr)) {
+                for (const item of arr) {
+                    if (!item || typeof item !== 'object') continue;
+                    const prompt = String(item.prompt || item.question || item.pergunta || item.enunciado || '').trim();
+                    const expected_answer = String(item.expected_answer || item.answer || item.resposta || item.gabarito || '').trim();
+                    if (prompt && expected_answer) {
+                        parsed.push({ prompt, expected_answer });
+                    }
+                }
+            }
+        } catch (err) {
+            alert('Formato JSON inválido: ' + err.message);
+            return;
         }
-    });
+    }
 
     if (parsed.length === 0) {
-        alert('Nenhuma pergunta identificada. Certifique-se de usar o separador "|" entre pergunta e resposta.');
+        // Fallback para o formato Pergunta | Resposta linha por linha
+        const lines = rawText.split('\n');
+        lines.forEach(line => {
+            const parts = line.split('|');
+            if (parts.length >= 2) {
+                const p = parts[0].trim();
+                const a = parts.slice(1).join('|').trim();
+                if (p && a) parsed.push({ prompt: p, expected_answer: a });
+            }
+        });
+    }
+
+    if (parsed.length === 0) {
+        alert('Nenhuma pergunta identificada. Cole um JSON válido ou use o formato "Pergunta | Resposta" por linha.');
         return;
     }
 
     try {
         const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions/batch`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({questions: parsed})
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questions: parsed })
         });
 
         if (res.ok) {
@@ -1357,12 +1434,14 @@ async function importPastedQuestions() {
             if (textarea) textarea.value = '';
             alert(`${created.length} perguntas importadas e cadastradas com sucesso!`);
         } else {
-            alert('Falha ao cadastrar perguntas coladas.');
+            const errData = await res.json().catch(() => ({}));
+            alert('Falha ao cadastrar perguntas coladas: ' + (errData.detail || 'Erro no servidor'));
         }
     } catch (err) {
         alert('Erro ao comunicar com o servidor: ' + err.message);
     }
 }
+window.importPastedQuestions = importPastedQuestions;
 
 function addQuestionToManageDOM(q) {
     const noQLabel = document.getElementById('manage-no-questions-label');
@@ -1373,6 +1452,15 @@ function addQuestionToManageDOM(q) {
         const card = document.createElement('div');
         card.id = `manage-q-card-${q.id}`;
         card.className = 'p-4 rounded-xl bg-[#0c0908] border border-[#785a28]/40 space-y-2 shadow-sm';
+        const promptVal = q.statement || q.prompt || '';
+        const answerVal = q.expected_answer || '';
+        const promptHtml = (typeof window.renderRpgMarkdown === 'function')
+            ? window.renderRpgMarkdown(promptVal)
+            : escapeHtml(promptVal);
+        const ansHtml = (typeof window.renderRpgMarkdown === 'function')
+            ? window.renderRpgMarkdown(answerVal)
+            : escapeHtml(answerVal);
+
         card.innerHTML = `
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center space-x-2">
@@ -1392,12 +1480,14 @@ function addQuestionToManageDOM(q) {
                     🗑️ Excluir
                 </button>
             </div>
-            <h4 class="font-semibold text-[#f5ebd6] text-xs sm:text-sm">
-                ${escapeHtml(q.statement || q.prompt)}
+            <h4 class="font-semibold text-[#f5ebd6] text-xs sm:text-sm rpg-markdown" data-rpg-markdown="true">
+                ${promptHtml}
             </h4>
             <div class="text-xs text-[#a39276] font-tome text-sm bg-[#14100d] p-2.5 rounded border border-[#785a28]/20">
                 <strong class="font-cinzel text-[10px] text-[#c89b3c] block uppercase mb-0.5">Gabarito:</strong>
-                ${escapeHtml(q.expected_answer)}
+                <div class="rpg-markdown" data-rpg-markdown="true">
+                    ${ansHtml}
+                </div>
             </div>
         `;
         list.prepend(card);
@@ -1434,11 +1524,16 @@ async function deleteQuestionAsync(questionId) {
 
 // --- Arena de Estudo Ativa (Modo Estudo) ---
 
+function renderCurrentQuestion() {
+    updateStudyArena();
+}
+window.renderCurrentQuestion = renderCurrentQuestion;
+
 function updateStudyArena() {
     const counterEl = document.getElementById('arena-question-counter');
     const rankEl = document.getElementById('arena-question-rank');
     const dueEl = document.getElementById('arena-question-due');
-    const promptEl = document.getElementById('arena-prompt');
+    const promptEl = document.getElementById('arena-question-prompt') || document.getElementById('arena-prompt');
     const answerEl = document.getElementById('arena-expected-answer');
 
     if (!QUESTIONS || QUESTIONS.length === 0) {
@@ -1458,8 +1553,19 @@ function updateStudyArena() {
     if (counterEl) counterEl.textContent = `Pergunta ${activeIndex + 1} de ${QUESTIONS.length}`;
     if (rankEl) rankEl.textContent = `RANK ${q.current_level}`;
     if (dueEl) dueEl.textContent = q.is_due ? '🔥 Vencida' : `Próxima: ${q.next_review_date}`;
-    if (promptEl) promptEl.textContent = q.statement || q.prompt;
-    if (answerEl) answerEl.textContent = q.expected_answer;
+
+    const promptVal = q.statement || q.prompt || '';
+    const answerVal = q.expected_answer || '';
+    if (promptEl) {
+        promptEl.innerHTML = (typeof window.renderRpgMarkdown === 'function')
+            ? window.renderRpgMarkdown(promptVal)
+            : escapeHtml(promptVal);
+    }
+    if (answerEl) {
+        answerEl.innerHTML = (typeof window.renderRpgMarkdown === 'function')
+            ? window.renderRpgMarkdown(answerVal)
+            : escapeHtml(answerVal);
+    }
 
     // Reseta estado da revelação
     const ansBox = document.getElementById('active-expected-answer-box');
@@ -1671,6 +1777,15 @@ function escapeHtml(str) {
     div.textContent = str;
     return div.innerHTML;
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof window.applyRpgMarkdownAll === 'function') {
+        window.applyRpgMarkdownAll();
+    }
+    if (typeof updateStudyArena === 'function' && typeof QUESTIONS !== 'undefined' && QUESTIONS && QUESTIONS.length > 0) {
+        updateStudyArena();
+    }
+});
 </script>
 <script src="/static/js/rpg_icons.js"></script>
 {% endblock %}

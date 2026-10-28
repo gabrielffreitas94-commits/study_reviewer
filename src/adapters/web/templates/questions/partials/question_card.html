@@ -17,7 +17,7 @@
         </div>
 
         <!-- Enunciado (Prompt) com suporte a Markdown seguro -->
-        <div class="prose dark:prose-invert max-w-none text-slate-900 dark:text-slate-100 text-base sm:text-lg mb-6 leading-relaxed select-text" id="question-prompt">
+        <div class="prose dark:prose-invert max-w-none text-slate-900 dark:text-slate-100 text-base sm:text-lg mb-6 leading-relaxed select-text rpg-markdown" id="question-prompt" data-rpg-markdown="true">
             {{ card.prompt | safe }}
         </div>
 
@@ -228,7 +228,7 @@
             <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
                 Resposta Esperada (Gabarito)
             </div>
-            <div class="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-sm sm:text-base leading-relaxed">
+            <div id="expected-answer-content" class="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-sm sm:text-base leading-relaxed rpg-markdown" data-rpg-markdown="true">
                 {{ card.expected_answer | safe }}
             </div>
         </div>

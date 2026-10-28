@@ -67,6 +67,9 @@
             form.classList.remove('opacity-40', 'pointer-events-none');
         }
         window.isAnswerRevealed = true;
+        if (window.applyRpgMarkdownAll) {
+            window.applyRpgMarkdownAll();
+        }
 
         if (announcer) {
             announcer.textContent = "Resposta esperada revelada. Painel de avaliação habilitado.";

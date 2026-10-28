@@ -28,6 +28,104 @@
 
     <!-- HTMX para interações ágeis sem recarregar a tela -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+    <!-- Dark RPG Markdown Styling -->
+    <style>
+        .rpg-markdown h1,
+        .rpg-markdown h2,
+        .rpg-markdown h3,
+        .rpg-markdown h4 {
+            font-family: 'Cinzel', serif;
+            color: #f0c869;
+            font-weight: 700;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .rpg-markdown h1 { font-size: 1.5rem; }
+        .rpg-markdown h2 { font-size: 1.25rem; }
+        .rpg-markdown h3 { font-size: 1.1rem; }
+        .rpg-markdown h4 { font-size: 0.95rem; }
+        .rpg-markdown p {
+            margin-bottom: 0.65rem;
+            line-height: 1.65;
+        }
+        .rpg-markdown strong,
+        .rpg-markdown b {
+            color: #f0c869;
+            font-weight: 700;
+        }
+        .rpg-markdown em,
+        .rpg-markdown i {
+            color: #e2d4b7;
+            font-style: italic;
+        }
+        .rpg-markdown ul {
+            list-style-type: disc;
+            padding-left: 1.4rem;
+            margin-bottom: 0.75rem;
+        }
+        .rpg-markdown ol {
+            list-style-type: decimal;
+            padding-left: 1.4rem;
+            margin-bottom: 0.75rem;
+        }
+        .rpg-markdown li {
+            margin-bottom: 0.25rem;
+        }
+        .rpg-markdown pre {
+            background-color: #080605;
+            border: 1px solid rgba(200, 155, 60, 0.4);
+            border-radius: 0.65rem;
+            padding: 0.85rem 1rem;
+            overflow-x: auto;
+            margin: 0.75rem 0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.85rem;
+            color: #f5ebd6;
+        }
+        .rpg-markdown code {
+            background-color: rgba(200, 155, 60, 0.15);
+            border: 1px solid rgba(200, 155, 60, 0.3);
+            border-radius: 0.35rem;
+            padding: 0.1rem 0.35rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.85em;
+            color: #f0c869;
+        }
+        .rpg-markdown pre code {
+            background: transparent;
+            border: none;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+        }
+        .rpg-markdown blockquote {
+            border-left: 3px solid #c89b3c;
+            background-color: rgba(200, 155, 60, 0.08);
+            padding: 0.5rem 0.85rem;
+            margin: 0.75rem 0;
+            border-radius: 0 0.5rem 0.5rem 0;
+            color: #e2d4b7;
+            font-style: italic;
+        }
+        .rpg-markdown table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.75rem 0;
+            font-size: 0.85rem;
+        }
+        .rpg-markdown th,
+        .rpg-markdown td {
+            border: 1px solid rgba(120, 90, 40, 0.5);
+            padding: 0.45rem 0.65rem;
+            text-align: left;
+        }
+        .rpg-markdown th {
+            background-color: #1c1510;
+            color: #f0c869;
+            font-family: 'Cinzel', serif;
+        }
+    </style>
 </head>
 <body class="h-full bg-[#0c0908] text-[#f5ebd6] flex flex-col font-sans transition-colors duration-200">
 
@@ -171,6 +269,150 @@
             }
             updateIcons();
         });
+    </script>
+
+    <!-- Progressive RPG Markdown Renderer -->
+    <script>
+        window.renderRpgMarkdown = function(rawText) {
+            if (!rawText || typeof rawText !== 'string') return '';
+            let text = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            const codeBlocks = [];
+            text = text.replace(/```(\w+)?\n([\s\S]*?)```/g, function(_, lang, code) {
+                const placeholder = '%%%RPGCODEBLOCK' + codeBlocks.length + '%%%';
+                const langClass = lang ? ' class="language-' + lang.trim() + '"' : '';
+                const trimmedCode = code.replace(/^\n+|\n+$/g, '');
+                codeBlocks.push('<pre><code' + langClass + '>' + escapeHtml(trimmedCode) + '</code></pre>');
+                return '\n\n' + placeholder + '\n\n';
+            });
+
+            const inlineCodes = [];
+            text = text.replace(/`([^`\n]+)`/g, function(_, code) {
+                const placeholder = '%%%RPGINLINECODE' + inlineCodes.length + '%%%';
+                inlineCodes.push('<code>' + escapeHtml(code) + '</code>');
+                return placeholder;
+            });
+
+            // Escape raw HTML entities
+            text = text.replace(/&(?!#?\w+;)/g, '&amp;').replace(/</g, '&lt;');
+
+            // Tables: | col1 | col2 |\n|---|---|\n| val1 | val2 |
+            text = text.replace(/(?:^|\n)(\|?[^\n|]+\|.+)\n(\|?\s*:?-+:?\s*\|[\s:|-]*)\n((?:\|?[^\n|]+\|.*(?:\n|$))+)/g, function(_, headerLine, sepLine, bodyLines) {
+                function splitCells(line) {
+                    let trimmed = line.trim();
+                    if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
+                    if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
+                    return trimmed.split('|').map(c => c.trim());
+                }
+                const headers = splitCells(headerLine);
+                const thead = '<thead><tr>' + headers.map(h => '<th>' + h + '</th>').join('') + '</tr></thead>';
+                const rows = bodyLines.trim().split('\n').filter(Boolean);
+                const tbodyRows = rows.map(r => {
+                    const cells = splitCells(r);
+                    return '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>';
+                }).join('');
+                return '\n\n<table>' + thead + '<tbody>' + tbodyRows + '</tbody></table>\n\n';
+            });
+
+            // Headings
+            text = text.replace(/^#### (.*)$/gm, '<h4>$1</h4>');
+            text = text.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+            text = text.replace(/^## (.*)$/gm, '<h2>$1</h2>');
+            text = text.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+
+            // Horizontal Rule
+            text = text.replace(/^(?:---|___|\*\*\*)$/gm, '<hr>');
+
+            // Blockquotes
+            text = text.replace(/^> ?(.*)$/gm, '<blockquote>$1</blockquote>');
+            text = text.replace(/<\/blockquote>\n<blockquote>/g, '<br>');
+
+            // Remaining >
+            text = text.replace(/>(?![\w#]*;)/g, function(match, offset, str) {
+                const prev = str.slice(0, offset);
+                if (/<[^>]*$/.test(prev)) return '>';
+                return '&gt;';
+            });
+
+            // Unordered lists
+            text = text.replace(/^[\*\-] (.*)$/gm, '<li>$1</li>');
+            text = text.replace(/(?:^|\n)(<li>.*<\/li>(?:\n<li>.*<\/li>)*)/g, function(_, listItems) {
+                return '\n<ul>' + listItems.split('\n').join('') + '</ul>';
+            });
+
+            // Ordered lists
+            text = text.replace(/^\d+\. (.*)$/gm, '<oli>$1</oli>');
+            text = text.replace(/(?:^|\n)(<oli>.*<\/oli>(?:\n<oli>.*<\/oli>)*)/g, function(_, listItems) {
+                const cleanItems = listItems.replace(/<\/?oli>/g, m => m === '<oli>' ? '<li>' : '</li>').split('\n').join('');
+                return '\n<ol>' + cleanItems + '</ol>';
+            });
+
+            // Bold & Italic
+            text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+            text = text.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+            text = text.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+
+            // Paragraphs & newlines
+            const rawBlocks = text.split(/\n{2,}/);
+            const renderedBlocks = [];
+            const isBlockTag = /^\s*<(?:h[1-4]|pre|blockquote|table|ul|ol|hr|div)/i;
+            const isPlaceholder = /^\s*%%%RPGCODEBLOCK\d+%%%\s*$/;
+
+            for (let i = 0; i < rawBlocks.length; i++) {
+                let block = rawBlocks[i].trim();
+                if (!block) continue;
+                if (isBlockTag.test(block) || isPlaceholder.test(block)) {
+                    renderedBlocks.push(block);
+                } else {
+                    block = block.replace(/\n/g, '<br>');
+                    renderedBlocks.push('<p>' + block + '</p>');
+                }
+            }
+
+            let result = renderedBlocks.join('\n');
+            for (let i = 0; i < codeBlocks.length; i++) {
+                result = result.replace('%%%RPGCODEBLOCK' + i + '%%%', codeBlocks[i]);
+            }
+            for (let i = 0; i < inlineCodes.length; i++) {
+                result = result.replace('%%%RPGINLINECODE' + i + '%%%', inlineCodes[i]);
+            }
+            return result;
+        };
+
+        window.applyRpgMarkdownAll = function(rootEl) {
+            const root = rootEl || document;
+            if (!root || !root.querySelectorAll) return;
+            const elements = Array.from(root.querySelectorAll('[data-rpg-markdown]:not([data-md-rendered="true"])'));
+            if (root.matches && root.matches('[data-rpg-markdown]:not([data-md-rendered="true"])')) {
+                elements.unshift(root);
+            }
+            elements.forEach(function(el) {
+                const raw = el.getAttribute('data-raw-md') || el.textContent || '';
+                el.innerHTML = window.renderRpgMarkdown(raw);
+                el.classList.add('rpg-markdown');
+                el.setAttribute('data-md-rendered', 'true');
+            });
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            window.applyRpgMarkdownAll();
+        });
+
+        if (document.body) {
+            document.body.addEventListener('htmx:afterSwap', function() {
+                window.applyRpgMarkdownAll();
+            });
+        }
     </script>
 
     {% block scripts %}{% endblock %}

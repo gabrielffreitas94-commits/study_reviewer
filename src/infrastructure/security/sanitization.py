@@ -2,7 +2,33 @@
 
 import nh3
 
-ALLOWED_TAGS = {"b", "i", "em", "strong", "p", "br", "code", "pre", "span", "ul", "ol", "li"}
+ALLOWED_TAGS = {
+    "b",
+    "i",
+    "em",
+    "strong",
+    "p",
+    "br",
+    "code",
+    "pre",
+    "span",
+    "ul",
+    "ol",
+    "li",
+    "img",
+    "blockquote",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "hr",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+}
 
 
 class MarkdownSanitizerService:
@@ -24,6 +50,14 @@ class MarkdownSanitizerService:
         "h1",
         "h2",
         "h3",
+        "h4",
+        "hr",
+        "table",
+        "thead",
+        "tbody",
+        "tr",
+        "th",
+        "td",
         "span",
         "br",
     }

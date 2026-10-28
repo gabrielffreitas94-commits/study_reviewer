@@ -1053,6 +1053,32 @@
         }
     };
 
+    window.copyAiJsonPrompt = async function () {
+        const nodeTitle = state.selectedNode ? state.selectedNode.title : 'este tópico';
+        const promptText = `Gere questões de estudo aprofundadas sobre "${nodeTitle}" para revisão espaçada ativa.\nRetorne EXCLUSIVAMENTE um array JSON válido no formato abaixo, usando formatação Markdown rica (**negrito** para conceitos-chave, listas com "-", blocos de código com \`\`\`linguagem, tabelas ou citações ">") tanto no "prompt" quanto no "expected_answer":\n\n[\n  {\n    "prompt": "Enunciado contextualizado ou problema prático em Markdown...",\n    "expected_answer": "### Pontos Essenciais:\\n- **Conceito 1:** Explicação objetiva.\\n- **Conceito 2:** Critério técnico ou exemplo de código."\n  }\n]`;
+
+        const statusEl = document.getElementById('copy-ai-prompt-status');
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(promptText);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = promptText;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            if (statusEl) {
+                statusEl.classList.remove('hidden');
+                setTimeout(() => statusEl.classList.add('hidden'), 3000);
+            }
+        } catch (err) {
+            console.error('Erro ao copiar prompt:', err);
+            prompt('Copie o prompt abaixo:', promptText);
+        }
+    };
+
     window.submitDrawerBulkQuestions = async function () {
         if (!state.selectedNode) return;
         const nodeId = state.selectedNode.id;
@@ -1065,9 +1091,16 @@
             return;
         }
 
-        const parsedQuestions = parseBulkQuestions(rawText);
+        let parsedQuestions;
+        try {
+            parsedQuestions = parseBulkQuestions(rawText);
+        } catch (parseErr) {
+            alert(parseErr.message);
+            return;
+        }
+
         if (!parsedQuestions || parsedQuestions.length === 0) {
-            alert('Não foi possível identificar perguntas e respostas no formato inserido. Use "P: Pergunta\\nR: Resposta" ou "Pergunta | Resposta".');
+            alert('Não foi possível identificar perguntas e respostas no formato inserido. Use JSON ou "P: Pergunta\\nR: Resposta" ou "Pergunta | Resposta".');
             return;
         }
 
@@ -1183,8 +1216,14 @@
         }
 
         listEl.innerHTML = questions.map((q, idx) => {
-            const promptText = escapeHtml(q.prompt || q.statement || '');
-            const ansText = escapeHtml(q.expected_answer || '');
+            const rawPrompt = q.prompt || q.statement || '';
+            const rawAnswer = q.expected_answer || '';
+            const promptHtml = (typeof window.renderRpgMarkdown === 'function')
+                ? window.renderRpgMarkdown(rawPrompt)
+                : escapeHtml(rawPrompt);
+            const ansHtml = (typeof window.renderRpgMarkdown === 'function')
+                ? window.renderRpgMarkdown(rawAnswer)
+                : escapeHtml(rawAnswer);
             const lvl = q.current_level || 0;
             return `
                 <div class="p-3 rounded-xl bg-[#0c0908] border border-[#785a28]/50 shadow-inner flex flex-col space-y-1.5 group">
@@ -1202,8 +1241,8 @@
                             🗑️
                         </button>
                     </div>
-                    <div class="text-xs font-bold font-tome text-[#f5ebd6] leading-snug">${promptText}</div>
-                    ${ansText ? `<div class="text-[11px] font-tome text-[#a39276] italic border-l-2 border-[#785a28]/50 pl-2 mt-1 leading-snug">${ansText}</div>` : ''}
+                    <div class="text-xs font-bold font-tome text-[#f5ebd6] leading-snug rpg-markdown" data-rpg-markdown="true">${promptHtml}</div>
+                    ${rawAnswer ? `<div class="text-[11px] font-tome text-[#a39276] italic border-l-2 border-[#785a28]/50 pl-2 mt-1 leading-snug rpg-markdown" data-rpg-markdown="true">${ansHtml}</div>` : ''}
                 </div>
             `;
         }).join('');
@@ -1300,10 +1339,42 @@
         renderDrawerPrerequisites(state.selectedNode);
     };
 
-    function parseBulkQuestions(text) {
-        if (!text || !text.trim()) return [];
+    function parseBulkQuestions(rawText) {
+        if (!rawText || !rawText.trim()) return [];
+        const trimmed = rawText.trim();
+        const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+        const candidateJson = fenceMatch ? fenceMatch[1].trim() : trimmed;
+
+        if (candidateJson.startsWith('[') || candidateJson.startsWith('{')) {
+            let parsedJson;
+            try {
+                parsedJson = JSON.parse(candidateJson);
+            } catch (err) {
+                throw new Error('Formato JSON inválido: ' + err.message);
+            }
+
+            const arr = Array.isArray(parsedJson)
+                ? parsedJson
+                : (parsedJson.questions || parsedJson.items || [parsedJson]);
+
+            if (Array.isArray(arr)) {
+                const questions = [];
+                for (const item of arr) {
+                    if (!item || typeof item !== 'object') continue;
+                    const prompt = String(item.prompt || item.question || item.pergunta || item.enunciado || '').trim();
+                    const expected_answer = String(item.expected_answer || item.answer || item.resposta || item.gabarito || '').trim();
+                    if (prompt && expected_answer) {
+                        questions.push({ prompt, expected_answer });
+                    }
+                }
+                if (questions.length > 0) {
+                    return questions;
+                }
+            }
+        }
+
         const questions = [];
-        const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+        const normalized = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 
         // Regex para blocos P: ... R: ... / Pergunta: ... Resposta: ... / Q: ... A: ...
         const prRegex = /(?:^|\n)\s*(?:P|Pergunta|Q|Question)\s*[:\-]\s*([\s\S]*?)\n\s*(?:R|Resposta|A|Answer)\s*[:\-]\s*([\s\S]*?)(?=(?:\n\s*(?:P|Pergunta|Q|Question)\s*[:\-])|\n\s*---\s*\n|$)/gi;
@@ -1322,12 +1393,12 @@
         // Divide por blocos separados por '---' ou por linhas em branco duplas
         const blocks = normalized.split(/\n\s*---\s*\n|\n\s*\n+/);
         for (const block of blocks) {
-            const trimmed = block.trim();
-            if (!trimmed) continue;
+            const blockTrimmed = block.trim();
+            if (!blockTrimmed) continue;
 
             // Formato separado por barra vertical |
-            if (trimmed.includes('|')) {
-                const parts = trimmed.split('|');
+            if (blockTrimmed.includes('|')) {
+                const parts = blockTrimmed.split('|');
                 const prompt = parts[0].trim();
                 const answer = parts.slice(1).join('|').trim();
                 if (prompt && answer) {
@@ -1337,7 +1408,7 @@
             }
 
             // Formato linha 1: pergunta, linha 2+: resposta
-            const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
+            const lines = blockTrimmed.split('\n').map(l => l.trim()).filter(Boolean);
             if (lines.length >= 2) {
                 const prompt = lines[0].replace(/^(?:P|Pergunta|Q|\d+[\.\)])\s*[:\-]\s*/i, '').trim();
                 const answer = lines.slice(1).join('\n').replace(/^(?:R|Resposta|A)\s*[:\-]\s*/i, '').trim();
@@ -1536,6 +1607,9 @@
     window.deleteDrawerQuestion = deleteDrawerQuestion;
     window.addDrawerPrerequisiteEdge = addDrawerPrerequisiteEdge;
     window.renderDrawerPrerequisites = renderDrawerPrerequisites;
+    window.renderDrawerQuestions = renderDrawerQuestionsList;
+    window.renderDrawerQuestionsList = renderDrawerQuestionsList;
+    window.copyAiJsonPrompt = copyAiJsonPrompt;
 
     // Menus de Contexto do Canvas & Nós
     window.closeContextMenus = closeContextMenus;
