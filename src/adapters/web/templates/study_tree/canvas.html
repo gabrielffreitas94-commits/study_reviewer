@@ -160,6 +160,125 @@
         <button type="button" onclick="toggleConnectMode()" class="ml-2 text-xs bg-[#0c0908]/20 px-2 py-0.5 rounded font-sans">Cancelar</button>
     </div>
 
+    <!-- Menu de Contexto do Nó (Botão Direito no Medalhão) -->
+    <div
+        id="node-context-menu"
+        class="hidden fixed z-50 bg-[#14100d]/95 backdrop-blur-md border-2 border-[#c89b3c] rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.9)] w-64 py-2 text-xs font-cinzel select-none text-[#f5ebd6]"
+    >
+        <!-- Header: Ícone e Título do Nó -->
+        <div class="px-3 py-1.5 border-b border-[#785a28]/40 flex items-center space-x-2.5 mb-1">
+            <div id="ctx-node-icon" class="w-6 h-6 rounded-full bg-[#1c1612] border border-[#785a28] flex items-center justify-center shrink-0">
+                <span>📜</span>
+            </div>
+            <div id="ctx-node-title" class="font-bold text-[#f0c869] truncate">
+                Nó Selecionado
+            </div>
+        </div>
+
+        <!-- Grupo 1: Expansão & Conexão -->
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-create-child"
+                onclick="ctxCreateChildNode()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>➕ Criar Nó Filho Conectado</span>
+            </button>
+            <button
+                type="button"
+                id="ctx-btn-start-connection"
+                onclick="ctxStartConnection()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>🔗 Puxar Conexão (Pré-requisito)</span>
+            </button>
+        </div>
+
+        <div class="border-t border-[#785a28]/40 my-1"></div>
+
+        <!-- Grupo 2: Alimentar com IA -->
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-open-theory"
+                onclick="ctxOpenTheory()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>📝 Colar Resumo / Teoria</span>
+            </button>
+            <button
+                type="button"
+                id="ctx-btn-open-bulk-questions"
+                onclick="ctxOpenBulkQuestions()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>❓ Colar Questões em Lote</span>
+            </button>
+        </div>
+
+        <div class="border-t border-[#785a28]/40 my-1"></div>
+
+        <!-- Grupo 3: Estudo -->
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-study-node"
+                onclick="ctxStudyNode()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2 text-[#f0c869] font-bold"
+            >
+                <span>⚔️ Estudar este Nó (Tela Cheia)</span>
+            </button>
+        </div>
+
+        <div class="border-t border-[#785a28]/40 my-1"></div>
+
+        <!-- Grupo 4: Manutenção -->
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-edit-meta"
+                onclick="ctxEditNodeMeta()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>✏️ Renomear / Trocar Ícone</span>
+            </button>
+            <button
+                type="button"
+                id="ctx-btn-delete-node"
+                onclick="ctxDeleteNode()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg text-[#e11d48] hover:bg-[#e11d48]/15 transition-colors flex items-center space-x-2 font-bold"
+            >
+                <span>🗑️ Excluir Nó</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Menu de Contexto do Canvas (Botão Direito no Fundo do Mapa) -->
+    <div
+        id="canvas-context-menu"
+        class="hidden fixed z-50 bg-[#14100d]/95 backdrop-blur-md border border-[#785a28] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.85)] w-56 py-1.5 text-xs font-cinzel select-none text-[#f5ebd6]"
+    >
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-create-node-here"
+                onclick="ctxCreateNodeAtCursor()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2 text-[#f0c869] font-bold"
+            >
+                <span>✨ Criar Nó Aqui</span>
+            </button>
+            <button
+                type="button"
+                id="ctx-btn-reset-view"
+                onclick="closeContextMenus(); resetView();"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f5ebd6] transition-colors flex items-center space-x-2 text-[#a39276]"
+            >
+                <span>🎯 Centralizar Câmera</span>
+            </button>
+        </div>
+    </div>
+
 </div>
 
 <!-- Modal da Forja: Criar ou Editar Nó / Medalhão -->

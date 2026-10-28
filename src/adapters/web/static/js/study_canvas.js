@@ -25,6 +25,9 @@
         currentDrawerTab: 'content',
         batchSaveTimer: null,
         pendingPositions: new Map(),
+        contextMenuNode: null,
+        contextMenuWorldPos: null,
+        pendingSpawnCoords: null,
     };
 
     // Mapeamento Rúnico de Todos os Ícones RPG
@@ -267,6 +270,7 @@
             // Eventos do mouse e clique no medalhão
             el.addEventListener('mousedown', (e) => onNodeMouseDown(e, node));
             el.addEventListener('click', (e) => onNodeClick(e, node));
+            el.addEventListener('contextmenu', (e) => onNodeContextMenu(e, node));
 
             nodesLayer.appendChild(el);
         });
@@ -278,10 +282,17 @@
         if (!viewport) return;
 
         viewport.addEventListener('mousedown', (e) => {
+            closeContextMenus();
             if (e.target === viewport || e.target.id === 'canvas-container' || e.target.tagName === 'svg') {
                 state.isPanning = true;
                 state.panStart.x = e.clientX - state.view.x;
                 state.panStart.y = e.clientY - state.view.y;
+            }
+        });
+
+        viewport.addEventListener('contextmenu', (e) => {
+            if (e.target === viewport || e.target.id === 'canvas-container' || e.target.tagName === 'svg') {
+                onCanvasContextMenu(e);
             }
         });
 
@@ -304,6 +315,7 @@
 
         viewport.addEventListener('wheel', (e) => {
             e.preventDefault();
+            closeContextMenus();
             const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
             const newScale = Math.min(Math.max(state.view.scale * zoomFactor, 0.4), 2.5);
 
@@ -318,6 +330,18 @@
             applyTransform();
             updateZoomLabel();
         }, { passive: false });
+
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('#node-context-menu') && !e.target.closest('#canvas-context-menu')) {
+                closeContextMenus();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeContextMenus();
+            }
+        });
     }
 
     function applyTransform() {
@@ -710,6 +734,7 @@
     };
 
     window.closeNodeModal = () => {
+        state.pendingSpawnCoords = null;
         if (nodeModal) nodeModal.classList.add('hidden');
     };
 
@@ -729,9 +754,16 @@
 
         try {
             if (!nodeId) {
-                // Criação do nó posicionado no centro visível
-                const centerX = (-state.view.x + viewport.clientWidth / 2) / state.view.scale - 40;
-                const centerY = (-state.view.y + viewport.clientHeight / 2) / state.view.scale - 40;
+                // Criação do nó posicionado no cursor (se invocado via menu de contexto) ou no centro visível
+                let posX, posY;
+                if (state.pendingSpawnCoords) {
+                    posX = state.pendingSpawnCoords.x;
+                    posY = state.pendingSpawnCoords.y;
+                    state.pendingSpawnCoords = null;
+                } else {
+                    posX = Math.round((-state.view.x + viewport.clientWidth / 2) / state.view.scale - 40);
+                    posY = Math.round((-state.view.y + viewport.clientHeight / 2) / state.view.scale - 40);
+                }
 
                 const res = await fetch(`/api/v1/study-maps/${state.mapId}/nodes`, {
                     method: 'POST',
@@ -740,8 +772,8 @@
                         title,
                         description,
                         icon,
-                        pos_x: Math.round(centerX),
-                        pos_y: Math.round(centerY),
+                        pos_x: posX,
+                        pos_y: posY,
                     }),
                 });
                 if (res.ok) {
@@ -1325,6 +1357,161 @@
         return div.innerHTML;
     }
 
+    // --- Menus de Contexto do Canvas & Nós (RPG Right-Click) ---
+
+    function closeContextMenus() {
+        const nodeMenu = document.getElementById('node-context-menu');
+        const canvasMenu = document.getElementById('canvas-context-menu');
+        if (nodeMenu) nodeMenu.classList.add('hidden');
+        if (canvasMenu) canvasMenu.classList.add('hidden');
+    }
+
+    function onNodeContextMenu(e, node) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenus();
+        state.contextMenuNode = node;
+
+        const menu = document.getElementById('node-context-menu');
+        if (!menu) return;
+
+        const titleEl = document.getElementById('ctx-node-title');
+        if (titleEl) titleEl.textContent = node.title;
+
+        const iconEl = document.getElementById('ctx-node-icon');
+        if (iconEl) {
+            const svgIcon = (typeof window.getRpgIconSvg === 'function')
+                ? window.getRpgIconSvg(node.icon, 'w-4 h-4 text-[#f0c869]')
+                : `<span>${ICON_MAP[node.icon] || '📜'}</span>`;
+            iconEl.innerHTML = svgIcon;
+        }
+
+        const maxLeft = Math.max(10, window.innerWidth - 270);
+        const maxTop = Math.max(10, window.innerHeight - 320);
+        const posX = Math.min(e.clientX, maxLeft);
+        const posY = Math.min(e.clientY, maxTop);
+
+        menu.style.left = `${posX}px`;
+        menu.style.top = `${posY}px`;
+        menu.classList.remove('hidden');
+    }
+
+    function onCanvasContextMenu(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenus();
+
+        const rect = viewport.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const worldX = Math.round((mouseX - state.view.x) / state.view.scale - 40);
+        const worldY = Math.round((mouseY - state.view.y) / state.view.scale - 40);
+        state.contextMenuWorldPos = { x: worldX, y: worldY };
+
+        const menu = document.getElementById('canvas-context-menu');
+        if (!menu) return;
+
+        const maxLeft = Math.max(10, window.innerWidth - 240);
+        const maxTop = Math.max(10, window.innerHeight - 150);
+        const posX = Math.min(e.clientX, maxLeft);
+        const posY = Math.min(e.clientY, maxTop);
+
+        menu.style.left = `${posX}px`;
+        menu.style.top = `${posY}px`;
+        menu.classList.remove('hidden');
+    }
+
+    function ctxCreateChildNode() {
+        const node = state.contextMenuNode;
+        closeContextMenus();
+        if (!node) return;
+        if (typeof window.quickAddChildNode === 'function') {
+            window.quickAddChildNode(node);
+        }
+    }
+
+    function ctxStartConnection() {
+        const node = state.contextMenuNode;
+        closeContextMenus();
+        if (!node) return;
+        state.connectModeActive = true;
+        state.connectSourceNodeId = node.id;
+        const banner = document.getElementById('connect-banner');
+        if (banner) {
+            banner.classList.remove('hidden');
+            banner.innerHTML = `<span>⚡ PRÉ-REQUISITO SELECIONADO: "${escapeHtml(node.title)}". Agora clique no nó DEPENDENTE.</span>
+            <button type="button" onclick="toggleConnectMode()" class="ml-2 text-xs bg-[#0c0908]/20 px-2 py-0.5 rounded font-sans">Cancelar</button>`;
+        }
+        const btn = document.getElementById('btn-connect-mode');
+        if (btn) btn.className = 'rpg-btn-gold text-xs py-1.5 px-3 flex items-center space-x-1';
+    }
+
+    async function ctxOpenTheory() {
+        const node = state.contextMenuNode;
+        closeContextMenus();
+        if (!node) return;
+        if (typeof window.openNodeSideDrawer === 'function') {
+            await window.openNodeSideDrawer(node);
+        }
+        if (typeof window.switchDrawerTab === 'function') {
+            window.switchDrawerTab('content');
+        }
+        const input = document.getElementById('drawer-theory-input');
+        if (input) {
+            input.focus();
+        }
+    }
+
+    async function ctxOpenBulkQuestions() {
+        const node = state.contextMenuNode;
+        closeContextMenus();
+        if (!node) return;
+        if (typeof window.openNodeSideDrawer === 'function') {
+            await window.openNodeSideDrawer(node);
+        }
+        if (typeof window.switchDrawerTab === 'function') {
+            window.switchDrawerTab('questions');
+        }
+        const input = document.getElementById('drawer-bulk-questions-input');
+        if (input) {
+            input.focus();
+        }
+    }
+
+    function ctxStudyNode() {
+        const node = state.contextMenuNode;
+        closeContextMenus();
+        if (!node) return;
+        window.location.href = `/study-maps/${state.mapId}/nodes/${node.id}`;
+    }
+
+    function ctxEditNodeMeta() {
+        const node = state.contextMenuNode;
+        closeContextMenus();
+        if (!node) return;
+        if (typeof window.openEditNodeModal === 'function') {
+            window.openEditNodeModal(node);
+        }
+    }
+
+    async function ctxDeleteNode() {
+        const node = state.contextMenuNode;
+        closeContextMenus();
+        if (!node) return;
+        state.selectedNode = node;
+        if (typeof window.deleteCurrentNode === 'function') {
+            await window.deleteCurrentNode();
+        }
+    }
+
+    function ctxCreateNodeAtCursor() {
+        closeContextMenus();
+        state.pendingSpawnCoords = state.contextMenuWorldPos;
+        if (typeof window.openCreateNodeModal === 'function') {
+            window.openCreateNodeModal();
+        }
+    }
+
     // Exposição Global de Comandos da Forja e Side Drawer
     window.updateEdgeRequiredLevel = updateEdgeRequiredLevel;
     window.deleteEdge = deleteEdge;
@@ -1349,5 +1536,18 @@
     window.deleteDrawerQuestion = deleteDrawerQuestion;
     window.addDrawerPrerequisiteEdge = addDrawerPrerequisiteEdge;
     window.renderDrawerPrerequisites = renderDrawerPrerequisites;
+
+    // Menus de Contexto do Canvas & Nós
+    window.closeContextMenus = closeContextMenus;
+    window.onNodeContextMenu = onNodeContextMenu;
+    window.onCanvasContextMenu = onCanvasContextMenu;
+    window.ctxCreateChildNode = ctxCreateChildNode;
+    window.ctxStartConnection = ctxStartConnection;
+    window.ctxOpenTheory = ctxOpenTheory;
+    window.ctxOpenBulkQuestions = ctxOpenBulkQuestions;
+    window.ctxStudyNode = ctxStudyNode;
+    window.ctxEditNodeMeta = ctxEditNodeMeta;
+    window.ctxDeleteNode = ctxDeleteNode;
+    window.ctxCreateNodeAtCursor = ctxCreateNodeAtCursor;
 
 })();
