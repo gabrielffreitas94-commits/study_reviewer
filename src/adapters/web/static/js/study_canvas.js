@@ -1055,7 +1055,36 @@
 
     window.copyAiJsonPrompt = async function () {
         const nodeTitle = state.selectedNode ? state.selectedNode.title : 'este tópico';
-        const promptText = `Gere questões de estudo aprofundadas sobre "${nodeTitle}" para revisão espaçada ativa.\nRetorne EXCLUSIVAMENTE um array JSON válido no formato abaixo, usando formatação Markdown rica (**negrito** para conceitos-chave, listas com "-", blocos de código com \`\`\`linguagem, tabelas ou citações ">") tanto no "prompt" quanto no "expected_answer":\n\n[\n  {\n    "prompt": "Enunciado contextualizado ou problema prático em Markdown...",\n    "expected_answer": "### Pontos Essenciais:\\n- **Conceito 1:** Explicação objetiva.\\n- **Conceito 2:** Critério técnico ou exemplo de código."\n  }\n]`;
+        const promptText = `---
+name: study-questions-json
+description: Generates deep, complex active-recall study questions in strict JSON format with rich GitHub Flavored Markdown (code snippets, tables, bold concepts, lists, headings) for import into the RPG Study Tree / Grimoire.
+---
+
+# Study Questions JSON Generator
+
+Você é um especialista em Ciência da Computação e Engenharia de Software encarregado de gerar questões de recordação ativa de alto nível para o sistema de repetição espaçada (SRS).
+
+Gere de 3 a 5 questões aprofundadas sobre o tópico solicitado.
+
+### Critérios Obrigatórios:
+1. **Nível Avançado**: Foque em cenários reais, depuração de código, trade-offs arquiteturais, falhas em produção ou casos de borda.
+2. **Formato Exclusivo**: Retorne EXCLUSIVAMENTE um array JSON no formato:
+[
+  {
+    "prompt": "Enunciado contextualizado em Markdown...",
+    "expected_answer": "### Critérios de Avaliação\\n- **Ponto 1:** Explicação...\\n- **Ponto 2:** Detalhe técnico..."
+  }
+]
+3. **Markdown Rico**:
+   - Use '###' para estruturar cabeçalhos.
+   - Use '**negrito**' para conceitos capitais.
+   - Use blocos de código com identificador de linguagem (\`\`\`python, \`\`\`sql, etc.).
+   - Use listas com '-' e citações '>' para notas críticas ou nuances.
+4. **Strings JSON Válidas**: Escape quebras de linha com '\\n' e aspas duplas com '\\"'.
+
+---
+### Tópico Alvo para Estudo:
+"${nodeTitle}"`;
 
         const statusEl = document.getElementById('copy-ai-prompt-status');
         try {
@@ -1071,7 +1100,7 @@
             }
             if (statusEl) {
                 statusEl.classList.remove('hidden');
-                setTimeout(() => statusEl.classList.add('hidden'), 3000);
+                setTimeout(() => statusEl.classList.add('hidden'), 2500);
             }
         } catch (err) {
             console.error('Erro ao copiar prompt:', err);
@@ -1100,7 +1129,7 @@
         }
 
         if (!parsedQuestions || parsedQuestions.length === 0) {
-            alert('Não foi possível identificar perguntas e respostas no formato inserido. Use JSON ou "P: Pergunta\\nR: Resposta" ou "Pergunta | Resposta".');
+            alert('Não foi possível identificar questões válidas. Cole um array JSON no formato [{"prompt": "...", "expected_answer": "..."}].');
             return;
         }
 

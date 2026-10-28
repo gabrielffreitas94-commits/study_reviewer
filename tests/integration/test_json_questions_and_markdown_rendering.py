@@ -98,9 +98,11 @@ def test_canvas_template_and_js_contain_json_prompt_and_markdown_support(
     assert "copyAiJsonPrompt" in html
     assert 'id="copy-ai-prompt-status"' in html
     assert 'id="drawer-bulk-questions-input"' in html
-    assert "Importar Questões em Lote (JSON + Markdown)" in html
+    assert "Questões em Lote (JSON)" in html
     assert "expected_answer" in html
-    assert "Strategy Pattern" in html
+    assert "skill" in html
+    assert "rpg_icons.js?v=20261028b" in html
+    assert "study_canvas.js?v=20261028b" in html
 
     # 2. Validação dos contratos em study_canvas.js
     js_path = Path("src/adapters/web/static/js/study_canvas.js")
@@ -119,7 +121,7 @@ def test_canvas_template_and_js_contain_json_prompt_and_markdown_support(
 def test_node_grimoire_template_contains_json_prompt_and_markdown_support(
     authenticated_client: TestClient, db_session: Session, test_user: User
 ) -> None:
-    """Valida se node_grimoire.html contém o botão de copiar prompt de IA, suporte a JSON e classes rpg-markdown."""
+    """Valida se node_grimoire.html contém o botão sutil 'skill', suporte a JSON e classes rpg-markdown."""
     map_res = authenticated_client.post(
         "/api/v1/study-maps",
         json={"title": "Grimório com IA", "description": "Validação de Prompt e JSON"},
@@ -154,6 +156,7 @@ def test_node_grimoire_template_contains_json_prompt_and_markdown_support(
     assert 'id="grimoire-copy-prompt-status"' in html
     assert 'id="paste-questions-textarea"' in html
     assert "importPastedQuestions" in html
+    assert "skill" in html
 
     # Elementos de renderização de Markdown
     assert 'id="theory-display-area"' in html
@@ -166,6 +169,21 @@ def test_node_grimoire_template_contains_json_prompt_and_markdown_support(
     assert "JSON.parse" in html
     assert "renderRpgMarkdown" in html
     assert "renderCurrentQuestion" in html
+
+
+@pytest.mark.integration
+def test_study_questions_json_skill_file_exists_and_valid() -> None:
+    """Valida a existência e o conteúdo da Skill de geração de questões JSON com Markdown."""
+    skill_path = Path(".agents/skills/study-questions-json/SKILL.md")
+    assert skill_path.exists(), (
+        "O arquivo de Skill .agents/skills/study-questions-json/SKILL.md deve existir"
+    )
+    content = skill_path.read_text(encoding="utf-8")
+    assert "name: study-questions-json" in content
+    assert "expected_answer" in content
+    assert "prompt" in content
+    assert "JSON" in content
+    assert "Markdown" in content
 
 
 @pytest.mark.integration

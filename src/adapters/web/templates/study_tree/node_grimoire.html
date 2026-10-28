@@ -804,36 +804,30 @@
                     </div>
                 </div>
 
-                <!-- FORM 3: Colar em Bloco (JSON com Markdown ou Separador) -->
+                <!-- FORM 3: Colar em Bloco (JSON com Markdown) -->
                 <div id="form-paste-questions" class="hidden space-y-3">
-                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div class="flex items-center justify-between gap-2">
                         <label for="paste-questions-textarea" class="block text-xs font-cinzel font-bold text-[#a39276] uppercase">
-                            Cole suas perguntas em JSON ou texto (formato: <code class="text-[#f0c869]">JSON</code> ou <code class="text-[#f0c869]">Pergunta | Resposta</code>):
+                            Cole suas questões em JSON (<code class="text-[#f0c869]">array de objetos</code>):
                         </label>
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-1.5">
+                            <span id="grimoire-copy-prompt-status" class="hidden text-[10px] text-emerald-400 font-cinzel">✓ copiado</span>
                             <button
                                 type="button"
                                 id="btn-grimoire-copy-ai-json"
                                 onclick="copyGrimoireAiJsonPrompt()"
-                                class="px-2.5 py-1 rounded-lg bg-[#251c14] hover:bg-[#c89b3c] text-[#f0c869] hover:text-[#0c0908] border border-[#c89b3c]/60 text-[11px] font-cinzel font-bold transition-all flex items-center gap-1 shadow-sm"
-                                title="Copia um comando pronto para você colar no ChatGPT/Claude e gerar questões em JSON com Markdown"
+                                class="px-2 py-0.5 rounded bg-[#14100d] hover:bg-[#251c14] text-[#a39276] hover:text-[#f0c869] border border-[#785a28]/40 hover:border-[#c89b3c]/60 text-[10px] font-mono tracking-tight transition-all cursor-pointer opacity-80 hover:opacity-100"
+                                title="Copiar Skill para gerar questões em JSON na IA"
                             >
-                                <span>📋 Copiar Prompt JSON para IA</span>
+                                skill
                             </button>
-                            <span id="grimoire-copy-prompt-status" class="hidden text-[11px] text-emerald-400 font-bold">✓ Prompt copiado!</span>
                         </div>
                     </div>
                     <textarea
                         id="paste-questions-textarea"
                         rows="7"
                         class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3 text-xs text-[#f5ebd6] font-mono focus:border-[#f0c869] focus:outline-none"
-                        placeholder='Cole aqui o JSON gerado pela IA (ou use Pergunta | Resposta):
-[
-  {
-    "prompt": "Como funciona o algoritmo **Dijkstra**?\n```python\n# Exemplo...\n```",
-    "expected_answer": "### Pontos Essenciais:\n- Usa fila de prioridades\n- Custo mínimo a partir da origem"
-  }
-]'
+                        placeholder="[&#10;  {&#10;    &quot;prompt&quot;: &quot;Enunciado da questão em **Markdown**...&quot;,&#10;    &quot;expected_answer&quot;: &quot;### Gabarito&#10;- **Conceito 1:** Explicação...&#10;- **Conceito 2:** Detalhe técnico...&quot;&#10;  }&#10;]"
                     ></textarea>
                     <div class="flex justify-end">
                         <button
@@ -1342,7 +1336,36 @@ async function submitBatchQuestions() {
 
 window.copyGrimoireAiJsonPrompt = async function () {
     const nodeTitle = (typeof NODE_TITLE !== 'undefined' && NODE_TITLE) ? NODE_TITLE : '{{ node.title }}';
-    const promptText = `Gere questões de estudo aprofundadas sobre "${nodeTitle}" para revisão espaçada ativa.\nRetorne EXCLUSIVAMENTE um array JSON válido no formato abaixo, usando formatação Markdown rica (**negrito** para conceitos-chave, listas com "-", blocos de código com \`\`\`linguagem, tabelas ou citações ">") tanto no "prompt" quanto no "expected_answer":\n\n[\n  {\n    "prompt": "Enunciado contextualizado ou problema prático em Markdown...",\n    "expected_answer": "### Pontos Essenciais:\\n- **Conceito 1:** Explicação objetiva.\\n- **Conceito 2:** Critério técnico ou exemplo de código."\n  }\n]`;
+    const promptText = `---
+name: study-questions-json
+description: Generates deep, complex active-recall study questions in strict JSON format with rich GitHub Flavored Markdown (code snippets, tables, bold concepts, lists, headings) for import into the RPG Study Tree / Grimoire.
+---
+
+# Study Questions JSON Generator
+
+Você é um especialista em Ciência da Computação e Engenharia de Software encarregado de gerar questões de recordação ativa de alto nível para o sistema de repetição espaçada (SRS).
+
+Gere de 3 a 5 questões aprofundadas sobre o tópico solicitado.
+
+### Critérios Obrigatórios:
+1. **Nível Avançado**: Foque em cenários reais, depuração de código, trade-offs arquiteturais, falhas em produção ou casos de borda.
+2. **Formato Exclusivo**: Retorne EXCLUSIVAMENTE um array JSON no formato:
+[
+  {
+    "prompt": "Enunciado contextualizado em Markdown...",
+    "expected_answer": "### Critérios de Avaliação\\n- **Ponto 1:** Explicação...\\n- **Ponto 2:** Detalhe técnico..."
+  }
+]
+3. **Markdown Rico**:
+   - Use '###' para estruturar cabeçalhos.
+   - Use '**negrito**' para conceitos capitais.
+   - Use blocos de código com identificador de linguagem (\`\`\`python, \`\`\`sql, etc.).
+   - Use listas com '-' e citações '>' para notas críticas ou nuances.
+4. **Strings JSON Válidas**: Escape quebras de linha com '\\n' e aspas duplas com '\\"'.
+
+---
+### Tópico Alvo para Estudo:
+"${nodeTitle}"`;
 
     const statusEl = document.getElementById('grimoire-copy-prompt-status');
     try {
@@ -1358,7 +1381,7 @@ window.copyGrimoireAiJsonPrompt = async function () {
         }
         if (statusEl) {
             statusEl.classList.remove('hidden');
-            setTimeout(() => statusEl.classList.add('hidden'), 3000);
+            setTimeout(() => statusEl.classList.add('hidden'), 2500);
         }
     } catch (err) {
         console.error('Erro ao copiar prompt:', err);
@@ -1413,7 +1436,7 @@ async function importPastedQuestions() {
     }
 
     if (parsed.length === 0) {
-        alert('Nenhuma pergunta identificada. Cole um JSON válido ou use o formato "Pergunta | Resposta" por linha.');
+        alert('Não foi possível identificar questões válidas. Cole um array JSON no formato [{"prompt": "...", "expected_answer": "..."}].');
         return;
     }
 
