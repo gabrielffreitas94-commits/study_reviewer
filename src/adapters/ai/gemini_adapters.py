@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import math
+from typing import Any
 
 import httpx
 
@@ -13,6 +14,7 @@ from src.domain.entities import (
     KnowledgeChunk,
     ValidationResult,
 )
+from src.domain.exceptions import AIProviderError
 from src.domain.protocols import (
     IAnswerEvaluationService,
     IAudioAnswerEvaluationService,
@@ -78,9 +80,12 @@ class GeminiQuestionValidatorAdapter(IKnowledgeValidationService):
         self,
         api_key: str | None = None,
         model: str = DEFAULT_GEMINI_MODEL,
+        client: Any = None,
     ) -> None:
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
         self._model = model
+        self._model_name = model
+        self._client = client
 
     async def validate_question_grounding(
         self,
@@ -150,9 +155,12 @@ class GeminiAnswerEvaluationAdapter(IAnswerEvaluationService):
         self,
         api_key: str | None = None,
         model: str = DEFAULT_GEMINI_MODEL,
+        client: Any = None,
     ) -> None:
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
         self._model = model
+        self._model_name = model
+        self._client = client
 
     async def evaluate_answer(
         self,
@@ -319,11 +327,28 @@ class GeminiAnswerEvaluationAdapter(IAnswerEvaluationService):
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(url, json=payload)
+                if (
+                    resp.status_code == 404
+                    or (resp.status_code != 200 and "NOT_FOUND" in resp.text)
+                ) and self._model_name != "gemini-2.5-flash":
+                    fallback_model = "gemini-2.5-flash"
+                    logger.warning(
+                        "gemini_model_not_found: %s not found (%s). Retrying fallback %s",
+                        self._model_name,
+                        resp.status_code,
+                        fallback_model,
+                    )
+                    fallback_url = (
+                        f"https://generativelanguage.googleapis.com/v1beta/models/"
+                        f"{fallback_model}:generateContent?key={self._api_key}"
+                    )
+                    resp = await client.post(fallback_url, json=payload)
+
                 if resp.status_code != 200:
                     logger.warning(
                         "gemini_api_status_error: status=%s model=%s",
                         resp.status_code,
-                        self._model,
+                        self._model_name,
                     )
                     return None
                 data = resp.json()
@@ -367,6 +392,45 @@ class GeminiAnswerEvaluationAdapter(IAnswerEvaluationService):
             )
             return None
 
+    def generate_content(
+        self,
+        contents: Any,
+        client: Any = None,
+        model: str | None = None,
+    ) -> Any:
+        active_client = client or self._client
+        model_to_use = model or self._model_name
+        fallback_model = "gemini-2.5-flash"
+        if (
+            active_client is not None
+            and hasattr(active_client, "models")
+            and hasattr(active_client.models, "generate_content")
+        ):
+            try:
+                return active_client.models.generate_content(
+                    model=model_to_use,
+                    contents=contents,
+                )
+            except Exception as exc:
+                exc_str = str(exc)
+                if ("404" in exc_str or "NOT_FOUND" in exc_str) and model_to_use != fallback_model:
+                    logger.warning(
+                        "gemini_model_not_found: %s not found. Retrying with fallback %s",
+                        model_to_use,
+                        fallback_model,
+                    )
+                    try:
+                        return active_client.models.generate_content(
+                            model=fallback_model,
+                            contents=contents,
+                        )
+                    except Exception as fb_exc:
+                        raise AIProviderError(
+                            f"Model fallback to {fallback_model} failed: {fb_exc}"
+                        ) from fb_exc
+                raise AIProviderError(f"AI provider call failed: {exc}") from exc
+        raise AIProviderError("No client with models.generate_content configured.")
+
 
 class GeminiAudioEvaluationAdapter(IAudioAnswerEvaluationService):
     """Adaptador de IA multimodal para avaliação de respostas em áudio com privacidade efêmera.
@@ -381,12 +445,16 @@ class GeminiAudioEvaluationAdapter(IAudioAnswerEvaluationService):
         self,
         api_key: str | None = None,
         model: str = DEFAULT_GEMINI_MODEL,
+        client: Any = None,
     ) -> None:
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
         self._model = model
+        self._model_name = model
+        self._client = client
         self._text_evaluator = GeminiAnswerEvaluationAdapter(
             api_key=self._api_key,
             model=self._model,
+            client=self._client,
         )
 
     async def evaluate_audio_answer(
@@ -446,9 +514,12 @@ class GeminiMultiAgentDisputeAdapter(IMultiAgentDisputeService):
         self,
         api_key: str | None = None,
         model: str = DEFAULT_GEMINI_MODEL,
+        client: Any = None,
     ) -> None:
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
         self._model = model
+        self._model_name = model
+        self._client = client
 
     async def dispute_evaluation(
         self,

@@ -15,6 +15,8 @@ from src.adapters.persistence.repositories import (
     SqlAlchemyQuestionProgressRepository,
     SqlAlchemyQuestionRepository,
     SqlAlchemyReviewAuditRepository,
+    SqlAlchemyStudyMapRepository,
+    SqlAlchemyStudyNodeRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
     SqlAlchemyUnitOfWork,
@@ -142,6 +144,9 @@ def review_question_submission(
     request: Request,
     question_id: UUID,
     score: int = Form(...),
+    student_answer: str | None = Form(None),
+    ai_feedback: str | None = Form(None),
+    evaluation_mode: str = Form("MANUAL"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Response:
@@ -161,6 +166,8 @@ def review_question_submission(
     subj_repo = SqlAlchemySubjectRepository(db)
     audit_repo = SqlAlchemyReviewAuditRepository(db)
     uow = SqlAlchemyUnitOfWork(db)
+    node_repo = SqlAlchemyStudyNodeRepository(db)
+    map_repo = SqlAlchemyStudyMapRepository(db)
 
     use_case = ReviewQuestionUseCase(
         progress_repo=prog_repo,
@@ -170,11 +177,19 @@ def review_question_submission(
         clock=system_clock,
         audit_repo=audit_repo,
         uow=uow,
+        node_repo=node_repo,
+        map_repo=map_repo,
     )
 
     try:
         use_case.execute(
-            ReviewQuestionInputDTO(question_id=question_id, score=score),
+            ReviewQuestionInputDTO(
+                question_id=question_id,
+                score=score,
+                student_answer=student_answer,
+                ai_feedback=ai_feedback,
+                evaluation_mode=evaluation_mode,
+            ),
             user_id=current_user.id,
         )
     except (

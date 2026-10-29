@@ -858,6 +858,9 @@ class ReviewNodeQuestionUseCase:
         question_id: UUID,
         score: int = 100,
         difficulty: str | None = None,
+        student_answer: str | None = None,
+        ai_feedback: str | None = None,
+        evaluation_mode: str = "MANUAL",
     ) -> dict[str, Any]:
         study_map = self.map_repo.get_by_id(map_id)
         if study_map is None:
@@ -877,12 +880,14 @@ class ReviewNodeQuestionUseCase:
         now = self.clock.now() if self.clock is not None else datetime.now(UTC)
 
         effective_score = score
-        if difficulty is not None and score == 100:
+        if difficulty is not None:
             diff_upper = difficulty.upper().strip()
-            if diff_upper in ("EASY", "GOOD", "PERFECT"):
+            if diff_upper == "EASY":
                 effective_score = 100
+            elif diff_upper in ("GOOD", "PERFECT"):
+                effective_score = score if (score != 100 and score is not None) else 85
             elif diff_upper == "HARD":
-                effective_score = 50
+                effective_score = 25
             elif diff_upper == "AGAIN":
                 effective_score = 0
 
@@ -947,8 +952,10 @@ class ReviewNodeQuestionUseCase:
                     score=effective_score,
                     level_before=old_q_level,
                     level_after=new_q_level,
-                    evaluation_mode="MANUAL",
+                    evaluation_mode=evaluation_mode,
                     logged_at=now,
+                    student_answer=student_answer,
+                    ai_feedback=ai_feedback,
                 )
                 self.audit_repo.save(audit_log)
 

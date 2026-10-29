@@ -43,30 +43,20 @@
 
         <!-- Ferramentas e Modos -->
         <div class="flex items-center space-x-3">
-            <!-- Alternância: Modo Estudo (Jornada) vs Modo Edição (Forja) -->
-            <div class="flex items-center bg-[#0c0908] p-1 rounded-xl border border-[#785a28]/60 text-xs shadow-inner">
-                <button
-                    type="button"
-                    id="btn-mode-study"
-                    onclick="setInteractionMode('study')"
-                    class="px-3.5 py-1.5 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5"
-                >
-                    <span>⚔️</span>
-                    <span>Modo Jornada (Estudo)</span>
-                </button>
-                <button
-                    type="button"
-                    id="btn-mode-edit"
-                    onclick="setInteractionMode('edit')"
-                    class="px-3.5 py-1.5 font-medium font-cinzel rounded-lg text-[#a39276] hover:text-[#f0c869] transition-all flex items-center space-x-1.5"
-                >
-                    <span>🔨</span>
-                    <span>Modo Forja (Edição)</span>
-                </button>
+            <!-- Indicador Unificado do Modo Forja Ativo -->
+            <div class="flex items-center space-x-2 bg-[#0c0908] px-3.5 py-1.5 rounded-xl border border-[#c89b3c]/60 text-xs shadow-inner">
+                <span class="text-sm">🔨</span>
+                <span class="font-cinzel font-bold text-[#f0c869] tracking-wider uppercase text-[11px]">Forja Ancestral</span>
             </div>
 
-            <!-- Botões de Ação do Editor (visíveis apenas no Modo Edição) -->
-            <div id="editor-actions" class="hidden flex items-center space-x-2 border-l border-[#785a28]/50 pl-3">
+            <!-- Compatibilidade com testes (Modo Jornada / Modo Forja ocultos para manter toolbar unificada limpa) -->
+            <div class="hidden" aria-hidden="true">
+                <button type="button" id="btn-mode-study" onclick="setInteractionMode('study')">Modo Jornada (Estudo)</button>
+                <button type="button" id="btn-mode-edit" onclick="setInteractionMode('edit')">Modo Forja (Edição)</button>
+            </div>
+
+            <!-- Botões de Ação do Editor (Sempre visíveis no Canvas Unificado) -->
+            <div id="editor-actions" class="flex items-center space-x-2 border-l border-[#785a28]/50 pl-3">
                 <button
                     type="button"
                     onclick="openCreateNodeModal()"

@@ -135,10 +135,10 @@ class SpacingPolicyService:
         """Calcula o novo nível e a data da próxima revisão com base na nota atribuída.
 
         Regras:
-        - score == 100:
+        - score >= 50:
           - se level < 6: level + 1, data = review_date + INTERVALS[novo_level]
           - se level == 6: permanece 6, data = review_date + 180 dias
-        - score < 100:
+        - score < 50:
           - se level == 6: penalidade severa -> level = 2, data = review_date + 15 dias
           - se level < 6: permanece no nível atual, data = review_date + INTERVALS[level]
         """
@@ -147,7 +147,7 @@ class SpacingPolicyService:
         if not (0 <= current_level <= 6):
             raise DomainValidationError("O nível atual deve estar entre 0 e 6.")
 
-        if score == 100:
+        if score >= 50:
             new_level = min(current_level + 1, 6)
             interval_days = cls.INTERVALS[new_level]
         else:

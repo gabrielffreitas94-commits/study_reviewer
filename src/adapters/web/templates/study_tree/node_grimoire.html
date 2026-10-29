@@ -357,10 +357,10 @@
                                         </button>
                                         <button
                                             type="button"
-                                            onclick="submitNodeReview(null, 'hard', 50)"
+                                            onclick="submitNodeReview(null, 'hard', 25)"
                                             class="py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-amber-800 bg-amber-950/60 text-amber-300 hover:bg-amber-900 transition-colors shadow"
                                         >
-                                            ⚠️ Difícil (50%)
+                                            ⚠️ Difícil (25%)
                                         </button>
                                         <button
                                             type="button"
@@ -1648,11 +1648,49 @@ async function submitNodeReview(questionId, difficulty, score) {
     const qid = questionId || (QUESTIONS[activeIndex] ? QUESTIONS[activeIndex].id : null);
     if (!qid) return;
 
+    const conjureTextarea = document.getElementById('conjure-textarea');
+    const conjureFeedback = document.getElementById('conjure-feedback');
+    const voiceFeedback = document.getElementById('voice-feedback');
+
+    let student_answer = null;
+    let ai_feedback = null;
+    let evaluation_mode = 'MANUAL';
+
+    if (currentArenaMode === 'conjure') {
+        evaluation_mode = 'AI_TEXT';
+        if (conjureTextarea && conjureTextarea.value.trim()) {
+            student_answer = conjureTextarea.value.trim();
+        }
+        if (conjureFeedback && conjureFeedback.textContent.trim()) {
+            ai_feedback = conjureFeedback.textContent.trim();
+        }
+    } else if (currentArenaMode === 'voice') {
+        evaluation_mode = 'AI_VOICE';
+        if (voiceFeedback && voiceFeedback.textContent.trim()) {
+            ai_feedback = voiceFeedback.textContent.trim();
+        }
+    } else {
+        if (conjureTextarea && conjureTextarea.value.trim()) {
+            student_answer = conjureTextarea.value.trim();
+        }
+        if (conjureFeedback && conjureFeedback.textContent.trim()) {
+            ai_feedback = conjureFeedback.textContent.trim();
+        }
+    }
+
+    const payload = {
+        score,
+        difficulty: difficulty || null,
+        student_answer: student_answer || null,
+        ai_feedback: ai_feedback || null,
+        evaluation_mode: evaluation_mode || 'MANUAL'
+    };
+
     try {
         const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions/${qid}/review`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({score, difficulty})
+            body: JSON.stringify(payload)
         });
 
         if (res.ok) {

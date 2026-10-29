@@ -100,6 +100,10 @@ class EvaluationServiceError(DomainException):
     """Falha ou indisponibilidade temporária no serviço de avaliação de respostas por IA."""
 
 
+class AIProviderError(EvaluationServiceError):
+    """Falha de comunicação, modelo não encontrado ou erro de execução no provedor de IA."""
+
+
 # --- Árvore de Estudos RPG & Grafo de Aprendizado ---
 
 

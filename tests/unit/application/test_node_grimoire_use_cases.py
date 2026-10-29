@@ -12,6 +12,7 @@ from src.adapters.persistence.repositories import (
     SqlAlchemyNodeContentRepository,
     SqlAlchemyQuestionProgressRepository,
     SqlAlchemyQuestionRepository,
+    SqlAlchemyReviewAuditRepository,
     SqlAlchemyStudyEdgeRepository,
     SqlAlchemyStudyMapRepository,
     SqlAlchemyStudyNodeRepository,
@@ -655,3 +656,75 @@ def test_node_use_cases_edge_cases_and_error_branches(db_session: Session) -> No
         difficulty="GOOD",
     )
     assert res_training["is_training_only"] is True
+
+
+def test_review_node_question_audit_logging_and_difficulty_matrix(db_session: Session) -> None:
+    """Verifica que ReviewNodeQuestionUseCase salva student_answer, ai_feedback e evaluation_mode no audit log
+
+    e respeita a matriz de pontuação por dificuldade (EASY=100, GOOD=85, HARD=25, AGAIN=0).
+    """
+    user_id = uuid4()
+    user_repo = SqlAlchemyUserRepository(db_session)
+    user_repo.save(
+        User(id=user_id, name="Cronista", email="cronista@arcana.dev", google_sub="sub_crono")
+    )
+
+    map_repo = SqlAlchemyStudyMapRepository(db_session)
+    node_repo = SqlAlchemyStudyNodeRepository(db_session)
+    content_repo = SqlAlchemyNodeContentRepository(db_session)
+    q_repo = SqlAlchemyQuestionRepository(db_session)
+    prog_repo = SqlAlchemyQuestionProgressRepository(db_session)
+    edge_repo = SqlAlchemyStudyEdgeRepository(db_session)
+    audit_repo = SqlAlchemyReviewAuditRepository(db_session)
+
+    study_map = CreateStudyMapUseCase(map_repo, node_repo).execute(
+        owner_id=user_id,
+        dto=CreateStudyMapDTO(title="Crônicas de Valinor"),
+    )
+    node = CreateStudyNodeUseCase(map_repo, node_repo).execute(
+        map_id=study_map.id,
+        user_id=user_id,
+        dto=CreateStudyNodeDTO(title="Telperion e Laurelin"),
+    )
+
+    q = CreateNodeQuestionUseCase(map_repo, node_repo, q_repo, prog_repo, content_repo).execute(
+        map_id=study_map.id,
+        node_id=node.id,
+        user_id=user_id,
+        prompt="Quem criou as duas árvores?",
+        expected_answer="Yavanna",
+    )
+
+    review_uc = ReviewNodeQuestionUseCase(
+        map_repo=map_repo,
+        node_repo=node_repo,
+        question_repo=q_repo,
+        progress_repo=prog_repo,
+        content_repo=content_repo,
+        edge_repo=edge_repo,
+        audit_repo=audit_repo,
+    )
+
+    res = review_uc.execute(
+        map_id=study_map.id,
+        node_id=node.id,
+        user_id=user_id,
+        question_id=q["id"],
+        difficulty="GOOD",
+        student_answer="Yavanna Kementári com o pranto de Nienna",
+        ai_feedback="Resposta precisa e abrangente.",
+        evaluation_mode="TEXT_AI",
+    )
+
+    assert res["new_level"] == 1
+    assert res["is_training_only"] is False
+
+    logs = audit_repo.list_by_user(user_id=user_id, limit=10)
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.historical_subject_name == "Crônicas de Valinor"
+    assert log.historical_topic_name == "Telperion e Laurelin"
+    assert log.score == 85
+    assert log.student_answer == "Yavanna Kementári com o pranto de Nienna"
+    assert log.ai_feedback == "Resposta precisa e abrangente."
+    assert log.evaluation_mode == "TEXT_AI"

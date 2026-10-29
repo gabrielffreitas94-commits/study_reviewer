@@ -147,6 +147,9 @@ class ReviewQuestionInputDTO:
 
     question_id: UUID
     score: int
+    student_answer: str | None = None
+    ai_feedback: str | None = None
+    evaluation_mode: str = "MANUAL"
 
 
 @dataclass(slots=True, frozen=True)

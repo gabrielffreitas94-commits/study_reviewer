@@ -11,6 +11,9 @@ from src.infrastructure.security.sanitization import (
 
 @pytest.mark.security
 def test_allowed_tags_contains_expected_markdown_elements() -> None:
+    """Vulnerabilidade prevenida: Injeção de tags HTML perigosas via markdown.
+    Garantia de segurança: Assegura que apenas tags permitidas e seguras estão no whitelist.
+    """
     expected_tags = {
         "b",
         "i",
@@ -44,6 +47,9 @@ def test_allowed_tags_contains_expected_markdown_elements() -> None:
 
 @pytest.mark.security
 def test_sanitize_html_content_empty_and_valid() -> None:
+    """Vulnerabilidade prevenida: Quebra ou bypass com strings vazias e HTML seguro.
+    Garantia de segurança: Sanitização preserva tags seguras e lida com vazios sem erros.
+    """
     assert sanitize_html_content("") == ""
     assert sanitize_html_content("   ") == "   "
     clean = sanitize_html_content("<p>Texto <strong>negrito</strong> e <code>código</code></p>")
@@ -52,6 +58,9 @@ def test_sanitize_html_content_empty_and_valid() -> None:
 
 @pytest.mark.security
 def test_sanitize_html_content_removes_dangerous_tags() -> None:
+    """Vulnerabilidade prevenida: Cross-Site Scripting (XSS) via script/iframe.
+    Garantia de segurança: Remove tags perigosas mantendo o conteúdo seguro intacto.
+    """
     malicious = "<script>alert('xss')</script><iframe src='https://evil.com'></iframe><p>OK</p>"
     clean = sanitize_html_content(malicious)
     assert "<script>" not in clean
@@ -61,6 +70,9 @@ def test_sanitize_html_content_removes_dangerous_tags() -> None:
 
 @pytest.mark.security
 def test_markdown_sanitizer_service_empty_and_safe_elements() -> None:
+    """Vulnerabilidade prevenida: Falhas na sanitização do serviço Markdown.
+    Garantia de segurança: Permite tags estruturais e imagens seguras com protocolo HTTPS.
+    """
     assert MarkdownSanitizerService.sanitize("") == ""
     raw = (
         "<h1>Título 1</h1>"
@@ -86,6 +98,9 @@ def test_markdown_sanitizer_service_empty_and_safe_elements() -> None:
 
 @pytest.mark.security
 def test_markdown_sanitizer_service_removes_xss() -> None:
+    """Vulnerabilidade prevenida: XSS através de handlers JavaScript inline e esquemas inseguros.
+    Garantia de segurança: Remove scripts, manipuladores de evento e URLs inseguras.
+    """
     malicious = (
         "<p>Alvo</p><script>alert(1)</script>"
         '<img src="http://insecure.com/x.png" onerror="alert(2)">'

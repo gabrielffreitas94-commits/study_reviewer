@@ -11,6 +11,8 @@ from src.adapters.persistence.repositories import (
     SqlAlchemyQuestionProgressRepository,
     SqlAlchemyQuestionRepository,
     SqlAlchemyReviewAuditRepository,
+    SqlAlchemyStudyMapRepository,
+    SqlAlchemyStudyNodeRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
     SqlAlchemyUnitOfWork,
@@ -70,6 +72,9 @@ class ReviewQuestionRequest(BaseModel):
     """Payload de entrada para submissão de nota de revisão."""
 
     score: int = Field(...)
+    student_answer: str | None = Field(default=None)
+    ai_feedback: str | None = Field(default=None)
+    evaluation_mode: str = Field(default="MANUAL", max_length=50)
 
 
 class DueQuestionsResponse(BaseModel):
@@ -156,6 +161,9 @@ def review_question_api(
     audit_repo = SqlAlchemyReviewAuditRepository(db)
     uow = SqlAlchemyUnitOfWork(db)
 
+    node_repo = SqlAlchemyStudyNodeRepository(db)
+    map_repo = SqlAlchemyStudyMapRepository(db)
+
     use_case = ReviewQuestionUseCase(
         progress_repo=prog_repo,
         question_repo=q_repo,
@@ -164,11 +172,19 @@ def review_question_api(
         clock=system_clock,
         audit_repo=audit_repo,
         uow=uow,
+        node_repo=node_repo,
+        map_repo=map_repo,
     )
 
     try:
         return use_case.execute(
-            ReviewQuestionInputDTO(question_id=question_id, score=payload.score),
+            ReviewQuestionInputDTO(
+                question_id=question_id,
+                score=payload.score,
+                student_answer=payload.student_answer,
+                ai_feedback=payload.ai_feedback,
+                evaluation_mode=payload.evaluation_mode,
+            ),
             user_id=current_user.id,
         )
     except QuestionNotFoundError as exc:

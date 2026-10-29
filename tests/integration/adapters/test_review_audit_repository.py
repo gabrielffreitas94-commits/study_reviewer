@@ -66,8 +66,10 @@ def test_review_audit_repository_save_and_list_by_user(db_session: Session) -> N
             score=100,
             level_before=i,
             level_after=i + 1,
-            evaluation_mode="MANUAL",
+            evaluation_mode="TEXT_AI" if i == 0 else "MANUAL",
             logged_at=datetime(2026, 10, i + 1, 10, 0, 0, tzinfo=UTC),
+            student_answer=f"Minha resposta {i}",
+            ai_feedback=f"Feedback da IA {i}",
         )
         audit_repo.save(log)
     db_session.commit()
@@ -76,11 +78,16 @@ def test_review_audit_repository_save_and_list_by_user(db_session: Session) -> N
     logs_p1 = audit_repo.list_by_user(user_id=user.id, limit=2, offset=0)
     assert len(logs_p1) == 2
     assert logs_p1[0].review_date == date(2026, 10, 3)
+    assert logs_p1[0].student_answer == "Minha resposta 2"
+    assert logs_p1[0].ai_feedback == "Feedback da IA 2"
     assert logs_p1[1].review_date == date(2026, 10, 2)
 
     logs_p2 = audit_repo.list_by_user(user_id=user.id, limit=2, offset=2)
     assert len(logs_p2) == 1
     assert logs_p2[0].review_date == date(2026, 10, 1)
+    assert logs_p2[0].evaluation_mode == "TEXT_AI"
+    assert logs_p2[0].student_answer == "Minha resposta 0"
+    assert logs_p2[0].ai_feedback == "Feedback da IA 0"
 
     # Contagem total
     assert audit_repo.count_by_user(user.id) == 3

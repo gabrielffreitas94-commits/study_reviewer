@@ -177,17 +177,15 @@ class EvaluateStudentAnswerUseCase:
         if self._uow is not None:
             self._uow.commit()
 
-        # 5. Recuperação de contexto RAG com fallback para Cold-Start
-        context_chunks = await _retrieve_rag_context(
-            chunk_repo=self._chunk_repo,
-            embedding_service=self._embedding_service,
-            topic_id=target_topic_id,
-            query_text=f"{clean_answer} {question.prompt}",
-            expected_answer=question.expected_answer,
-        )
-
-        # 6. Avaliação semântica via IA com estorno em caso de falha
+        # 5. Avaliação semântica via IA com estorno em caso de falha
         try:
+            context_chunks = await _retrieve_rag_context(
+                chunk_repo=self._chunk_repo,
+                embedding_service=self._embedding_service,
+                topic_id=target_topic_id,
+                query_text=f"{clean_answer} {question.prompt}",
+                expected_answer=question.expected_answer,
+            )
             eval_result = await self._evaluation_service.evaluate_answer(
                 prompt=question.prompt,
                 expected_answer=question.expected_answer,
@@ -481,17 +479,15 @@ class EvaluateAudioAnswerUseCase:
         if self._uow is not None:
             self._uow.commit()
 
-        # 5. Recuperação de contexto RAG com fallback para Cold-Start
-        context_chunks = await _retrieve_rag_context(
-            chunk_repo=self._chunk_repo,
-            embedding_service=self._embedding_service,
-            topic_id=target_topic_id,
-            query_text=question.prompt,
-            expected_answer=question.expected_answer,
-        )
-
-        # 6. Avaliação multimodal efêmera com estorno em caso de falha
+        # 5. Avaliação multimodal efêmera com estorno em caso de falha
         try:
+            context_chunks = await _retrieve_rag_context(
+                chunk_repo=self._chunk_repo,
+                embedding_service=self._embedding_service,
+                topic_id=target_topic_id,
+                query_text=question.prompt,
+                expected_answer=question.expected_answer,
+            )
             eval_result = await self._audio_service.evaluate_audio_answer(
                 prompt=question.prompt,
                 expected_answer=question.expected_answer,
@@ -690,17 +686,15 @@ class DisputeEvaluationUseCase:
         if self._uow is not None:
             self._uow.commit()
 
-        # 5. RAG Chunks com fallback Cold-Start
-        context_chunks = await _retrieve_rag_context(
-            chunk_repo=self._chunk_repo,
-            embedding_service=self._embedding_service,
-            topic_id=target_topic_id,
-            query_text=f"{clean_arg} {clean_answer} {question.prompt}",
-            expected_answer=question.expected_answer,
-        )
-
-        # 6. Deliberação da Câmara Multiagente
+        # 5. Deliberação da Câmara Multiagente com estorno em caso de falha
         try:
+            context_chunks = await _retrieve_rag_context(
+                chunk_repo=self._chunk_repo,
+                embedding_service=self._embedding_service,
+                topic_id=target_topic_id,
+                query_text=f"{clean_arg} {clean_answer} {question.prompt}",
+                expected_answer=question.expected_answer,
+            )
             dispute_result = await self._dispute_service.dispute_evaluation(
                 prompt=question.prompt,
                 expected_answer=question.expected_answer,

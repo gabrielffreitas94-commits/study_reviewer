@@ -347,3 +347,131 @@ def test_gemini_answer_evaluation_live_api_clamping_and_fallback_tokens() -> Non
     assert result.accuracy_score == 100
     assert result.depth_score == 0
     assert result.tokens_used > 100
+
+
+def test_gemini_answer_evaluation_http_404_fallback_to_gemini_2_5_flash() -> None:
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    adapter = GeminiAnswerEvaluationAdapter(api_key="live-key", model="gemini-3.8-flash")
+
+    # Primeira resposta: 404 NOT FOUND para gemini-3.8-flash
+    mock_resp_404 = MagicMock()
+    mock_resp_404.status_code = 404
+    mock_resp_404.text = "models/gemini-3.8-flash is not found: NOT_FOUND"
+
+    # Segunda resposta: 200 OK para gemini-2.5-flash
+    mock_resp_200 = MagicMock()
+    mock_resp_200.status_code = 200
+    mock_resp_200.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": (
+                                '{"score": 90, "feedback": "Excelente resposta via fallback!", '
+                                '"coverage_score": 90, "accuracy_score": 90, "depth_score": 90, '
+                                '"evidence_quotes": ["quote 1"]}'
+                            )
+                        }
+                    ]
+                }
+            }
+        ],
+        "usageMetadata": {"totalTokenCount": 250},
+    }
+
+    mock_client = AsyncMock()
+    mock_client.post.side_effect = [mock_resp_404, mock_resp_200]
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        result = asyncio.run(
+            adapter._call_gemini_api(
+                prompt="O que é fotossíntese?",
+                expected_answer="Conversão de luz em energia.",
+                student_answer="Processo vegetal que usa luz.",
+                context_chunks=["Plantas realizam fotossíntese."],
+            )
+        )
+
+    assert result is not None
+    assert result.score == 90
+    assert "fallback" in result.feedback
+    assert mock_client.post.call_count == 2
+    second_call_url = mock_client.post.call_args_list[1][0][0]
+    assert "gemini-2.5-flash" in second_call_url
+
+
+def test_gemini_generate_content_model_fallback_success() -> None:
+    from unittest.mock import MagicMock
+
+    mock_genai_client = MagicMock()
+    # Primeira chamada falha com 404, segunda tem sucesso
+    mock_genai_client.models.generate_content.side_effect = [
+        RuntimeError("404 NOT_FOUND: models/gemini-3.8-flash is not found"),
+        MagicMock(text="Sucesso via gemini-2.5-flash"),
+    ]
+
+    adapter = GeminiAnswerEvaluationAdapter(
+        api_key="test-key",
+        model="gemini-3.8-flash",
+        client=mock_genai_client,
+    )
+
+    res = adapter.generate_content("Texto de teste")
+    assert res.text == "Sucesso via gemini-2.5-flash"
+    assert mock_genai_client.models.generate_content.call_count == 2
+    calls = mock_genai_client.models.generate_content.call_args_list
+    assert calls[0].kwargs["model"] == "gemini-3.8-flash"
+    assert calls[1].kwargs["model"] == "gemini-2.5-flash"
+
+
+def test_gemini_generate_content_model_fallback_failure_raises_ai_provider_error() -> None:
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from src.domain.exceptions import AIProviderError
+
+    mock_genai_client = MagicMock()
+    # Ambas falham com 404
+    mock_genai_client.models.generate_content.side_effect = [
+        RuntimeError("404 NOT_FOUND: models/gemini-3.8-flash is not found"),
+        RuntimeError("404 NOT_FOUND: models/gemini-2.5-flash is not found"),
+    ]
+
+    adapter = GeminiAnswerEvaluationAdapter(
+        api_key="test-key",
+        model="gemini-3.8-flash",
+        client=mock_genai_client,
+    )
+
+    with pytest.raises(AIProviderError, match="Model fallback to gemini-2.5-flash failed"):
+        adapter.generate_content("Texto")
+
+
+def test_gemini_generate_content_other_error_raises_ai_provider_error() -> None:
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from src.domain.exceptions import AIProviderError
+
+    mock_genai_client = MagicMock()
+    mock_genai_client.models.generate_content.side_effect = RuntimeError("500 Internal Error")
+
+    adapter = GeminiAnswerEvaluationAdapter(
+        api_key="test-key",
+        model="gemini-3.8-flash",
+        client=mock_genai_client,
+    )
+
+    with pytest.raises(AIProviderError, match="AI provider call failed"):
+        adapter.generate_content("Texto")
+
+    # Sem client configurado
+    adapter_no_client = GeminiAnswerEvaluationAdapter(api_key="test-key")
+    with pytest.raises(AIProviderError, match="No client with models.generate_content configured"):
+        adapter_no_client.generate_content("Texto")

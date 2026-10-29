@@ -17,7 +17,7 @@
         activeDragNode: null,
         dragOffset: { x: 0, y: 0 },
         hasDragged: false,
-        interactionMode: 'study', // 'study' (Modo Jornada) ou 'edit' (Modo Forja)
+        interactionMode: 'forge', // Modo Forja sempre ativo por padrão
         connectModeActive: false,
         connectSourceNodeId: null,
         selectedNode: null,
@@ -67,9 +67,17 @@
     const nodeModal = document.getElementById('node-modal');
 
     // Inicialização ao carregar a página
-    document.addEventListener('DOMContentLoaded', () => {
+    function initCanvas() {
+        const editorActions = document.getElementById('editor-actions');
+        if (editorActions) {
+            editorActions.classList.remove('hidden');
+        }
         setupPanAndZoom();
         loadGraph();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initCanvas();
     });
 
     // --- Carregamento e Renderização do Grafo ---
@@ -159,7 +167,7 @@
             }
 
             // No Modo Forja, clicar na linha permite remover o vínculo
-            if (state.interactionMode === 'edit') {
+            if (state.interactionMode === 'forge' || state.interactionMode === 'edit') {
                 path.style.cursor = 'pointer';
                 path.style.pointerEvents = 'stroke';
                 path.setAttribute('stroke-width', '10');
@@ -283,7 +291,8 @@
 
         viewport.addEventListener('mousedown', (e) => {
             closeContextMenus();
-            if (e.target === viewport || e.target.id === 'canvas-container' || e.target.tagName === 'svg') {
+            const isBackground = e.target === viewport || e.target.id === 'canvas-container' || e.target.id === 'nodes-layer' || e.target.tagName === 'svg';
+            if (isBackground && (e.button === 0 || e.button === 1)) {
                 state.isPanning = true;
                 state.panStart.x = e.clientX - state.view.x;
                 state.panStart.y = e.clientY - state.view.y;
@@ -291,7 +300,8 @@
         });
 
         viewport.addEventListener('contextmenu', (e) => {
-            if (e.target === viewport || e.target.id === 'canvas-container' || e.target.tagName === 'svg') {
+            const isBackground = e.target === viewport || e.target.id === 'canvas-container' || e.target.id === 'nodes-layer' || e.target.tagName === 'svg';
+            if (isBackground) {
                 onCanvasContextMenu(e);
             }
         });
@@ -378,7 +388,7 @@
     // --- Arrastar Medalhões na Forja (Drag & Drop) ---
 
     function onNodeMouseDown(e, node) {
-        if (state.interactionMode !== 'edit' || state.connectModeActive) return;
+        if ((state.interactionMode !== 'forge' && state.interactionMode !== 'edit') || state.connectModeActive) return;
         if (e.button !== 0) return;
 
         e.stopPropagation();
@@ -638,7 +648,7 @@
         }
     }
 
-    // --- Alternar Modos: Modo Jornada vs Modo Forja ---
+    // --- Alternar Modos: Modo Jornada vs Modo Forja (com compatibilidade legada) ---
 
     window.setInteractionMode = (mode) => {
         state.interactionMode = mode;
@@ -646,7 +656,7 @@
         const btnEdit = document.getElementById('btn-mode-edit');
         const editorActions = document.getElementById('editor-actions');
 
-        if (mode === 'edit') {
+        if (mode === 'forge' || mode === 'edit') {
             if (btnEdit) {
                 btnEdit.className = 'px-3.5 py-1.5 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5';
             }
@@ -665,6 +675,10 @@
             if (state.connectModeActive) toggleConnectMode();
         }
         renderEdges();
+    };
+
+    window.setCanvasMode = function (mode) {
+        window.setInteractionMode(mode);
     };
 
     // --- Inspector da Forja (Criação & Edição de Nós Raiz / Metadados) ---
@@ -926,7 +940,11 @@
 
     // --- Side Drawer Interativo do Nó (Dual-Screen com IA) ---
 
-    window.openNodeSideDrawer = async function (node) {
+    window.openNodeSideDrawer = async function (nodeOrId) {
+        if (!nodeOrId) return;
+        const node = (typeof nodeOrId === 'object' && nodeOrId !== null)
+            ? nodeOrId
+            : (state.graph.nodes || []).find(n => n.id === nodeOrId);
         if (!node) return;
         state.selectedNode = node;
 
@@ -1652,5 +1670,11 @@ Gere de 3 a 5 questões aprofundadas sobre o tópico solicitado.
     window.ctxEditNodeMeta = ctxEditNodeMeta;
     window.ctxDeleteNode = ctxDeleteNode;
     window.ctxCreateNodeAtCursor = ctxCreateNodeAtCursor;
+
+    // Inicialização, viewport e modos
+    window.initCanvas = initCanvas;
+    window.setupViewportEvents = setupPanAndZoom;
+    window.setCanvasMode = window.setCanvasMode;
+    window.setInteractionMode = window.setInteractionMode;
 
 })();

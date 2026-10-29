@@ -253,6 +253,8 @@ class ReviewAuditLogMapper:
             level_after=model.level_after,
             evaluation_mode=model.evaluation_mode,
             logged_at=model.logged_at,
+            student_answer=model.student_answer,
+            ai_feedback=model.ai_feedback,
         )
 
     @staticmethod
@@ -271,6 +273,8 @@ class ReviewAuditLogMapper:
             level_after=entity.level_after,
             evaluation_mode=entity.evaluation_mode,
             logged_at=entity.logged_at or datetime.now(UTC),
+            student_answer=entity.student_answer,
+            ai_feedback=entity.ai_feedback,
         )
 
 

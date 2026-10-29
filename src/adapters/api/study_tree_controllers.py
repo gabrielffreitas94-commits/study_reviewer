@@ -106,6 +106,9 @@ class BatchCreateNodeQuestionsRequest(BaseModel):
 class ReviewNodeQuestionRequest(BaseModel):
     score: int = Field(default=100, ge=0, le=100)
     difficulty: str | None = Field(default=None, max_length=20)
+    student_answer: str | None = Field(default=None)
+    ai_feedback: str | None = Field(default=None)
+    evaluation_mode: str = Field(default="MANUAL", max_length=50)
 
 
 class CreateNodeMaterialRequest(BaseModel):
@@ -522,6 +525,7 @@ def create_node_question(
             prompt=effective_prompt,
             expected_answer=payload.expected_answer.strip(),
         )
+        db.commit()
         return {
             "id": str(res["id"]),
             "question_id": str(res["id"]),
@@ -589,6 +593,7 @@ def create_node_questions_batch(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Nenhuma pergunta com enunciado válido foi enviada no lote.",
             )
+        db.commit()
         return results
     except (StudyMapNotFoundError, StudyNodeNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -656,7 +661,11 @@ def review_node_question(
             question_id=question_id,
             score=payload.score,
             difficulty=payload.difficulty,
+            student_answer=payload.student_answer,
+            ai_feedback=payload.ai_feedback,
+            evaluation_mode=payload.evaluation_mode,
         )
+        db.commit()
         return {k: (str(v) if isinstance(v, UUID) else v) for k, v in res.items()}
     except (StudyMapNotFoundError, StudyNodeNotFoundError, QuestionNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
