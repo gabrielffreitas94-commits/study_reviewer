@@ -1579,17 +1579,16 @@
             if (e.key === 'Escape') {
                 const audioModal = document.getElementById('audio-answer-modal');
                 const disputeModal = document.getElementById('dispute-modal');
+                const editModal = document.getElementById('edit-question-modal');
+
                 if (audioModal && !audioModal.classList.contains('hidden')) {
                     window.closeAudioModal();
                 } else if (disputeModal && !disputeModal.classList.contains('hidden')) {
                     window.closeDisputeModal();
-                {% if card.can_edit %}
-                } else {
-                    const editModal = document.getElementById('edit-question-modal');
-                    if (editModal && !editModal.classList.contains('hidden')) {
+                } else if (editModal && !editModal.classList.contains('hidden')) {
+                    if (typeof window.closeEditQuestionModal === 'function') {
                         window.closeEditQuestionModal();
                     }
-                {% endif %}
                 }
             }
         });

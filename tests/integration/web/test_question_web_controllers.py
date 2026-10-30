@@ -603,4 +603,4 @@ def test_study_page_question_card_inline_edit_button_hidden_for_non_owner(
     assert res.status_code == 200
     assert "O que é dolo eventual?" in res.text
     assert "btn-edit-question-modal" not in res.text
-    assert "edit-question-modal" not in res.text
+    assert 'id="edit-question-modal"' not in res.text
