@@ -14,11 +14,21 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.adapters.persistence.repositories import (
     SqlAlchemyQuestionProgressRepository,
     SqlAlchemyQuestionRepository,
+    SqlAlchemyStudyMapRepository,
+    SqlAlchemyStudyNodeRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
     SqlAlchemyUserRepository,
 )
-from src.domain.entities import Question, Subject, Topic, User, UserQuestionProgress
+from src.domain.entities import (
+    Question,
+    StudyMap,
+    StudyNode,
+    Subject,
+    Topic,
+    User,
+    UserQuestionProgress,
+)
 from src.infrastructure.database import Base
 
 
@@ -409,3 +419,101 @@ def test_question_repository_multi_topic_persistence_and_queries(db_session: Ses
     list_top2 = q_repo.list_by_topic(top2.id)
     assert any(item.id == q.id for item in list_top1)
     assert any(item.id == q.id for item in list_top2)
+
+
+@pytest.mark.integration
+def test_get_due_questions_can_edit_flag(db_session: Session) -> None:
+    """Verifica se card.can_edit é True para o dono da matéria/mapa e False para outros usuários."""
+    user_repo = SqlAlchemyUserRepository(db_session)
+    subj_repo = SqlAlchemySubjectRepository(db_session)
+    top_repo = SqlAlchemyTopicRepository(db_session)
+    map_repo = SqlAlchemyStudyMapRepository(db_session)
+    node_repo = SqlAlchemyStudyNodeRepository(db_session)
+    q_repo = SqlAlchemyQuestionRepository(db_session)
+    prog_repo = SqlAlchemyQuestionProgressRepository(db_session)
+
+    today = date(2026, 10, 10)
+
+    # 1. Caso Matéria: owner vs estudante
+    owner = User(google_sub="sub-owner-subj", email="owner_subj@test.com", name="Owner Subj")
+    student = User(
+        google_sub="sub-student-subj", email="student_subj@test.com", name="Student Subj"
+    )
+    user_repo.save(owner)
+    user_repo.save(student)
+
+    subj = Subject(name="Direito Constitucional", owner_id=owner.id, is_public=True)
+    subj_repo.save(subj)
+    topic = Topic(subject_id=subj.id, name="Direitos Fundamentais")
+    top_repo.save(topic)
+
+    q_subj = Question(topic_id=topic.id, prompt="Pergunta Subj?", expected_answer="Resposta Subj")
+    q_repo.save(q_subj)
+
+    prog_repo.save(
+        UserQuestionProgress(
+            user_id=owner.id,
+            question_id=q_subj.id,
+            current_level=0,
+            next_review_date=today,
+        )
+    )
+    prog_repo.save(
+        UserQuestionProgress(
+            user_id=student.id,
+            question_id=q_subj.id,
+            current_level=0,
+            next_review_date=today,
+        )
+    )
+
+    owner_due = prog_repo.get_due_questions(owner.id, today)
+    assert len(owner_due) == 1
+    assert owner_due[0].can_edit is True
+
+    student_due = prog_repo.get_due_questions(student.id, today)
+    assert len(student_due) == 1
+    assert student_due[0].can_edit is False
+
+    # 2. Caso Estudo RPG (StudyMap / StudyNode): owner vs estudante
+    map_owner = User(google_sub="sub-owner-map", email="owner_map@test.com", name="Owner Map")
+    map_student = User(
+        google_sub="sub-student-map", email="student_map@test.com", name="Student Map"
+    )
+    user_repo.save(map_owner)
+    user_repo.save(map_student)
+
+    study_map = StudyMap(title="Árvore de Anatomia", owner_id=map_owner.id, is_public=True)
+    map_repo.save(study_map)
+    study_node = StudyNode(map_id=study_map.id, title="Sistema Nervoso")
+    node_repo.save(study_node)
+
+    q_node = Question(
+        node_id=study_node.id, prompt="Pergunta Node?", expected_answer="Resposta Node"
+    )
+    q_repo.save(q_node)
+
+    prog_repo.save(
+        UserQuestionProgress(
+            user_id=map_owner.id,
+            question_id=q_node.id,
+            current_level=0,
+            next_review_date=today,
+        )
+    )
+    prog_repo.save(
+        UserQuestionProgress(
+            user_id=map_student.id,
+            question_id=q_node.id,
+            current_level=0,
+            next_review_date=today,
+        )
+    )
+
+    map_owner_due = prog_repo.get_due_questions(map_owner.id, today)
+    assert len(map_owner_due) == 1
+    assert map_owner_due[0].can_edit is True
+
+    map_student_due = prog_repo.get_due_questions(map_student.id, today)
+    assert len(map_student_due) == 1
+    assert map_student_due[0].can_edit is False

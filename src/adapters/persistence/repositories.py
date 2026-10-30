@@ -586,6 +586,9 @@ class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
                 QuestionModel.expected_answer,
                 UserQuestionProgressModel.current_level,
                 UserQuestionProgressModel.next_review_date,
+                (func.coalesce(SubjectModel.owner_id, StudyMapModel.owner_id) == user_id).label(
+                    "can_edit"
+                ),
             )
             .join(QuestionModel, UserQuestionProgressModel.question_id == QuestionModel.id)
             .outerjoin(TopicModel, QuestionModel.topic_id == TopicModel.id)
@@ -642,6 +645,7 @@ class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
                 current_level=row.current_level,
                 interval_days=SpacingPolicyService.get_interval(row.current_level),
                 due_date=row.next_review_date,
+                can_edit=bool(row.can_edit),
             )
             for row in rows
         ]

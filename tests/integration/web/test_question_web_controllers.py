@@ -525,3 +525,82 @@ def test_study_page_question_card_audio_and_dispute_accessible_features(
     assert "Advogado do Estudante" in res.text
     assert "Crítico Técnico" in res.text
     assert "Árbitro Imparcial" in res.text
+
+
+@pytest.mark.integration
+def test_study_page_question_card_inline_edit_button_and_modal_for_owner(
+    client: TestClient, test_user: User, db_engine: Any
+) -> None:
+    """Verifica presença do botão sutil de edição e modal acessível quando o usuário é dono da matéria."""
+    with Session(db_engine) as session:
+        subj = Subject(name="Direito Administrativo", owner_id=test_user.id)
+        SqlAlchemySubjectRepository(session).save(subj)
+        topic = Topic(subject_id=subj.id, name="Atos Administrativos")
+        SqlAlchemyTopicRepository(session).save(topic)
+        q = Question(
+            topic_id=topic.id,
+            prompt="O que é ato administrativo?",
+            expected_answer="Manifestação unilateral de vontade da Administração Pública.",
+        )
+        SqlAlchemyQuestionRepository(session).save(q)
+        SqlAlchemyQuestionProgressRepository(session).save(
+            UserQuestionProgress(
+                user_id=test_user.id, question_id=q.id, next_review_date=date.today()
+            )
+        )
+        session.commit()
+
+    res = client.get("/questions/study")
+    assert res.status_code == 200
+
+    # Botão sutil de edição
+    assert 'id="btn-edit-question-modal"' in res.text
+    assert "Editar Questão" in res.text or "btn-edit-question-modal" in res.text
+    assert 'aria-controls="edit-question-modal"' in res.text
+
+    # Modal acessível de edição inline
+    assert 'id="edit-question-modal"' in res.text
+    assert 'role="dialog"' in res.text
+    assert 'aria-modal="true"' in res.text
+    assert 'aria-labelledby="edit-question-modal-title"' in res.text
+
+    # Campos de edição com texto pré-carregado
+    assert 'id="edit-question-prompt"' in res.text
+    assert "O que é ato administrativo?" in res.text
+    assert 'id="edit-question-expected-answer"' in res.text
+    assert "Manifestação unilateral de vontade da Administração Pública." in res.text
+
+    # Botões de salvar e cancelar e funções JS associadas
+    assert "saveQuestionEdits" in res.text
+    assert "closeEditQuestionModal" in res.text
+    assert "applyRpgMarkdownAll" in res.text
+
+
+@pytest.mark.integration
+def test_study_page_question_card_inline_edit_button_hidden_for_non_owner(
+    client: TestClient, test_user: User, other_user: User, db_engine: Any
+) -> None:
+    """Verifica que o botão e o modal de edição NÃO são renderizados quando o usuário não é o dono."""
+    with Session(db_engine) as session:
+        subj_other = Subject(name="Direito Penal", owner_id=other_user.id, is_public=True)
+        SqlAlchemySubjectRepository(session).save(subj_other)
+        topic_other = Topic(subject_id=subj_other.id, name="Tipicidade")
+        SqlAlchemyTopicRepository(session).save(topic_other)
+        q_other = Question(
+            topic_id=topic_other.id,
+            prompt="O que é dolo eventual?",
+            expected_answer="Assunção consciente do risco de produzir o resultado.",
+        )
+        SqlAlchemyQuestionRepository(session).save(q_other)
+        SqlAlchemyQuestionProgressRepository(session).save(
+            UserQuestionProgress(
+                user_id=test_user.id, question_id=q_other.id, next_review_date=date.today()
+            )
+        )
+        session.commit()
+
+    res = client.get("/questions/study")
+    assert res.status_code == 200
+    assert "O que é dolo eventual?" in res.text
+    assert "btn-edit-question-modal" not in res.text
+    assert 'id="edit-question-modal"' not in res.text
