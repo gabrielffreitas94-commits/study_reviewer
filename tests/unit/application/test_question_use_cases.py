@@ -527,10 +527,10 @@ def test_review_question_level_6_penalty_regression(repos: RepoFixture) -> None:
     prog_repo.save(prog)
 
     use_case = ReviewQuestionUseCase(prog_repo, q_repo, top_repo, subj_repo, clock)
-    res = use_case.execute(ReviewQuestionInputDTO(question_id=q.id, score=99), user_id=user_id)
+    res = use_case.execute(ReviewQuestionInputDTO(question_id=q.id, score=25), user_id=user_id)
 
     assert res.previous_level == 6
-    assert res.new_level == 2  # Penalidade severa: regride para o Nível 2 (+15d)
+    assert res.new_level == 2  # Penalidade severa: regride para o Nível 2 (+15d) quando score < 50
     assert res.interval_days == 15
     assert res.next_review_date == date(2026, 10, 25)
     assert res.is_promoted is False
@@ -795,3 +795,67 @@ def test_missing_question_or_topic_not_found_errors(repos: RepoFixture) -> None:
         ReviewQuestionUseCase(prog_repo, q_repo, top_repo, subj_repo, clock).execute(
             ReviewQuestionInputDTO(question_id=uuid4(), score=100), user_id=user_id
         )
+
+
+@pytest.mark.unit
+def test_review_question_node_question_resolves_map_and_node_titles(repos: RepoFixture) -> None:
+    """Verifica resolução de histórico de subject_name e topic_name a partir de StudyMap/StudyNode
+
+    e salvamento de student_answer, ai_feedback e evaluation_mode no log de auditoria.
+    """
+    from unittest.mock import MagicMock
+
+    subj_repo, top_repo, q_repo, prog_repo, clock = repos
+    user_id = uuid4()
+    node_id = uuid4()
+    map_id = uuid4()
+    q = Question(
+        id=uuid4(),
+        prompt="Qual a capital de Gondor?",
+        expected_answer="Minas Tirith",
+        node_id=node_id,
+    )
+    q_repo.save(q)
+
+    prog = UserQuestionProgress(
+        user_id=user_id, question_id=q.id, current_level=0, next_review_date=clock.today()
+    )
+    prog_repo.save(prog)
+
+    node_repo = MagicMock()
+    map_repo = MagicMock()
+    node_mock = MagicMock(id=node_id, map_id=map_id, title="Portão de Minas Tirith")
+    map_mock = MagicMock(id=map_id, title="Reino de Gondor")
+    node_repo.get_by_id.return_value = node_mock
+    map_repo.get_by_id.return_value = map_mock
+
+    audit_repo = FakeReviewAuditRepository()
+    use_case = ReviewQuestionUseCase(
+        progress_repo=prog_repo,
+        question_repo=q_repo,
+        topic_repo=top_repo,
+        subject_repo=subj_repo,
+        clock=clock,
+        audit_repo=audit_repo,
+        node_repo=node_repo,
+        map_repo=map_repo,
+    )
+
+    dto = ReviewQuestionInputDTO(
+        question_id=q.id,
+        score=85,
+        student_answer="Minas Tirith nos Campos do Pelennor",
+        ai_feedback="Excelente resposta com localização precisa.",
+        evaluation_mode="TEXT_AI",
+    )
+    res = use_case.execute(dto, user_id=user_id)
+
+    assert res.is_promoted is True
+    assert res.new_level == 1
+    assert len(audit_repo.logs) == 1
+    log = audit_repo.logs[0]
+    assert log.historical_subject_name == "Reino de Gondor"
+    assert log.historical_topic_name == "Portão de Minas Tirith"
+    assert log.student_answer == "Minas Tirith nos Campos do Pelennor"
+    assert log.ai_feedback == "Excelente resposta com localização precisa."
+    assert log.evaluation_mode == "TEXT_AI"

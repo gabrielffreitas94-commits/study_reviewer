@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ map.title }} — Forja Ancestral & Canvas RPG{% endblock %}
+{% block title %}{{ map.title }} — Árvore de Conhecimento & Forja{% endblock %}
 
 {% block content %}
 <div class="relative w-full h-[calc(100vh-4rem)] bg-[#0c0908] overflow-hidden flex flex-col select-none text-[#f5ebd6]">
@@ -28,7 +28,7 @@
             <div class="flex items-center space-x-3 border-l border-[#785a28]/50 pl-4">
                 <span class="text-2xl" aria-hidden="true">🌌</span>
                 <div>
-                    <div class="text-[10px] font-bold font-cinzel uppercase tracking-widest text-[#a39276]">Tomo de Habilidades</div>
+                    <div class="text-[10px] font-bold font-cinzel uppercase tracking-widest text-[#a39276]">Tomo de Habilidades &bull; Árvore de Estudos</div>
                     <h1 class="text-sm sm:text-base font-bold font-cinzel text-[#f0c869] flex items-center space-x-2 leading-none">
                         <span>{{ map.title }}</span>
                         {% if map.is_submap %}
@@ -41,38 +41,28 @@
             </div>
         </div>
 
-        <!-- Ferramentas e Modos da Forja -->
+        <!-- Ferramentas e Modos -->
         <div class="flex items-center space-x-3">
-            <!-- Alternância: Modo Jornada (Estudo) vs Modo Forja (Construção) -->
-            <div class="flex items-center bg-[#0c0908] p-1 rounded-xl border border-[#785a28]/60 text-xs shadow-inner">
-                <button
-                    type="button"
-                    id="btn-mode-study"
-                    onclick="setInteractionMode('study')"
-                    class="px-3.5 py-1.5 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5"
-                >
-                    <span>⚔️</span>
-                    <span>Modo Jornada</span>
-                </button>
-                <button
-                    type="button"
-                    id="btn-mode-edit"
-                    onclick="setInteractionMode('edit')"
-                    class="px-3.5 py-1.5 font-medium font-cinzel rounded-lg text-[#a39276] hover:text-[#f0c869] transition-all flex items-center space-x-1.5"
-                >
-                    <span>🔨</span>
-                    <span>Modo Forja</span>
-                </button>
+            <!-- Indicador Unificado do Modo Forja Ativo -->
+            <div class="flex items-center space-x-2 bg-[#0c0908] px-3.5 py-1.5 rounded-xl border border-[#c89b3c]/60 text-xs shadow-inner">
+                <span class="text-sm">🔨</span>
+                <span class="font-cinzel font-bold text-[#f0c869] tracking-wider uppercase text-[11px]">Forja Ancestral</span>
             </div>
 
-            <!-- Botões de Ação do Editor (visíveis apenas no Modo Forja) -->
-            <div id="editor-actions" class="hidden flex items-center space-x-2 border-l border-[#785a28]/50 pl-3">
+            <!-- Compatibilidade com testes (Modo Jornada / Modo Forja ocultos para manter toolbar unificada limpa) -->
+            <div class="hidden" aria-hidden="true">
+                <button type="button" id="btn-mode-study" onclick="setInteractionMode('study')">Modo Jornada (Estudo)</button>
+                <button type="button" id="btn-mode-edit" onclick="setInteractionMode('edit')">Modo Forja (Edição)</button>
+            </div>
+
+            <!-- Botões de Ação do Editor (Sempre visíveis no Canvas Unificado) -->
+            <div id="editor-actions" class="flex items-center space-x-2 border-l border-[#785a28]/50 pl-3">
                 <button
                     type="button"
                     onclick="openCreateNodeModal()"
                     class="rpg-btn-gold text-xs py-1.5 px-3 flex items-center space-x-1"
                 >
-                    <span>+ Forjar Nó</span>
+                    <span>+ Novo Nó</span>
                 </button>
                 <button
                     type="button"
@@ -81,7 +71,7 @@
                     class="rpg-btn-bronze text-xs py-1.5 px-3 flex items-center space-x-1"
                     title="Conectar dois nós como pré-requisito"
                 >
-                    <span>🔗 Traçar Vínculo</span>
+                    <span>🔗 Conectar Nós</span>
                 </button>
             </div>
 
@@ -115,16 +105,14 @@
         </div>
     </div>
 
-    <!-- Área do Canvas Infinito com Vinheta e Grade de Runas -->
+    <!-- Área do Canvas Infinito com Vinheta e Grade -->
     <div id="canvas-viewport" class="relative flex-1 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing bg-[#0c0908]">
-        <!-- Grade Sutil de Runas Ancestrais -->
         <div class="absolute inset-0 bg-[radial-gradient(#785a28_1px,transparent_1px)] [background-size:32px_32px] pointer-events-none opacity-20"></div>
-        <!-- Vinheta Dramática de Bordas -->
         <div class="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.95)]"></div>
 
         <!-- Container Transformável (Pan & Zoom) -->
         <div id="canvas-container" class="absolute inset-0 origin-top-left">
-            <!-- Camada de Conexões de Energia Dourada (SVG) -->
+            <!-- Camada de Conexões (SVG) -->
             <svg id="canvas-svg" class="absolute inset-0 w-[6000px] h-[6000px] pointer-events-none overflow-visible">
                 <defs>
                     <linearGradient id="edge-unlocked-grad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -135,11 +123,17 @@
                         <stop offset="0%" stop-color="#3b322c"/>
                         <stop offset="100%" stop-color="#241c17"/>
                     </linearGradient>
-                    <marker id="arrow-unlocked" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                        <polygon points="0 0, 8 4, 0 8" fill="#f0c869"/>
+                    <marker id="arrow-unlocked" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                        <polygon points="0 1, 7 4.5, 0 8, 2.5 4.5" fill="#f0c869"/>
                     </marker>
-                    <marker id="arrow-locked" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                        <polygon points="0 0, 8 4, 0 8" fill="#4a3b32"/>
+                    <marker id="arrow-locked" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                        <polygon points="0 1, 7 4.5, 0 8, 2.5 4.5" fill="#4a3b32"/>
+                    </marker>
+                    <marker id="diamond-unlocked" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                        <polygon points="1 5, 5 1.5, 9 5, 5 8.5" fill="#f0c869"/>
+                    </marker>
+                    <marker id="diamond-locked" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                        <polygon points="1 5, 5 1.5, 9 5, 5 8.5" fill="#3b322c"/>
                     </marker>
                 </defs>
                 <g id="edges-group"></g>
@@ -152,73 +146,245 @@
 
     <!-- Banner Informativo de Conexão Ativa -->
     <div id="connect-banner" class="hidden absolute top-20 left-1/2 -translate-x-1/2 bg-[#c89b3c] text-[#0c0908] px-5 py-2.5 rounded-2xl shadow-2xl font-bold font-cinzel text-xs flex items-center space-x-2 z-30 border border-[#f0c869] animate-bounce">
-        <span>⚡ TRAÇAR VÍNCULO: Clique no nó de pré-requisito e depois no medalhão dependente</span>
+        <span>⚡ CONECTAR NÓS: Clique no nó de pré-requisito e depois no nó dependente</span>
         <button type="button" onclick="toggleConnectMode()" class="ml-2 text-xs bg-[#0c0908]/20 px-2 py-0.5 rounded font-sans">Cancelar</button>
+    </div>
+
+    <!-- Menu de Contexto do Nó (Botão Direito no Medalhão) -->
+    <div
+        id="node-context-menu"
+        class="hidden fixed z-50 bg-[#14100d]/95 backdrop-blur-md border-2 border-[#c89b3c] rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.9)] w-64 py-2 text-xs font-cinzel select-none text-[#f5ebd6]"
+    >
+        <!-- Header: Ícone e Título do Nó -->
+        <div class="px-3 py-1.5 border-b border-[#785a28]/40 flex items-center space-x-2.5 mb-1">
+            <div id="ctx-node-icon" class="w-6 h-6 rounded-full bg-[#1c1612] border border-[#785a28] flex items-center justify-center shrink-0">
+                <span>📜</span>
+            </div>
+            <div id="ctx-node-title" class="font-bold text-[#f0c869] truncate">
+                Nó Selecionado
+            </div>
+        </div>
+
+        <!-- Grupo 1: Expansão & Conexão -->
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-create-child"
+                onclick="ctxCreateChildNode()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>➕ Criar Nó Filho Conectado</span>
+            </button>
+            <button
+                type="button"
+                id="ctx-btn-start-connection"
+                onclick="ctxStartConnection()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>🔗 Puxar Conexão (Pré-requisito)</span>
+            </button>
+        </div>
+
+        <div class="border-t border-[#785a28]/40 my-1"></div>
+
+        <!-- Grupo 2: Alimentar com IA -->
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-open-theory"
+                onclick="ctxOpenTheory()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>📝 Colar Resumo / Teoria</span>
+            </button>
+            <button
+                type="button"
+                id="ctx-btn-open-bulk-questions"
+                onclick="ctxOpenBulkQuestions()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>❓ Colar Questões em Lote</span>
+            </button>
+        </div>
+
+        <div class="border-t border-[#785a28]/40 my-1"></div>
+
+        <!-- Grupo 3: Estudo -->
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-study-node"
+                onclick="ctxStudyNode()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2 text-[#f0c869] font-bold"
+            >
+                <span>⚔️ Estudar este Nó (Tela Cheia)</span>
+            </button>
+        </div>
+
+        <div class="border-t border-[#785a28]/40 my-1"></div>
+
+        <!-- Grupo 4: Manutenção -->
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-edit-meta"
+                onclick="ctxEditNodeMeta()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2"
+            >
+                <span>✏️ Renomear / Trocar Ícone</span>
+            </button>
+            <button
+                type="button"
+                id="ctx-btn-delete-node"
+                onclick="ctxDeleteNode()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg text-[#e11d48] hover:bg-[#e11d48]/15 transition-colors flex items-center space-x-2 font-bold"
+            >
+                <span>🗑️ Excluir Nó</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Menu de Contexto do Canvas (Botão Direito no Fundo do Mapa) -->
+    <div
+        id="canvas-context-menu"
+        class="hidden fixed z-50 bg-[#14100d]/95 backdrop-blur-md border border-[#785a28] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.85)] w-56 py-1.5 text-xs font-cinzel select-none text-[#f5ebd6]"
+    >
+        <div class="px-1 space-y-0.5">
+            <button
+                type="button"
+                id="ctx-btn-create-node-here"
+                onclick="ctxCreateNodeAtCursor()"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f0c869] transition-colors flex items-center space-x-2 text-[#f0c869] font-bold"
+            >
+                <span>✨ Criar Nó Aqui</span>
+            </button>
+            <button
+                type="button"
+                id="ctx-btn-reset-view"
+                onclick="closeContextMenus(); resetView();"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#c89b3c]/20 hover:text-[#f5ebd6] transition-colors flex items-center space-x-2 text-[#a39276]"
+            >
+                <span>🎯 Centralizar Câmera</span>
+            </button>
+        </div>
     </div>
 
 </div>
 
-<!-- Modal da Forja: Criar ou Editar Medalhão -->
+<!-- Modal da Forja: Criar ou Editar Nó / Medalhão -->
 <div id="node-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeNodeModal()"></div>
     <div class="min-h-full flex items-center justify-center p-4">
         <div class="relative rpg-panel bg-[#14100d] border border-[#785a28] rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-[#f5ebd6]">
             <div class="flex items-center justify-between pb-4 border-b border-[#785a28]/50">
-                <h3 id="node-modal-title" class="text-lg font-bold font-cinzel text-[#f0c869]">Forjar Novo Medalhão</h3>
+                <h3 id="node-modal-title" class="text-lg font-bold font-cinzel text-[#f0c869]">Criar Novo Nó</h3>
                 <button type="button" onclick="closeNodeModal()" class="text-[#a39276] hover:text-[#f0c869] transition-colors">✕</button>
             </div>
             
             <form onsubmit="handleSaveNode(event)" class="mt-6 space-y-4">
                 <input type="hidden" id="modal-node-id"/>
                 <div>
-                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Título do Medalhão</label>
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Título do Nó</label>
                     <input
                         type="text"
                         id="modal-node-title-input"
                         required
                         maxlength="150"
-                        placeholder="Ex: Teoria Espectral de Grafos"
-                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm"
+                        placeholder="Ex: Teoria de Grafos e Caminhos"
+                        style="background-color: #0c0908 !important; color: #f5ebd6 !important; border: 1px solid #785a28 !important;"
+                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] placeholder-[#a39276]/70 focus:border-[#f0c869] focus:outline-none text-sm shadow-inner"
                     />
                 </div>
                 <div>
-                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Ícone Rúnico</label>
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Ícone</label>
                     <select
                         id="modal-node-icon-select"
+                        style="background-color: #0c0908 !important; color: #f5ebd6 !important; border: 1px solid #785a28 !important;"
                         class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm"
                     >
-                        <option value="calculator">📐 Cálculo & Álgebra (calculator)</option>
-                        <option value="trending-up">📈 Análise & Estatística (trending-up)</option>
-                        <option value="dice">🎲 Probabilidade & Aleatoriedade (dice)</option>
-                        <option value="activity">⚡ Sinais & Dinâmica (activity)</option>
-                        <option value="brain">🧠 Raciocínio & Conceito (brain)</option>
-                        <option value="book">📖 Tomo & Fundamentos (book)</option>
-                        <option value="code">💻 Algoritmos & Código (code)</option>
-                        <option value="cpu">⚙️ Hardware & Arquitetura (cpu)</option>
-                        <option value="database">🗄️ Dados & Persistência (database)</option>
-                        <option value="globe">🌐 Redes & Distribuído (globe)</option>
-                        <option value="layers">📚 Camadas & Design Patterns (layers)</option>
-                        <option value="shield">🛡️ Segurança & Blindagem (shield)</option>
-                        <option value="terminal">🖥️ CLI & Sistema (terminal)</option>
-                        <option value="zap">⚡ Performance & Otimização (zap)</option>
-                        <option value="award">🏆 Conquista & Maestria (award)</option>
-                        <option value="compass">🧭 Navegação & Estratégia (compass)</option>
-                        <option value="feather">🪶 Filosofia & Escrita (feather)</option>
-                        <option value="flame">🔥 Provações & Desafios (flame)</option>
-                        <option value="key">🗝️ Criptografia & Chaves (key)</option>
-                        <option value="scroll">📜 História & Protocolos (scroll)</option>
-                        <option value="sword">⚔️ Prática & Combate (sword)</option>
+                        <option value="sword">⚔️ Espada Rúnica (sword)</option>
+                        <option value="scroll">📜 Pergaminho Selado (scroll)</option>
+                        <option value="shield">🛡️ Égide de Cavaleiro (shield)</option>
+                        <option value="dice">🎲 Dado D20 (dice)</option>
+                        <option value="book">📖 Grimório Ancestral (book)</option>
+                        <option value="calculator">📐 Ábaco Arcano (calculator)</option>
+                        <option value="trending-up">📈 Flecha de Ascensão (trending-up)</option>
+                        <option value="activity">⚡ Pulso de Éter (activity)</option>
+                        <option value="brain">🧠 Runa da Mente (brain)</option>
+                        <option value="code">💻 Matriz Rúnica (code)</option>
+                        <option value="cpu">⚙️ Núcleo de Golem (cpu)</option>
+                        <option value="database">🗄️ Cofre de Cristais (database)</option>
+                        <option value="globe">🌐 Orbe Planar (globe)</option>
+                        <option value="layers">📚 Estratos Elementais (layers)</option>
+                        <option value="terminal">🖥️ Espelho de Vidência (terminal)</option>
+                        <option value="zap">⚡ Raio Sagrado (zap)</option>
+                        <option value="award">🏆 Medalhão de Láurea (award)</option>
+                        <option value="compass">🧭 Astrolábio Arcano (compass)</option>
+                        <option value="feather">🪶 Pena de Fênix (feather)</option>
+                        <option value="flame">🔥 Tocha Alquímica (flame)</option>
+                        <option value="key">🗝️ Chave Esqueleto (key)</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Descrição Breve do Medalhão</label>
+                    <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Descrição do Nó (Opcional)</label>
                     <textarea
                         id="modal-node-desc-input"
                         rows="3"
                         maxlength="2000"
-                        placeholder="Breve descrição dos conceitos abordados neste medalhão..."
+                        placeholder="Breve descrição dos conceitos abordados neste nó..."
                         class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none text-sm font-tome text-base"
                     ></textarea>
+                </div>
+
+                <!-- Seção de Pré-requisitos & Bloqueios do Nó (Modo Edição) -->
+                <div id="node-prerequisites-section" class="pt-4 border-t border-[#785a28]/40 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#f0c869]">
+                            🔗 Pré-requisitos &amp; Bloqueios do Nó
+                        </label>
+                        <span class="text-[10px] font-tome text-[#a39276]">Nível exigido para liberar este nó</span>
+                    </div>
+
+                    <!-- Lista de Pré-requisitos Atuais -->
+                    <div id="node-prerequisites-list" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                        <!-- Itens renderizados dinamicamente pelo study_canvas.js -->
+                    </div>
+
+                    <!-- Formulário de Adição de Pré-requisito -->
+                    <div id="add-prerequisite-container" class="pt-1">
+                        <div class="text-[11px] font-cinzel text-[#a39276] mb-1.5 font-bold">+ Adicionar Pré-requisito de Desbloqueio</div>
+                        <div id="add-prerequisite-form" class="flex flex-col sm:flex-row items-center gap-2">
+                            <select
+                                id="new-prereq-node-select"
+                                name="add-prerequisite-select"
+                                data-testid="add-prerequisite-select"
+                                class="w-full sm:flex-1 px-3 py-1.5 rounded-lg border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] text-xs focus:border-[#f0c869] focus:outline-none"
+                            >
+                                <option value="">Selecione um nó de pré-requisito...</option>
+                            </select>
+
+                            <select
+                                id="new-prereq-level-select"
+                                name="add-prerequisite-level"
+                                data-testid="add-prerequisite-level"
+                                class="w-full sm:w-28 px-2 py-1.5 rounded-lg border border-[#785a28] bg-[#0c0908] text-[#f0c869] font-cinzel font-bold text-xs focus:border-[#f0c869] focus:outline-none"
+                            >
+                                <option value="1">Nv. 1</option>
+                                <option value="2">Nv. 2</option>
+                                <option value="3">Nv. 3</option>
+                                <option value="4">Nv. 4</option>
+                            </select>
+
+                            <button
+                                type="button"
+                                id="btn-add-prerequisite"
+                                onclick="addPrerequisiteEdge(event)"
+                                class="w-full sm:w-auto rpg-btn-bronze text-xs py-1.5 px-3 font-cinzel font-bold whitespace-nowrap"
+                            >
+                                + Conectar Bloqueio
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Ações do Modal -->
@@ -230,7 +396,7 @@
                             onclick="deleteCurrentNode()"
                             class="text-xs text-[#e11d48] hover:text-red-400 font-cinzel font-bold px-2 py-1 rounded transition-colors hidden"
                         >
-                            Dissipar Nó
+                            Excluir Nó
                         </button>
                         <button
                             type="button"
@@ -238,13 +404,295 @@
                             onclick="openSelectedNodeGrimoire()"
                             class="rpg-btn-bronze text-xs py-1.5 px-3 hidden"
                         >
-                            📖 Abrir Grimório
+                            📖 Abrir Conteúdo & Estudo
                         </button>
                     </div>
                     <div class="flex items-center space-x-3">
                         <button type="button" onclick="closeNodeModal()" class="px-4 py-2 text-sm font-cinzel text-[#a39276] hover:text-[#f5ebd6]">Cancelar</button>
-                        <button type="submit" class="rpg-btn-gold text-sm px-5 py-2">✨ Gravar Medalhão</button>
+                        <button type="submit" class="rpg-btn-gold text-sm px-5 py-2">Salvar Nó</button>
                     </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Slide-Over Side Drawer Interativo do Nó (Dual-Screen com IA) -->
+<div
+    id="node-side-drawer"
+    class="fixed top-16 right-0 w-full sm:w-[480px] lg:w-[540px] h-[calc(100vh-4rem)] bg-[#14100d]/98 border-l border-[#785a28]/70 shadow-2xl z-40 flex flex-col transition-transform duration-300 transform translate-x-full text-[#f5ebd6] backdrop-blur-md"
+>
+    <!-- Cabeçalho do Drawer -->
+    <div class="px-5 py-3.5 bg-[#0c0908]/90 border-b border-[#785a28]/50 flex items-center justify-between">
+        <div class="flex items-center space-x-3 min-w-0 pr-2">
+            <div id="drawer-node-icon" class="w-8 h-8 rounded-full bg-[#1c1612] border border-[#785a28] flex items-center justify-center shrink-0">
+                <span>📜</span>
+            </div>
+            <div class="min-w-0">
+                <div class="flex items-center space-x-2">
+                    <span id="drawer-node-rank" class="px-2 py-0.5 rounded text-[10px] font-cinzel font-bold bg-[#0c0908] border border-[#785a28] text-[#f0c869]">
+                        Nv. 0
+                    </span>
+                    <span class="text-[10px] uppercase font-cinzel text-[#a39276] tracking-wider">Tomo do Nó</span>
+                </div>
+                <h2 id="drawer-node-title" class="text-sm font-bold font-cinzel text-[#f5ebd6] truncate">
+                    Título do Nó
+                </h2>
+            </div>
+        </div>
+        <div class="flex items-center space-x-1.5 shrink-0">
+            <button
+                type="button"
+                onclick="openSelectedNodeGrimoire()"
+                class="rpg-btn-bronze text-[11px] py-1 px-2.5 flex items-center space-x-1"
+                title="Abrir Grimório em Tela Cheia"
+            >
+                <span>📖 Tela Cheia</span>
+            </button>
+            <button
+                type="button"
+                onclick="if (state.selectedNode) openEditNodeModal(state.selectedNode)"
+                class="px-2.5 py-1 text-[11px] font-cinzel text-[#a39276] hover:text-[#f0c869] border border-[#785a28]/50 rounded-lg hover:border-[#f0c869] transition-colors"
+                title="Editar Título e Ícone"
+            >
+                <span>⚙️ Editar</span>
+            </button>
+            <button
+                type="button"
+                onclick="closeNodeSideDrawer()"
+                class="p-1 text-[#a39276] hover:text-[#f0c869] text-base leading-none transition-colors ml-1"
+                title="Fechar Painel Lateral"
+            >
+                ✕
+            </button>
+        </div>
+    </div>
+
+    <!-- Navegação das 3 Sub-Abas -->
+    <div class="flex border-b border-[#785a28]/40 bg-[#0c0908]">
+        <button
+            type="button"
+            id="drawer-tab-btn-content"
+            onclick="switchDrawerTab('content')"
+            class="flex-1 py-2.5 text-xs font-cinzel font-bold border-b-2 border-[#f0c869] text-[#f0c869] bg-[#1a1410] transition-colors"
+        >
+            📝 Resumo &amp; Conteúdo
+        </button>
+        <button
+            type="button"
+            id="drawer-tab-btn-questions"
+            onclick="switchDrawerTab('questions')"
+            class="flex-1 py-2.5 text-xs font-cinzel font-medium border-b-2 border-transparent text-[#a39276] hover:text-[#f5ebd6] hover:bg-[#14100d] transition-colors"
+        >
+            ⚡ Questões em Lote
+        </button>
+        <button
+            type="button"
+            id="drawer-tab-btn-prereqs"
+            onclick="switchDrawerTab('prereqs')"
+            class="flex-1 py-2.5 text-xs font-cinzel font-medium border-b-2 border-transparent text-[#a39276] hover:text-[#f5ebd6] hover:bg-[#14100d] transition-colors"
+        >
+            🔗 Bloqueios
+        </button>
+    </div>
+
+    <!-- Conteúdo da Aba 1: Resumo & Conteúdo -->
+    <div id="drawer-tab-content" class="flex-1 overflow-y-auto p-5 space-y-4">
+        <div>
+            <div class="flex items-center justify-between mb-1.5">
+                <label for="drawer-theory-input" class="text-xs font-bold font-cinzel text-[#f0c869] uppercase tracking-wider">
+                    Tomo de Sabedoria &amp; Teoria
+                </label>
+                <span class="text-[10px] font-tome text-[#a39276]">Cole resumos de IA ou anotações</span>
+            </div>
+            <textarea
+                id="drawer-theory-input"
+                rows="9"
+                placeholder="Cole aqui o resumo gerado pela IA, anotações ou conceitos deste tópico..."
+                class="w-full px-4 py-3 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] placeholder-[#a39276]/60 focus:border-[#f0c869] focus:outline-none text-sm font-tome leading-relaxed resize-y shadow-inner"
+            ></textarea>
+        </div>
+        <div class="flex items-center justify-between pt-2">
+            <div class="flex items-center">
+                <button
+                    type="button"
+                    onclick="saveDrawerTheory()"
+                    class="rpg-btn-gold text-xs px-4 py-2 font-cinzel font-bold flex items-center space-x-1.5"
+                >
+                    <span>💾 Salvar Resumo no Nó</span>
+                </button>
+                <span id="drawer-theory-status" class="hidden text-xs text-emerald-400 font-cinzel font-bold ml-3">
+                    ✓ Salvo com sucesso!
+                </span>
+            </div>
+            <button
+                type="button"
+                onclick="openSelectedNodeGrimoire()"
+                class="text-xs text-[#a39276] hover:text-[#f0c869] underline font-cinzel"
+            >
+                Ver no Grimório Completo →
+            </button>
+        </div>
+    </div>
+
+    <!-- Conteúdo da Aba 2: Questões em Lote & Avulsas -->
+    <div id="drawer-tab-questions" class="hidden flex-1 overflow-y-auto p-5 space-y-5">
+        <!-- Bloco de Importação em Lote -->
+        <div class="p-4 rounded-2xl bg-[#0c0908] border border-[#785a28]/60 shadow-inner space-y-3">
+            <div class="flex items-center justify-between gap-2">
+                <label for="drawer-bulk-questions-input" class="text-xs font-bold font-cinzel text-[#f0c869] uppercase tracking-wider">
+                    ⚡ Questões em Lote (JSON)
+                </label>
+                <div class="flex items-center space-x-1.5">
+                    <span id="copy-ai-prompt-status" class="hidden text-[10px] text-emerald-400 font-cinzel">✓ copiado</span>
+                    <button
+                        type="button"
+                        id="btn-copy-ai-json-prompt"
+                        onclick="copyAiJsonPrompt()"
+                        class="px-2 py-0.5 rounded bg-[#14100d] hover:bg-[#251c14] text-[#a39276] hover:text-[#f0c869] border border-[#785a28]/40 hover:border-[#c89b3c]/60 text-[10px] font-mono tracking-tight transition-all cursor-pointer opacity-80 hover:opacity-100"
+                        title="Copiar Skill para gerar questões em JSON na IA"
+                    >
+                        skill
+                    </button>
+                </div>
+            </div>
+            <textarea
+                id="drawer-bulk-questions-input"
+                rows="6"
+                placeholder="[&#10;  {&#10;    &quot;prompt&quot;: &quot;Enunciado da questão em **Markdown**...&quot;,&#10;    &quot;expected_answer&quot;: &quot;### Gabarito&#10;- **Conceito 1:** Explicação...&#10;- **Conceito 2:** Detalhe técnico...&quot;&#10;  }&#10;]"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-[#785a28]/80 bg-[#14100d] text-[#f5ebd6] placeholder-[#a39276]/60 focus:border-[#f0c869] focus:outline-none text-xs font-tome leading-relaxed resize-y"
+            ></textarea>
+            <div class="flex items-center justify-between">
+                <button
+                    type="button"
+                    onclick="submitDrawerBulkQuestions()"
+                    class="rpg-btn-gold text-xs px-3.5 py-2 font-cinzel font-bold flex items-center space-x-1"
+                >
+                    <span>⚡ Importar Questões em Lote</span>
+                </button>
+                <span id="drawer-bulk-status" class="hidden text-xs font-cinzel font-bold text-emerald-400"></span>
+            </div>
+        </div>
+
+        <!-- Bloco de Criação Rápida de Questão Única -->
+        <div class="p-4 rounded-2xl bg-[#0c0908] border border-[#785a28]/40 space-y-3">
+            <div class="text-xs font-bold font-cinzel text-[#a39276] uppercase tracking-wider">
+                + Adicionar Questão Avulsa
+            </div>
+            <div class="space-y-2">
+                <input
+                    type="text"
+                    id="drawer-single-prompt"
+                    placeholder="Pergunta / Enunciado..."
+                    class="w-full px-3 py-2 rounded-xl border border-[#785a28]/70 bg-[#14100d] text-[#f5ebd6] placeholder-[#a39276]/60 focus:border-[#f0c869] focus:outline-none text-xs"
+                />
+                <textarea
+                    id="drawer-single-answer"
+                    rows="2"
+                    placeholder="Resposta esperada..."
+                    class="w-full px-3 py-2 rounded-xl border border-[#785a28]/70 bg-[#14100d] text-[#f5ebd6] placeholder-[#a39276]/60 focus:border-[#f0c869] focus:outline-none text-xs font-tome resize-y"
+                ></textarea>
+            </div>
+            <button
+                type="button"
+                onclick="submitDrawerSingleQuestion(event)"
+                class="rpg-btn-bronze text-xs py-1.5 px-3 font-cinzel font-bold"
+            >
+                + Adicionar Questão
+            </button>
+        </div>
+
+        <!-- Lista de Questões Cadastradas no Nó -->
+        <div class="space-y-2">
+            <div class="flex items-center justify-between pt-1">
+                <span class="text-xs font-bold font-cinzel text-[#f0c869] uppercase tracking-wider">
+                    Questões do Nó (<span id="drawer-questions-count">0</span>)
+                </span>
+                <span class="text-[10px] font-tome text-[#a39276]">Fila de Repetição Espaçada</span>
+            </div>
+            <div id="drawer-questions-list" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                <!-- Renderizado dinamicamente pelo study_canvas.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Conteúdo da Aba 3: Bloqueios & Pré-requisitos -->
+    <div id="drawer-tab-prereqs" class="hidden flex-1 overflow-y-auto p-5 space-y-4">
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold font-cinzel text-[#f0c869] uppercase tracking-wider">
+                    🔗 Pré-requisitos Atuais
+                </span>
+                <span class="text-[10px] font-tome text-[#a39276]">Nós necessários para desbloqueio</span>
+            </div>
+            <div id="drawer-prerequisites-list" class="space-y-2 max-h-52 overflow-y-auto pr-1">
+                <!-- Itens renderizados dinamicamente pelo study_canvas.js -->
+            </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-[#0c0908] border border-[#785a28]/50 space-y-3">
+            <div class="text-xs font-cinzel text-[#a39276] font-bold uppercase tracking-wider">
+                + Conectar Novo Bloqueio
+            </div>
+            <div class="flex flex-col sm:flex-row items-center gap-2">
+                <select
+                    id="drawer-prereq-node-select"
+                    class="w-full sm:flex-1 px-3 py-2 rounded-xl border border-[#785a28] bg-[#14100d] text-[#f5ebd6] text-xs focus:border-[#f0c869] focus:outline-none"
+                >
+                    <option value="">Selecione um nó de pré-requisito...</option>
+                </select>
+
+                <select
+                    id="drawer-prereq-level-select"
+                    class="w-full sm:w-28 px-2 py-2 rounded-xl border border-[#785a28] bg-[#14100d] text-[#f0c869] font-cinzel font-bold text-xs focus:border-[#f0c869] focus:outline-none"
+                >
+                    <option value="1">Nv. 1</option>
+                    <option value="2">Nv. 2</option>
+                    <option value="3">Nv. 3</option>
+                    <option value="4">Nv. 4</option>
+                </select>
+
+                <button
+                    type="button"
+                    onclick="addDrawerPrerequisiteEdge(event)"
+                    class="w-full sm:w-auto rpg-btn-bronze text-xs py-2 px-3 font-cinzel font-bold whitespace-nowrap"
+                >
+                    + Conectar Bloqueio
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal da Forja: Criação Rápida de Nó Filho Conectado (1-Click) -->
+<div id="quick-child-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeQuickChildModal()"></div>
+    <div class="min-h-full flex items-center justify-center p-4">
+        <div class="relative rpg-panel bg-[#14100d] border border-[#785a28] rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl text-[#f5ebd6]">
+            <div class="flex items-center justify-between pb-3 border-b border-[#785a28]/50">
+                <h3 class="text-base font-bold font-cinzel text-[#f0c869] flex items-center space-x-2">
+                    <span>⚡ Novo Nó Conectado</span>
+                </h3>
+                <button type="button" onclick="closeQuickChildModal()" class="text-[#a39276] hover:text-[#f0c869] transition-colors">✕</button>
+            </div>
+            <p class="text-xs text-[#a39276] mt-2">
+                Conectando nó filho a: <span id="quick-child-parent-name" class="font-bold text-[#f5ebd6]"></span>
+            </p>
+            <form id="quick-child-form" onsubmit="handleQuickChildSubmit(event)" class="mt-4 space-y-4">
+                <div>
+                    <label for="quick-child-title-input" class="block text-xs font-bold font-cinzel uppercase tracking-wider text-[#a39276] mb-1">Título do Nó Filho</label>
+                    <input
+                        type="text"
+                        id="quick-child-title-input"
+                        required
+                        maxlength="150"
+                        placeholder="Ex: Padrão Factory, Algoritmos Gulosos..."
+                        class="w-full px-4 py-2.5 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] placeholder-[#a39276]/70 focus:border-[#f0c869] focus:outline-none text-sm shadow-inner"
+                    />
+                </div>
+                <div class="flex items-center justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeQuickChildModal()" class="px-3 py-1.5 text-xs font-cinzel text-[#a39276] hover:text-[#f5ebd6]">Cancelar</button>
+                    <button type="submit" id="btn-submit-quick-child" class="rpg-btn-gold text-xs px-4 py-2 font-cinzel font-bold">Criar e Abrir</button>
                 </div>
             </form>
         </div>
@@ -255,5 +703,6 @@
     window.CURRENT_MAP_ID = "{{ map.id }}";
     window.CURRENT_MAP_IS_OWNER = {{ "true" if map.is_owner else "false" }};
 </script>
-<script src="/static/js/study_canvas.js"></script>
+<script src="/static/js/rpg_icons.js?v=20261028b"></script>
+<script src="/static/js/study_canvas.js?v=20261028b"></script>
 {% endblock %}

@@ -65,7 +65,7 @@ warn_unused_configs = true
 minversion = "8.0"
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-ra -q --strict-markers"
+addopts = "-ra -q --strict-markers --import-mode=importlib"
 markers = [
     "security: Testes que avaliam aspectos de segurança e vulnerabilidade (requerem docstring estruturada obrigatória)",
     "unit: Testes unitários puros de domínio e serviços",

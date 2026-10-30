@@ -69,6 +69,29 @@ def test_gemini_question_validator_unsupported_answer() -> None:
 
 
 @pytest.mark.unit
+def test_gemini_question_validator_supported_answer() -> None:
+    validator = GeminiQuestionValidatorAdapter()
+    chunk = KnowledgeChunk(
+        source_id=uuid4(),
+        topic_id=uuid4(),
+        chunk_index=0,
+        content="Remédio constitucional para proteger a liberdade de locomoção em caso de ilegalidade.",
+        embedding=(0.1, 0.2),
+    )
+    res = asyncio.run(
+        validator.validate_question_grounding(
+            prompt="Como funciona o remédio constitucional?",
+            expected_answer="Proteger a liberdade de locomoção contra ato ilegal.",
+            context_chunks=[chunk],
+        )
+    )
+    assert res.is_grounded is True
+    assert res.confidence_score >= 0.90
+    assert len(res.evidence_chunk_ids) == 1
+    assert "respaldo direto" in res.reasoning
+
+
+@pytest.mark.unit
 def test_gemini_question_validator_model_configuration() -> None:
     validator_default = GeminiQuestionValidatorAdapter()
     assert validator_default._model == "gemini-3.8-flash"

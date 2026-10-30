@@ -1,278 +1,195 @@
 {% extends "base.html" %}
 
-{% block title %}{{ node.title }} — Grimório de Habilidades — Study Reviewer{% endblock %}
+{% block title %}{{ node.title }} — Conteúdo & Estudo{% endblock %}
 
 {% block content %}
-{% set icon_map = {
-    'calculator': '📐',
-    'trending-up': '📈',
-    'dice': '🎲',
-    'activity': '⚡',
-    'brain': '🧠',
-    'book': '📖',
-    'code': '💻',
-    'cpu': '⚙️',
-    'database': '🗄️',
-    'globe': '🌐',
-    'layers': '📚',
-    'shield': '🛡️',
-    'terminal': '🖥️',
-    'zap': '⚡',
-    'award': '🏆',
-    'compass': '🧭',
-    'feather': '🪶',
-    'flame': '🔥',
-    'key': '🗝️',
-    'scroll': '📜',
-    'sword': '⚔️',
-    'fire': '🔥',
-    'flask': '🧪',
-    'gem': '💎',
-    'rune': '🔮'
-} %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-<div class="space-y-6 w-full max-w-7xl mx-auto py-2">
-
-    <!-- Top Navigation / Breadcrumbs -->
-    <nav class="flex flex-wrap items-center justify-between gap-3 border-b border-[#785a28]/40 pb-4">
-        <div class="flex items-center space-x-3">
+    <!-- Topbar do Nó: Navegação, Identificação & Seletor de Modo -->
+    <div class="rpg-panel p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-[#785a28]">
+        <!-- Lado Esquerdo: Voltar & Título do Nó -->
+        <div class="flex items-center space-x-4 min-w-0">
             <a
                 href="/study-maps/{{ map.id }}/canvas"
-                class="inline-flex items-center text-sm font-cinzel font-bold text-[#f0c869] hover:text-[#c89b3c] transition-colors"
+                class="rpg-btn-bronze text-xs py-2 px-3 flex items-center space-x-1 shrink-0 font-cinzel"
+                title="Voltar ao canvas"
             >
-                <span class="mr-2 text-lg" aria-hidden="true">←</span>
-                <span>Voltar à Árvore:</span>
-                <strong class="ml-1.5 text-white underline decoration-[#785a28] decoration-2 underline-offset-4">{{ map.title }}</strong>
+                <span>←</span>
+                <span>Voltar à Árvore: {{ map.title }}</span>
             </a>
-        </div>
-        <div class="flex items-center space-x-3">
-            {% if node.is_unlocked %}
-            <span class="px-3 py-1 text-xs font-bold uppercase rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-700/60 font-cinzel shadow-sm flex items-center gap-1.5">
-                <span aria-hidden="true">🔓</span>
-                <span>Pré-requisitos cumpridos</span>
-            </span>
-            {% else %}
-            <span class="px-3 py-1 text-xs font-bold uppercase rounded-lg bg-rose-950/80 text-rose-400 border border-rose-700/60 font-cinzel shadow-sm flex items-center gap-1.5">
-                <span aria-hidden="true">🔒</span>
-                <span>Selado — Requer Nv. 1 em: {{ node.prereq_titles | join(', ') if node.prereq_titles else 'nós anteriores' }}</span>
-            </span>
-            {% endif %}
-            <span class="px-3 py-1 text-xs font-black uppercase rounded-lg bg-[#14100d] text-[#f0c869] border border-[#785a28] font-cinzel shadow-inner tracking-wider">
-                PATENTE ATUAL: Nv. {{ node.effective_level }}
-            </span>
-        </div>
-    </nav>
 
-    <!-- Node Header Card (HUD RPG) -->
-    <header class="rpg-panel p-6 shadow-2xl relative overflow-hidden">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-            <div class="flex items-center space-x-5">
-                <!-- Medalhão com Ícone Rúnico -->
-                <div class="w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center text-3xl shadow-xl border-2 transition-transform hover:scale-105 {% if not node.is_unlocked %}bg-[#14100d] border-[#3b322c] opacity-75 grayscale{% elif node.effective_level >= 3 %}bg-[#251c14] border-[#f0c869] shadow-[#f0c869]/30 text-[#f0c869]{% elif node.effective_level >= 1 %}bg-[#1f1813] border-[#785a28] shadow-[#c89b3c]/20 text-[#c89b3c]{% else %}bg-[#1c1612] border-[#574737] text-[#a39276]{% endif %}">
-                    {{ icon_map.get(node.icon, '⚔️') }}
+            <div class="flex items-center space-x-3 min-w-0">
+                <!-- Medalhão com Ícone Rúnico SVG -->
+                <div class="w-12 h-12 rounded-full border-2 border-[#c89b3c] bg-[#1c1612] flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(200,155,60,0.4)]">
+                    {{ get_rpg_icon_svg(node.icon, "w-6 h-6 text-[#f0c869]") | safe }}
                 </div>
-                <div>
-                    <h1 class="text-2xl sm:text-3xl font-extrabold text-[#f0c869] tracking-wider font-cinzel">
+
+                <div class="min-w-0">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-[10px] font-bold font-cinzel uppercase tracking-widest text-[#a39276] truncate">
+                            {{ map.title }}
+                        </span>
+                        <span class="px-2 py-0.5 text-[10px] font-cinzel font-black rounded bg-[#251c14] text-[#f0c869] border border-[#785a28]">
+                            Nv. {{ node.effective_level }}
+                        </span>
+                        {% if not node.is_unlocked %}
+                        <span class="px-2 py-0.5 text-[10px] font-cinzel font-bold rounded bg-rose-950/80 text-rose-300 border border-rose-800 animate-pulse">
+                            🔒 Bloqueado
+                        </span>
+                        {% endif %}
+                    </div>
+                    <h1 class="text-lg sm:text-xl font-bold font-cinzel text-[#f5ebd6] truncate">
                         {{ node.title }}
                     </h1>
-                    <p class="text-sm text-[#a39276] mt-1 font-tome text-base">
-                        {{ node.description or 'Sem descrição rúnica cadastrada neste nó.' }}
-                    </p>
-                </div>
-            </div>
-
-            <!-- Resumo de Maestria e Barra de Progresso -->
-            <div class="flex flex-col sm:flex-row sm:items-center gap-4 bg-[#14100d]/80 px-4 py-3 rounded-xl border border-[#785a28]/40 shadow-inner">
-                <div class="text-left sm:text-right">
-                    <span class="text-[11px] uppercase font-bold tracking-wider text-[#a39276] block font-cinzel">Maestria do Nó</span>
-                    <span class="font-bold text-sm text-[#f5ebd6]" id="node-progress-summary">
-                        {{ node.mastered_questions_count }}/{{ node.total_questions_count }} Provações Dominadas ({{ node.progress_percent }}%)
-                    </span>
-                </div>
-                <div class="w-36 bg-[#0c0908] rounded-full h-3 overflow-hidden border border-[#785a28]/60 shadow-inner">
-                    <div
-                        id="node-progress-bar"
-                        class="bg-gradient-to-r from-[#c89b3c] to-[#f0c869] h-3 rounded-full transition-all duration-500 shadow-md"
-                        style="width: {{ node.progress_percent }}%"
-                    ></div>
                 </div>
             </div>
         </div>
-    </header>
 
-    <!-- Layout Bipartido do Grimório (2 Colunas) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <!-- Lado Direito: Alternância de Modo (Estudo vs Gerenciar Conteúdo) -->
+        {% if map.is_owner %}
+        <div class="flex items-center self-start md:self-auto bg-[#0c0908] p-1 rounded-xl border border-[#785a28]/60 text-xs shadow-inner shrink-0">
+            <button
+                type="button"
+                id="btn-tab-study-mode"
+                onclick="switchNodeView('study')"
+                class="px-4 py-2 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5"
+            >
+                <span>📖</span>
+                <span>Modo Estudo</span>
+            </button>
+            <button
+                type="button"
+                id="btn-tab-manage-mode"
+                onclick="switchNodeView('manage')"
+                class="px-4 py-2 font-medium font-cinzel rounded-lg text-[#a39276] hover:text-[#f0c869] transition-all flex items-center space-x-1.5"
+            >
+                <span>⚙️</span>
+                <span>Gerenciar Conteúdo & Questões</span>
+            </button>
+        </div>
+        {% endif %}
+    </div>
 
-        <!-- ========================================== -->
-        <!-- COLUNA ESQUERDA: 📖 Tomo de Sabedoria      -->
-        <!-- ========================================== -->
-        <section class="space-y-6">
+    <!-- Banner de Status de Pré-requisitos & Bloqueios -->
+    {% if not node.is_unlocked %}
+    <div class="p-4 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-200 text-xs flex items-center justify-between gap-4 shadow-lg">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl">🔒</span>
+            <div>
+                <strong class="font-cinzel text-rose-300 font-bold block uppercase tracking-wider">
+                    Selado — Requer:
+                </strong>
+                <p class="text-rose-200/90 mt-1 flex flex-wrap gap-2">
+                    {% for req in node.incoming_requirements %}
+                        <span class="inline-block bg-rose-900/60 px-2.5 py-1 rounded border border-rose-700/50 font-mono">
+                            {{ req.title }} (Nv. {{ req.required_level }})
+                        </span>
+                    {% endfor %}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="p-3 rounded-2xl bg-emerald-950/30 border border-emerald-800/50 text-emerald-300 text-xs flex items-center space-x-2">
+        <span>🔓</span>
+        <span class="font-cinzel font-bold">Selos Arcanos Satisfeitos (Pronto para Estudo)</span>
+    </div>
+    {% endif %}
 
-            <!-- Tomo de Sabedoria Principal (Teoria RAG) -->
+    <!-- ======================================================== -->
+    <!-- MODO 1: 📖 MODO ESTUDO (Visualização Focada & Sem Spoiler) -->
+    <!-- ======================================================== -->
+    <div id="view-study-mode" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Coluna Esquerda (lg:col-span-7): Resumo & Materiais de Apoio -->
+        <div class="lg:col-span-7 space-y-6">
+
+            <!-- Painel 1: Resumo do Tópico (Tomo de Sabedoria) -->
             <div class="rpg-panel p-6 space-y-4">
                 <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
-                    <h2 class="text-lg font-bold text-[#f0c869] flex items-center space-x-2 font-cinzel tracking-wide">
-                        <span aria-hidden="true">📖</span>
-                        <span>Tomo de Sabedoria</span>
+                    <h2 class="text-base font-bold text-[#f0c869] flex items-center space-x-2 font-cinzel">
+                        <span>📖</span>
+                        <span>Resumo do Tópico • Tomo de Sabedoria</span>
                     </h2>
+                    {% if map.is_owner %}
                     <button
                         type="button"
-                        id="btn-edit-theory"
-                        onclick="toggleTheoryEditor()"
-                        class="rpg-btn-bronze text-xs py-1 px-2.5"
+                        onclick="switchNodeView('manage'); switchManageSubTab('content');"
+                        class="text-xs text-[#a39276] hover:text-[#f0c869] font-cinzel transition-colors"
+                        title="Editar Resumo"
                     >
-                        ✍️ Editar Tomo
+                        ✏️ Editar Resumo
                     </button>
-                </div>
-
-                <!-- Visualização da Teoria com Tipografia Editorial Cormorant Garamond -->
-                <div
-                    id="theory-display"
-                    class="font-tome text-lg text-[#f5ebd6] leading-relaxed whitespace-pre-line bg-[#14100d]/90 p-5 rounded-xl border border-[#785a28]/40 shadow-inner min-h-[10rem] select-text"
-                >
-                    {% if node.theory_content %}
-                    {{ node.theory_content }}
-                    {% else %}
-                    <p class="text-[#a39276] italic text-base">O Tomo de Sabedoria deste nó ainda está em branco. Clique em 'Editar Tomo' para escrever a fundamentação teórica que servirá de âncora para a IA.</p>
                     {% endif %}
                 </div>
 
-                <!-- Editor de Teoria Inline -->
-                <form
-                    id="theory-editor"
-                    class="hidden space-y-3 pt-2"
-                    onsubmit="event.preventDefault(); saveNodeTheory();"
-                >
-                    <label for="theory-textarea" class="block text-xs font-bold uppercase tracking-wider text-[#a39276] font-cinzel">
-                        Texto Sagrado do Tomo (Markdown / Teoria)
-                    </label>
-                    <textarea
-                        id="theory-textarea"
-                        rows="10"
-                        class="w-full bg-[#14100d] border border-[#785a28] rounded-xl p-3.5 text-[#f5ebd6] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#f0c869] leading-relaxed resize-y"
-                        placeholder="Escreva as definições, teoremas, fórmulas ou explicações do tópico..."
-                    >{{ node.theory_content }}</textarea>
-                    <div class="flex justify-end space-x-2 pt-1">
-                        <button
-                            type="button"
-                            onclick="toggleTheoryEditor()"
-                            class="rpg-btn-bronze text-xs"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            id="btn-save-theory"
-                            class="rpg-btn-gold text-xs"
-                        >
-                            Salvar Tomo
-                        </button>
-                    </div>
-                </form>
+                <div id="theory-display-area" class="text-[#f5ebd6] font-tome text-base leading-relaxed whitespace-pre-line min-h-[120px] rpg-markdown" data-rpg-markdown="true">
+                    {% if node.theory_content %}
+                        {{ node.theory_content }}
+                    {% else %}
+                        <div class="p-6 rounded-xl bg-[#0c0908]/60 border border-dashed border-[#785a28]/40 text-center space-y-2">
+                            <span class="text-2xl block">📝</span>
+                            <p class="text-xs text-[#a39276] italic font-sans">
+                                Nenhum resumo cadastrado para este tópico ainda.
+                            </p>
+                            {% if map.is_owner %}
+                            <button
+                                type="button"
+                                onclick="switchNodeView('manage'); switchManageSubTab('content');"
+                                class="rpg-btn-bronze text-xs py-1.5 px-3"
+                            >
+                                + Adicionar Resumo ou Arquivo (PDF/DOCX)
+                            </button>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
             </div>
 
-            <!-- Pergaminhos & Fontes Complementares (Materials) -->
+            <!-- Painel 2: Materiais de Apoio Anexados -->
             <div class="rpg-panel p-6 space-y-4">
                 <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
-                    <h2 class="text-lg font-bold text-[#f0c869] flex items-center space-x-2 font-cinzel tracking-wide">
-                        <span aria-hidden="true">📜</span>
-                        <span>Pergaminhos & Fontes Complementares</span>
+                    <h2 class="text-base font-bold text-[#f0c869] flex items-center space-x-2 font-cinzel">
+                        <span>📎</span>
+                        <span>Materiais de Apoio &amp; Fontes ({{ materials | length }})</span>
                     </h2>
+                    {% if map.is_owner %}
                     <button
                         type="button"
-                        id="btn-toggle-new-material"
-                        onclick="toggleNewMaterialForm()"
-                        class="rpg-btn-bronze text-xs py-1 px-2.5"
+                        onclick="switchNodeView('manage'); switchManageSubTab('content');"
+                        class="text-xs text-[#a39276] hover:text-[#f0c869] font-cinzel transition-colors"
                     >
-                        + Novo Pergaminho
+                        + Gerenciar Arquivos
                     </button>
+                    {% endif %}
                 </div>
 
-                <!-- Formulário Inline: Novo Pergaminho -->
-                <form
-                    id="new-material-form"
-                    class="hidden p-4 rounded-xl bg-[#14100d] border border-[#785a28] space-y-3 shadow-lg"
-                    onsubmit="event.preventDefault(); createNodeMaterial();"
-                >
-                    <div>
-                        <label for="material-title-input" class="block text-xs font-bold uppercase text-[#a39276] mb-1 font-cinzel">
-                            Título do Pergaminho / Artigo
-                        </label>
-                        <input
-                            type="text"
-                            id="material-title-input"
-                            class="w-full bg-[#1c1612] border border-[#785a28]/80 rounded-lg px-3 py-2 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869]"
-                            placeholder="Ex: Teorema Espectral e Aplicações"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label for="material-text-input" class="block text-xs font-bold uppercase text-[#a39276] mb-1 font-cinzel">
-                            Conteúdo Integral do Pergaminho (Texto Puro para Leitura & RAG)
-                        </label>
-                        <textarea
-                            id="material-text-input"
-                            rows="5"
-                            class="w-full bg-[#1c1612] border border-[#785a28]/80 rounded-lg px-3 py-2 text-sm text-[#f5ebd6] font-mono focus:outline-none focus:ring-1 focus:ring-[#f0c869]"
-                            placeholder="Insira o texto integral de referência..."
-                            required
-                        ></textarea>
-                    </div>
-                    <div class="flex justify-end space-x-2 pt-1">
-                        <button
-                            type="button"
-                            onclick="toggleNewMaterialForm()"
-                            class="rpg-btn-bronze text-xs"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            id="btn-create-material"
-                            class="rpg-btn-gold text-xs"
-                        >
-                            Forjar Pergaminho
-                        </button>
-                    </div>
-                </form>
-
-                <!-- Lista de Pergaminhos Cadastrados com Leitura Expansível -->
-                <div id="materials-list" class="space-y-3">
+                <div id="study-materials-list" class="space-y-3">
                     {% if materials %}
                         {% for m in materials %}
-                        <div class="p-4 rounded-xl bg-[#14100d]/90 border border-[#785a28]/50 space-y-2.5 shadow-sm" id="material-item-{{ m.id }}">
+                        <div class="p-4 rounded-xl bg-[#14100d]/90 border border-[#785a28]/40 space-y-2.5 shadow-sm">
                             <div class="flex items-center justify-between gap-2">
                                 <h3 class="font-bold text-[#f5ebd6] text-sm flex items-center space-x-2 font-cinzel">
-                                    <span aria-hidden="true">📜</span>
+                                    <span>📄</span>
                                     <span>{{ m.title }}</span>
                                 </h3>
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-[10px] uppercase font-bold text-[#a39276] bg-[#1c1612] px-2 py-0.5 rounded border border-[#785a28]/40">
-                                        {{ m.content_type }}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onclick="deleteNodeMaterial('{{ m.id }}')"
-                                        title="Dissipar pergaminho"
-                                        class="text-xs text-[#a39276] hover:text-[#e11d48] transition-colors p-1"
-                                    >
-                                        🗑️
-                                    </button>
-                                </div>
+                                <span class="text-[10px] uppercase font-bold text-[#a39276] bg-[#1c1612] px-2 py-0.5 rounded border border-[#785a28]/40">
+                                    {{ m.content_type }}
+                                </span>
                             </div>
                             {% if m.raw_text %}
                             <div>
                                 <button
                                     type="button"
-                                    onclick="toggleMaterialText('{{ m.id }}')"
+                                    onclick="toggleMaterialText('study-mat-{{ m.id }}', this)"
                                     class="text-xs text-[#f0c869] hover:text-[#c89b3c] flex items-center gap-1 font-semibold"
                                 >
-                                    <span id="mat-icon-{{ m.id }}" aria-hidden="true">👁️</span>
-                                    <span id="mat-label-{{ m.id }}">Expandir Leitura Integral</span>
+                                    <span>👁️</span>
+                                    <span>Expandir Leitura</span>
                                 </button>
                                 <div
-                                    id="mat-text-{{ m.id }}"
-                                    class="mt-2 text-sm text-[#f5ebd6] font-tome text-base leading-relaxed whitespace-pre-line bg-[#0c0908] p-3 rounded-lg border border-[#785a28]/30 max-h-60 overflow-y-auto"
+                                    id="study-mat-{{ m.id }}"
+                                    class="hidden mt-2 text-sm text-[#f5ebd6] font-tome text-base leading-relaxed whitespace-pre-line bg-[#0c0908] p-3.5 rounded-lg border border-[#785a28]/30 max-h-64 overflow-y-auto"
                                 >
                                     {{ m.raw_text }}
                                 </div>
@@ -281,136 +198,85 @@
                         </div>
                         {% endfor %}
                     {% else %}
-                        <p class="text-[#a39276] italic text-sm text-center py-4">Nenhum pergaminho complementar anexado a este nó.</p>
+                        <p class="text-[#a39276] italic text-xs text-center py-3">Nenhum material de apoio anexado.</p>
                     {% endif %}
                 </div>
             </div>
-        </section>
 
-        <!-- ========================================== -->
-        <!-- COLUNA DIREITA: ⚔️ Provações de Maestria   -->
-        <!-- ========================================== -->
-        <section class="space-y-6">
+        </div>
 
-            <!-- Card Principal: Arena de Provação Ativa (SRS & IA) -->
+        <!-- Coluna Direita (lg:col-span-5): 🎯 Revisão de Questões (Provações de Maestria) -->
+        <div class="lg:col-span-5 space-y-6">
+
             <div class="rpg-panel p-6 space-y-5">
                 <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
-                    <h2 class="text-lg font-bold text-[#f0c869] flex items-center space-x-2 font-cinzel tracking-wide">
-                        <span aria-hidden="true">⚔️</span>
-                        <span>Provações de Maestria</span>
+                    <h2 class="text-base font-bold text-[#f0c869] flex items-center space-x-2 font-cinzel">
+                        <span>🎯</span>
+                        <span>Questões de Revisão &bull; Provações de Maestria</span>
                     </h2>
-                    <button
-                        type="button"
-                        id="btn-toggle-new-question"
-                        onclick="toggleNewQuestionForm()"
-                        class="rpg-btn-bronze text-xs py-1 px-2.5"
-                    >
-                        + Forjar Nova Provação
-                    </button>
+                    <span class="text-xs font-bold text-[#c89b3c] font-cinzel" id="study-progress-label">
+                        Domínio: {{ node.progress_percent }}%
+                    </span>
                 </div>
 
-                <!-- Formulário Inline: Forjar Nova Provação -->
-                <form
-                    id="new-question-form"
-                    class="hidden p-4 rounded-xl bg-[#14100d] border border-[#785a28] space-y-3 shadow-lg"
-                    onsubmit="event.preventDefault(); createNodeQuestion();"
-                >
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-[#f0c869] font-cinzel">
-                        Forjar Nova Provação SRS
-                    </h3>
-                    <div>
-                        <label for="question-prompt-input" class="block text-xs font-bold uppercase text-[#a39276] mb-1 font-cinzel">
-                            Enunciado da Provação (Desafio Conceitual)
-                        </label>
-                        <input
-                            type="text"
-                            id="question-prompt-input"
-                            class="w-full bg-[#1c1612] border border-[#785a28]/80 rounded-lg px-3 py-2 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869]"
-                            placeholder="Ex: Como a decomposição SVD atua na compressão dimensional?"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label for="question-answer-input" class="block text-xs font-bold uppercase text-[#a39276] mb-1 font-cinzel">
-                            Gabarito / Runas Esperadas (Critério de Correção da IA)
-                        </label>
-                        <textarea
-                            id="question-answer-input"
-                            rows="3"
-                            class="w-full bg-[#1c1612] border border-[#785a28]/80 rounded-lg px-3 py-2 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869]"
-                            placeholder="Ex: A SVD fatora A = U Σ V^T, permitindo truncar os menores valores singulares..."
-                            required
-                        ></textarea>
-                    </div>
-                    <div class="flex justify-end space-x-2 pt-1">
-                        <button
-                            type="button"
-                            onclick="toggleNewQuestionForm()"
-                            class="rpg-btn-bronze text-xs"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            id="btn-create-question"
-                            class="rpg-btn-gold text-xs"
-                        >
-                            Selar Provação
-                        </button>
-                    </div>
-                </form>
+                <!-- Barra de Progresso do Nó -->
+                <div class="w-full bg-[#0c0908] h-2 rounded-full border border-[#785a28]/40 overflow-hidden">
+                    <div
+                        id="node-progress-bar"
+                        class="bg-gradient-to-r from-[#c89b3c] to-[#f0c869] h-full transition-all duration-500"
+                        style="width: {{ node.progress_percent }}%;"
+                    ></div>
+                </div>
 
-                <!-- Banners de Notificação (Rank Up & Treino Livre) -->
-                <div id="rankup-banner" class="hidden p-4 rounded-xl bg-gradient-to-r from-[#c89b3c]/20 via-[#f0c869]/30 to-[#c89b3c]/20 border-2 border-[#f0c869] text-[#f5ebd6] shadow-xl animate-pulse">
-                    <div class="flex items-center gap-3">
-                        <span class="text-3xl" aria-hidden="true">🏆</span>
+                <!-- Banners de Estado (Subida de Nível & Treino Livre) -->
+                <div id="rankup-banner" class="hidden p-3.5 rounded-xl bg-gradient-to-r from-[#c89b3c]/20 via-[#f0c869]/30 to-[#c89b3c]/20 border-2 border-[#f0c869] text-[#f5ebd6] shadow-xl animate-pulse">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-2xl">🏆</span>
                         <div>
-                            <div class="font-cinzel font-black text-sm text-[#f0c869] tracking-wider uppercase">
-                                ⚡ PATENTE ELEVADA! NÓ DOMINADO (RANK I+)
+                            <div class="font-cinzel font-bold text-xs text-[#f0c869] uppercase">
+                                Patente Elevada!
                             </div>
-                            <div class="text-xs text-[#f5ebd6] mt-0.5" id="rankup-banner-text">
-                                Novos caminhos foram destrancados na Árvore de Conhecimento!
+                            <div class="text-[11px] text-[#f5ebd6]" id="rankup-banner-text">
+                                Seu domínio sobre este nó aumentou!
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div id="training-mode-banner" class="hidden p-3.5 rounded-xl bg-[#1c1612] border border-[#785a28] text-[#f5ebd6] shadow-md">
-                    <div class="flex items-center gap-2.5 text-xs text-[#f0c869] font-cinzel font-semibold">
-                        <span class="text-base" aria-hidden="true">⚔️</span>
-                        <span id="training-mode-banner-text">Modo Treino Livre — Provação já agendada para hoje. Nível mantido sem penalidade.</span>
+                <div id="training-mode-banner" class="hidden p-3 rounded-xl bg-[#1c1612] border border-[#785a28] text-[#f5ebd6] text-xs">
+                    <div class="flex items-center gap-2 text-[#f0c869] font-cinzel">
+                        <span>⚔️</span>
+                        <span id="training-mode-banner-text">Modo Treino Livre — Revisão já realizada para hoje. Nível mantido sem penalidade.</span>
                     </div>
                 </div>
 
-                <!-- Arena Ativa da Pergunta Selecionada -->
-                <div id="active-srs-arena" class="space-y-4">
+                <!-- Arena de Estudo Ativa -->
+                <div id="active-study-arena" class="space-y-4">
                     {% if questions %}
-                    <!-- Navegação do Carrossel de Provações -->
-                    <div class="flex items-center justify-between bg-[#14100d] p-3 rounded-xl border border-[#785a28]/40">
+                    <!-- Carrossel / Navegação da Pergunta -->
+                    <div class="flex items-center justify-between bg-[#14100d] p-2.5 rounded-xl border border-[#785a28]/40">
                         <button
                             type="button"
-                            id="btn-prev-question"
                             onclick="navigateQuestion(-1)"
                             class="rpg-btn-bronze text-xs py-1 px-2.5"
                         >
                             ← Anterior
                         </button>
                         <div class="text-center">
-                            <span class="font-cinzel text-xs font-bold text-[#f0c869] tracking-wider" id="arena-question-counter">
-                                Provação 1 de {{ questions | length }}
+                            <span class="font-cinzel text-xs font-bold text-[#f0c869]" id="arena-question-counter">
+                                Pergunta 1 de {{ questions | length }}
                             </span>
                             <div class="flex items-center justify-center gap-2 mt-0.5">
                                 <span class="text-[10px] uppercase font-bold text-[#c89b3c]" id="arena-question-rank">
                                     RANK {{ questions[0].current_level }}
                                 </span>
                                 <span class="text-[10px] text-[#a39276]" id="arena-question-due">
-                                    {{ '🔥 VENCIDA' if questions[0].is_due else ('Próxima: ' ~ questions[0].next_review_date) }}
+                                    {{ '🔥 Vencida' if questions[0].is_due else ('Próxima: ' ~ questions[0].next_review_date) }}
                                 </span>
                             </div>
                         </div>
                         <button
                             type="button"
-                            id="btn-next-question"
                             onclick="navigateQuestion(1)"
                             class="rpg-btn-bronze text-xs py-1 px-2.5"
                         >
@@ -418,30 +284,30 @@
                         </button>
                     </div>
 
-                    <!-- Card da Pergunta Ativa -->
+                    <!-- Card com Enunciado -->
                     <div class="bg-[#14100d] p-5 rounded-xl border border-[#785a28]/50 space-y-4 shadow-inner">
                         <div class="text-xs uppercase font-bold text-[#a39276] font-cinzel tracking-wider">
-                            Enunciado do Desafio
+                            Desafio / Questão
                         </div>
-                        <div class="text-base sm:text-lg font-semibold text-[#f5ebd6] leading-relaxed" id="arena-prompt">
+                        <div class="text-base sm:text-lg font-semibold text-[#f5ebd6] leading-relaxed rpg-markdown" id="arena-question-prompt" data-testid="arena-prompt" data-rpg-markdown="true">
                             {{ questions[0].statement or questions[0].prompt }}
                         </div>
 
-                        <!-- Seletor de Modo de Resposta -->
+                        <!-- Seletor das 3 Formas de Resposta -->
                         <div class="grid grid-cols-3 gap-2 pt-2 border-t border-[#785a28]/30">
                             <button
                                 type="button"
                                 id="tab-reveal"
                                 onclick="selectArenaMode('reveal')"
-                                class="py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow"
+                                class="py-2 px-1 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow text-center"
                             >
-                                🔮 Revelar Runas
+                                👁️ Revelar Runas & Gabarito
                             </button>
                             <button
                                 type="button"
                                 id="tab-conjure"
                                 onclick="selectArenaMode('conjure')"
-                                class="py-2 px-2 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all"
+                                class="py-2 px-1 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all text-center"
                             >
                                 ✍️ Conjurar Resposta
                             </button>
@@ -449,13 +315,13 @@
                                 type="button"
                                 id="tab-voice"
                                 onclick="selectArenaMode('voice')"
-                                class="py-2 px-2 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all"
+                                class="py-2 px-1 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all text-center"
                             >
                                 🎙️ Voz Arcana
                             </button>
                         </div>
 
-                        <!-- PAINEL 1: 🔮 Revelar Runas (Gabarito Direto) -->
+                        <!-- PAINEL 1: 👁️ Ver Gabarito Direto (Autoavaliação SRS) -->
                         <div id="panel-reveal" class="space-y-4 pt-2">
                             <div class="text-center" id="reveal-btn-container">
                                 <button
@@ -464,22 +330,22 @@
                                     onclick="revealActiveRunes()"
                                     class="rpg-btn-gold text-xs px-6 py-2.5"
                                 >
-                                    🔮 Revelar Runas & Gabarito
+                                    👁️ Revelar Resposta &amp; Gabarito
                                 </button>
                             </div>
 
                             <div id="active-expected-answer-box" class="hidden space-y-3">
                                 <div class="bg-[#0c0908] p-4 rounded-xl border border-[#785a28]/60 text-sm font-tome text-base text-[#f5ebd6] leading-relaxed">
                                     <span class="font-cinzel text-xs font-bold text-[#c89b3c] block uppercase tracking-wider mb-1">
-                                        Runas Esperadas (Gabarito Oficial):
+                                        Gabarito / Resposta Esperada:
                                     </span>
-                                    <span id="arena-expected-answer">{{ questions[0].expected_answer }}</span>
+                                    <div id="arena-expected-answer" class="rpg-markdown" data-rpg-markdown="true">{{ questions[0].expected_answer }}</div>
                                 </div>
 
                                 <!-- 4 Botões Oficiais de Avaliação SRS -->
-                                <div class="space-y-1.5">
+                                <div class="space-y-1.5 pt-1">
                                     <span class="block text-center text-xs font-cinzel font-bold text-[#a39276] uppercase">
-                                        Avalie seu Domínio Conceitual:
+                                        Como foi seu desempenho?
                                     </span>
                                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         <button
@@ -491,10 +357,10 @@
                                         </button>
                                         <button
                                             type="button"
-                                            onclick="submitNodeReview(null, 'hard', 50)"
+                                            onclick="submitNodeReview(null, 'hard', 25)"
                                             class="py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-amber-800 bg-amber-950/60 text-amber-300 hover:bg-amber-900 transition-colors shadow"
                                         >
-                                            ⚠️ Difícil (50%)
+                                            ⚠️ Difícil (25%)
                                         </button>
                                         <button
                                             type="button"
@@ -515,19 +381,19 @@
                             </div>
                         </div>
 
-                        <!-- PAINEL 2: ✍️ Conjurar Resposta (Texto + IA RAG) -->
+                        <!-- PAINEL 2: ✍️ Responder por Texto (com Avaliação por IA) -->
                         <div id="panel-conjure" class="hidden space-y-3 pt-2">
                             <label for="conjure-textarea" class="block text-xs font-cinzel font-bold uppercase text-[#a39276]">
-                                Digite sua resposta dissertativa para avaliação:
+                                Digite sua resposta dissertativa:
                             </label>
                             <textarea
                                 id="conjure-textarea"
                                 rows="4"
                                 class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869] font-sans leading-relaxed"
-                                placeholder="Explique os conceitos com suas próprias palavras..."
+                                placeholder="Explique os conceitos com suas palavras..."
                             ></textarea>
                             <div class="flex items-center justify-between">
-                                <span class="text-[11px] text-[#a39276]">Avaliação com Gemini AI & RAG do Tomo</span>
+                                <span class="text-[11px] text-[#a39276]">Avaliação semântica com IA</span>
                                 <button
                                     type="button"
                                     id="btn-evaluate-text"
@@ -546,10 +412,10 @@
                             </div>
                         </div>
 
-                        <!-- PAINEL 3: 🎙️ Voz Arcana (Áudio + IA Multimodal) -->
+                        <!-- PAINEL 3: 🎙️ Gravar Voz (Multimodal IA) -->
                         <div id="panel-voice" class="hidden space-y-3 pt-2 text-center">
                             <p class="text-xs text-[#a39276] leading-relaxed max-w-md mx-auto">
-                                Fale sua resposta em voz alta. O modelo multimodal transcreverá e julgará seu domínio conceitual.
+                                Fale sua resposta em voz alta. O modelo transcreverá e julgará seu entendimento.
                             </p>
                             <div class="py-2">
                                 <button
@@ -567,7 +433,7 @@
                             </div>
                             <div id="voice-feedback-box" class="hidden text-left p-4 rounded-xl bg-[#0c0908] border border-[#785a28] space-y-2">
                                 <div class="flex items-center justify-between">
-                                    <span class="font-cinzel font-bold text-xs text-[#f0c869]">Voz Arcana Decodificada</span>
+                                    <span class="font-cinzel font-bold text-xs text-[#f0c869]">Avaliação por Voz</span>
                                     <span class="text-xs font-bold text-emerald-400" id="voice-score">100%</span>
                                 </div>
                                 <p class="text-xs text-[#f5ebd6] leading-relaxed" id="voice-feedback"></p>
@@ -576,222 +442,1155 @@
 
                     </div>
                     {% else %}
-                    <p class="text-[#a39276] italic text-sm text-center py-6">Nenhuma provação SRS forjada para este nó. Use o botão acima para criar a primeira provação!</p>
+                    <!-- Empty State de Perguntas -->
+                    <div class="p-8 rounded-xl bg-[#0c0908]/60 border border-dashed border-[#785a28]/40 text-center space-y-3">
+                        <span class="text-3xl block">🎯</span>
+                        <p class="text-xs text-[#a39276] italic font-sans">
+                            Nenhuma questão cadastrada para este nó ainda.
+                        </p>
+                        {% if map.is_owner %}
+                        <button
+                            type="button"
+                            onclick="switchNodeView('manage'); switchManageSubTab('questions');"
+                            class="rpg-btn-gold text-xs py-2 px-4"
+                        >
+                            + Cadastrar Perguntas no Modo Gerenciamento
+                        </button>
+                        {% endif %}
+                    </div>
                     {% endif %}
                 </div>
+            </div>
 
-                <!-- Lista de Provações Cadastradas (com Exclusão e Consulta Rápida) -->
-                <div class="space-y-3 pt-4 border-t border-[#785a28]/40">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-[#a39276] font-cinzel">
-                        Todas as Provações do Nó ({{ questions | length }})
-                    </h3>
-                    <div id="questions-list" class="space-y-2.5">
-                        {% if questions %}
-                            {% for q in questions %}
-                            <div class="p-3.5 rounded-xl bg-[#14100d]/80 border border-[#785a28]/40 space-y-2 shadow-sm" id="question-card-item-{{ q.id }}">
-                                <div class="flex items-center justify-between gap-2">
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-[10px] font-black uppercase text-[#f0c869] bg-[#1c1612] px-2 py-0.5 rounded border border-[#785a28]/60 font-cinzel">
-                                            RANK {{ q.current_level }}
-                                        </span>
-                                        {% if q.is_due %}
-                                        <span class="text-[10px] font-bold text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/40 animate-pulse">
-                                            🔥 VENCIDA
-                                        </span>
-                                        {% else %}
-                                        <span class="text-[10px] text-[#a39276]">
-                                            Próxima: {{ q.next_review_date }}
-                                        </span>
-                                        {% endif %}
+        </div>
+
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- MODO 2: ⚙️ GERENCIAR CONTEÚDO & QUESTÕES (Estúdio Fácil e Rápido)   -->
+    <!-- =================================================================== -->
+    {% if map.is_owner %}
+    <div id="view-manage-mode" class="hidden space-y-6">
+
+        <!-- Sub-navegação do Gerenciador: Conteúdo vs Perguntas -->
+        <div class="flex border-b border-[#785a28]/40 space-x-3 pb-2">
+            <button
+                type="button"
+                id="btn-subtab-content"
+                onclick="switchManageSubTab('content')"
+                class="px-4 py-2 text-xs font-cinzel font-bold rounded-lg bg-[#c89b3c] text-[#0c0908] transition-all shadow"
+            >
+                📝 Resumo &amp; Upload de Documentos
+            </button>
+            <button
+                type="button"
+                id="btn-subtab-questions"
+                onclick="switchManageSubTab('questions')"
+                class="px-4 py-2 text-xs font-cinzel font-semibold rounded-lg bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] border border-[#785a28] transition-all"
+            >
+                ❓ Perguntas do Nó (<span id="manage-questions-count">{{ questions | length }}</span>)
+            </button>
+        </div>
+
+        <!-- SUB-ABA A: Conteúdo & Arquivos (PDF / DOCX / TXT) -->
+        <div id="manage-subtab-content" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                <!-- Bloco 1: Editor do Resumo Principal (theory-editor) -->
+                <div class="rpg-panel p-6 space-y-4" id="theory-editor">
+                    <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
+                        <h3 class="text-sm font-bold text-[#f0c869] font-cinzel flex items-center space-x-2">
+                            <span>📝</span>
+                            <span>Resumo Principal • Tomo de Sabedoria</span>
+                        </h3>
+                        <span id="save-theory-status" class="text-xs text-emerald-400 hidden">✓ Salvo com sucesso!</span>
+                    </div>
+
+                    <form onsubmit="event.preventDefault(); saveNodeTheory();" class="space-y-3">
+                        <div>
+                            <label for="theory-textarea" class="block text-xs font-cinzel font-bold text-[#a39276] uppercase mb-1">
+                                Conteúdo em Texto / Markdown
+                            </label>
+                            <textarea
+                                id="theory-textarea"
+                                rows="12"
+                                class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3.5 text-sm text-[#f5ebd6] font-tome text-base focus:border-[#f0c869] focus:outline-none leading-relaxed"
+                                placeholder="Redija ou cole o resumo completo deste tópico de estudos..."
+                            >{{ node.theory_content or '' }}</textarea>
+                        </div>
+
+                        <div class="flex justify-end space-x-2 pt-1">
+                            <button
+                                type="submit"
+                                id="btn-save-theory"
+                                class="rpg-btn-gold text-xs py-2 px-5"
+                            >
+                                💾 Salvar Resumo (Tomo)
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Bloco 2: Upload de Arquivos (PDF, DOCX, TXT, MD) com Extração Automática -->
+                <div class="space-y-6">
+                    <div class="rpg-panel p-6 space-y-4">
+                        <div class="border-b border-[#785a28]/40 pb-3">
+                            <h3 class="text-sm font-bold text-[#f0c869] font-cinzel flex items-center space-x-2">
+                                <span>📄</span>
+                                <span>Importar de Arquivo (PDF, DOCX, TXT, MD)</span>
+                            </h3>
+                            <p class="text-xs text-[#a39276] mt-0.5">
+                                Envie sua apostila ou documento para extrair o texto automaticamente.
+                            </p>
+                        </div>
+
+                        <!-- Dropzone de Arquivo -->
+                        <div
+                            id="file-dropzone"
+                            onclick="document.getElementById('doc-file-input').click()"
+                            class="border-2 border-dashed border-[#785a28] hover:border-[#f0c869] rounded-2xl p-6 text-center transition-colors cursor-pointer bg-[#0c0908]/50 space-y-2"
+                        >
+                            <span class="text-3xl block">📤</span>
+                            <p class="text-xs font-bold font-cinzel text-[#f5ebd6]">
+                                Clique para selecionar ou arraste o arquivo aqui
+                            </p>
+                            <p class="text-[11px] text-[#a39276]">
+                                Formatos aceitos: <strong>.pdf, .docx, .txt, .md</strong> (máx. 15 MB)
+                            </p>
+                            <input
+                                type="file"
+                                id="doc-file-input"
+                                accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+                                class="hidden"
+                                onchange="handleFileSelected(this)"
+                            />
+                        </div>
+
+                        <!-- Indicador de Carregamento / Extração -->
+                        <div id="file-extract-spinner" class="hidden p-4 rounded-xl bg-[#0c0908] border border-[#785a28] text-center text-xs text-[#f0c869] animate-pulse">
+                            ⏳ Extraindo texto do documento com o serviço de extração...
+                        </div>
+
+                        <!-- Card de Resultado da Extração -->
+                        <div id="file-extracted-card" class="hidden p-4 rounded-xl bg-[#14100d] border border-[#785a28] space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="font-cinzel font-bold text-xs text-[#f0c869]" id="extracted-file-name">documento.pdf</span>
+                                <span class="text-[10px] text-[#a39276]" id="extracted-char-count">0 caracteres</span>
+                            </div>
+                            <div
+                                id="extracted-preview-box"
+                                class="max-h-32 overflow-y-auto p-2.5 bg-[#0c0908] rounded-lg border border-[#785a28]/40 text-xs text-[#f5ebd6] font-mono whitespace-pre-wrap"
+                            ></div>
+
+                            <div class="flex flex-col sm:flex-row gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onclick="applyExtractedToTheory()"
+                                    class="rpg-btn-gold text-xs py-1.5 px-3 flex-1"
+                                >
+                                    📥 Inserir no Resumo do Nó
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick="createMaterialFromExtracted()"
+                                    class="rpg-btn-bronze text-xs py-1.5 px-3 flex-1"
+                                >
+                                    📎 Anexar como Material Didático
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bloco 3: Materiais Complementares Anexados com Exclusão Rápida -->
+                    <div class="rpg-panel p-6 space-y-4">
+                        <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
+                            <h3 class="text-sm font-bold text-[#f0c869] font-cinzel">
+                                Materiais Anexados ({{ materials | length }})
+                            </h3>
+                            <button
+                                type="button"
+                                onclick="document.getElementById('new-material-form').classList.toggle('hidden')"
+                                class="rpg-btn-bronze text-xs py-1 px-2.5"
+                            >
+                                + Adicionar Texto Manual
+                            </button>
+                        </div>
+
+                        <!-- Formulário Inline: Novo Material Manual (new-material-form) -->
+                        <form
+                            id="new-material-form"
+                            class="hidden p-4 rounded-xl bg-[#0c0908] border border-[#785a28] space-y-3"
+                            onsubmit="event.preventDefault(); createNodeMaterial();"
+                        >
+                            <div>
+                                <label for="material-title-input" class="block text-xs font-cinzel text-[#a39276] uppercase mb-1">Título</label>
+                                <input
+                                    type="text"
+                                    id="material-title-input"
+                                    required
+                                    class="w-full bg-[#14100d] border border-[#785a28]/80 rounded-lg px-3 py-1.5 text-xs text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none"
+                                    placeholder="Ex: Artigo de Referência sobre Índices"
+                                />
+                            </div>
+                            <div>
+                                <label for="material-text-input" class="block text-xs font-cinzel text-[#a39276] uppercase mb-1">Conteúdo</label>
+                                <textarea
+                                    id="material-text-input"
+                                    rows="4"
+                                    required
+                                    class="w-full bg-[#14100d] border border-[#785a28]/80 rounded-lg p-2.5 text-xs text-[#f5ebd6] font-mono focus:border-[#f0c869] focus:outline-none"
+                                    placeholder="Cole o texto de apoio..."
+                                ></textarea>
+                            </div>
+                            <div class="flex justify-end space-x-2">
+                                <button
+                                    type="button"
+                                    onclick="document.getElementById('new-material-form').classList.add('hidden')"
+                                    class="rpg-btn-bronze text-xs"
+                                >
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="rpg-btn-gold text-xs">Salvar Material</button>
+                            </div>
+                        </form>
+
+                        <div id="manage-materials-list" class="space-y-2.5">
+                            {% if materials %}
+                                {% for m in materials %}
+                                <div class="p-3 rounded-xl bg-[#0c0908] border border-[#785a28]/40 flex items-center justify-between gap-3" id="manage-mat-item-{{ m.id }}">
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-bold text-[#f5ebd6] truncate font-cinzel">{{ m.title }}</div>
+                                        <div class="text-[10px] text-[#a39276]">{{ m.char_count }} caracteres • {{ m.content_type }}</div>
                                     </div>
                                     <button
                                         type="button"
-                                        onclick="deleteNodeQuestion('{{ q.id }}')"
-                                        title="Dissipar provação"
-                                        class="text-xs text-[#a39276] hover:text-[#e11d48] transition-colors p-1"
+                                        onclick="deleteMaterialAsync('{{ m.id }}')"
+                                        class="text-xs text-[#a39276] hover:text-red-400 p-1 transition-colors"
+                                        title="Excluir Material"
                                     >
                                         🗑️
                                     </button>
                                 </div>
-                                <h4 class="font-semibold text-[#f5ebd6] text-xs sm:text-sm">
-                                    {{ q.statement or q.prompt }}
-                                </h4>
-                                <div class="text-xs text-[#a39276] font-tome text-sm bg-[#0c0908] p-2 rounded border border-[#785a28]/20">
-                                    <strong class="font-cinzel text-[10px] text-[#c89b3c] block uppercase">Gabarito:</strong>
-                                    {{ q.expected_answer }}
-                                </div>
-                            </div>
-                            {% endfor %}
-                        {% else %}
-                            <p class="text-[#a39276] italic text-xs text-center py-2">Sem provações no registro.</p>
-                        {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-[#a39276] italic text-xs text-center py-2" id="no-materials-label">Nenhum material anexado ainda.</p>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
 
             </div>
-        </section>
+        </div>
+
+        <!-- SUB-ABA B: Perguntas do Nó (Adição Rápida, Lote & Gestão Sem Reload) -->
+        <div id="manage-subtab-questions" class="hidden space-y-6">
+
+            <!-- Card Superior: Métodos de Cadastro Rápido -->
+            <div class="rpg-panel p-6 space-y-5">
+                <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-[#f0c869] font-cinzel">
+                            Cadastrar Novas Perguntas • Forjar Nova Provação
+                        </h3>
+                        <p class="text-xs text-[#a39276] mt-0.5">
+                            Cadastre perguntas de revisão com gabarito para praticar com repetição espaçada.
+                        </p>
+                    </div>
+
+                    <!-- Botões de Modo de Criação -->
+                    <div class="flex items-center space-x-2">
+                        <button
+                            type="button"
+                            id="btn-create-mode-single"
+                            onclick="switchQuestionCreateMode('single')"
+                            class="px-3 py-1.5 text-xs font-cinzel font-bold rounded-lg bg-[#c89b3c] text-[#0c0908]"
+                        >
+                            + Pergunta Rápida
+                        </button>
+                        <button
+                            type="button"
+                            id="btn-create-mode-batch"
+                            onclick="switchQuestionCreateMode('batch')"
+                            class="px-3 py-1.5 text-xs font-cinzel font-semibold rounded-lg bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] border border-[#785a28]"
+                        >
+                            ⚡ Lote de Perguntas
+                        </button>
+                        <button
+                            type="button"
+                            id="btn-create-mode-paste"
+                            onclick="switchQuestionCreateMode('paste')"
+                            class="px-3 py-1.5 text-xs font-cinzel font-semibold rounded-lg bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] border border-[#785a28]"
+                        >
+                            📋 Colar em Bloco
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FORM 1: Adicionar Pergunta Rápida (new-question-form) -->
+                <form
+                    id="new-question-form"
+                    onsubmit="event.preventDefault(); createNodeQuestion();"
+                    class="space-y-4"
+                >
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="question-prompt-input" class="block text-xs font-cinzel font-bold text-[#a39276] uppercase mb-1">
+                                Enunciado / Pergunta <span class="text-rose-400">*</span>
+                            </label>
+                            <textarea
+                                id="question-prompt-input"
+                                rows="3"
+                                required
+                                class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3 text-xs text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none leading-relaxed"
+                                placeholder="Ex: Qual é a complexidade assintótica da busca binária em vetor ordenado?"
+                            ></textarea>
+                        </div>
+                        <div>
+                            <label for="question-answer-input" class="block text-xs font-cinzel font-bold text-[#a39276] uppercase mb-1">
+                                Gabarito Detalhado / Critério de Avaliação <span class="text-rose-400">*</span>
+                            </label>
+                            <textarea
+                                id="question-answer-input"
+                                rows="3"
+                                required
+                                class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3 text-xs text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none leading-relaxed"
+                                placeholder="Ex: O(log n), pois o espaço de busca é dividido pela metade a cada iteração..."
+                            ></textarea>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-1">
+                        <span id="single-q-status" class="text-xs text-emerald-400 hidden">✓ Pergunta adicionada com sucesso!</span>
+                        <button
+                            type="submit"
+                            id="btn-submit-single-q"
+                            class="rpg-btn-gold text-xs py-2 px-6 ml-auto"
+                        >
+                            + Salvar Pergunta
+                        </button>
+                    </div>
+                </form>
+
+                <!-- FORM 2: Adicionar Perguntas em Lote (Linhas Dinâmicas) -->
+                <div id="form-batch-questions" class="hidden space-y-4">
+                    <div id="batch-rows-container" class="space-y-3">
+                        <!-- Linhas geradas dinamicamente via JS -->
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2 border-t border-[#785a28]/30">
+                        <div class="flex items-center space-x-2">
+                            <button
+                                type="button"
+                                onclick="addBatchRow()"
+                                class="rpg-btn-bronze text-xs py-1.5 px-3"
+                            >
+                                + Adicionar 1 Linha
+                            </button>
+                            <button
+                                type="button"
+                                onclick="addBatchRow(5)"
+                                class="rpg-btn-bronze text-xs py-1.5 px-3"
+                            >
+                                + Adicionar 5 Linhas
+                            </button>
+                        </div>
+                        <button
+                            type="button"
+                            id="btn-save-batch-q"
+                            onclick="submitBatchQuestions()"
+                            class="rpg-btn-gold text-xs py-2 px-6"
+                        >
+                            💾 Salvar Todas as Perguntas em Lote
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FORM 3: Colar em Bloco (JSON com Markdown) -->
+                <div id="form-paste-questions" class="hidden space-y-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <label for="paste-questions-textarea" class="block text-xs font-cinzel font-bold text-[#a39276] uppercase">
+                            Cole suas questões em JSON (<code class="text-[#f0c869]">array de objetos</code>):
+                        </label>
+                        <div class="flex items-center space-x-1.5">
+                            <span id="grimoire-copy-prompt-status" class="hidden text-[10px] text-emerald-400 font-cinzel">✓ copiado</span>
+                            <button
+                                type="button"
+                                id="btn-grimoire-copy-ai-json"
+                                onclick="copyGrimoireAiJsonPrompt()"
+                                class="px-2 py-0.5 rounded bg-[#14100d] hover:bg-[#251c14] text-[#a39276] hover:text-[#f0c869] border border-[#785a28]/40 hover:border-[#c89b3c]/60 text-[10px] font-mono tracking-tight transition-all cursor-pointer opacity-80 hover:opacity-100"
+                                title="Copiar Skill para gerar questões em JSON na IA"
+                            >
+                                skill
+                            </button>
+                        </div>
+                    </div>
+                    <textarea
+                        id="paste-questions-textarea"
+                        rows="7"
+                        class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3 text-xs text-[#f5ebd6] font-mono focus:border-[#f0c869] focus:outline-none"
+                        placeholder="[&#10;  {&#10;    &quot;prompt&quot;: &quot;Enunciado da questão em **Markdown**...&quot;,&#10;    &quot;expected_answer&quot;: &quot;### Gabarito&#10;- **Conceito 1:** Explicação...&#10;- **Conceito 2:** Detalhe técnico...&quot;&#10;  }&#10;]"
+                    ></textarea>
+                    <div class="flex justify-end">
+                        <button
+                            type="button"
+                            onclick="importPastedQuestions()"
+                            class="rpg-btn-gold text-xs py-2 px-5"
+                        >
+                            📥 Importar Perguntas Coladas
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Lista Completa de Perguntas Cadastradas com Exclusão Rápida -->
+            <div class="rpg-panel p-6 space-y-4">
+                <div class="flex items-center justify-between border-b border-[#785a28]/40 pb-3">
+                    <h3 class="text-base font-bold text-[#f0c869] font-cinzel">
+                        Todas as Perguntas deste Nó (<span id="manage-questions-count-bottom">{{ questions | length }}</span>)
+                    </h3>
+                    <span class="text-xs text-[#a39276]">Gestão sem recarregamento de página</span>
+                </div>
+
+                <div id="manage-questions-list" class="space-y-3">
+                    {% if questions %}
+                        {% for q in questions %}
+                        <div class="p-4 rounded-xl bg-[#0c0908] border border-[#785a28]/40 space-y-2 shadow-sm" id="manage-q-card-{{ q.id }}">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-[10px] font-black uppercase text-[#f0c869] bg-[#1c1612] px-2 py-0.5 rounded border border-[#785a28]/60 font-cinzel">
+                                        RANK {{ q.current_level }}
+                                    </span>
+                                    <span class="text-[10px] text-[#a39276]">
+                                        {{ '🔥 Vencida' if q.is_due else ('Próxima revisão: ' ~ q.next_review_date) }}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onclick="deleteQuestionAsync('{{ q.id }}')"
+                                    class="text-xs text-[#a39276] hover:text-red-400 p-1 transition-colors"
+                                    title="Excluir Pergunta"
+                                >
+                                    🗑️ Excluir
+                                </button>
+                            </div>
+                            <h4 class="font-semibold text-[#f5ebd6] text-xs sm:text-sm rpg-markdown" data-rpg-markdown="true">
+                                {{ q.statement or q.prompt }}
+                            </h4>
+                            <div class="text-xs text-[#a39276] font-tome text-sm bg-[#14100d] p-2.5 rounded border border-[#785a28]/20">
+                                <strong class="font-cinzel text-[10px] text-[#c89b3c] block uppercase mb-0.5">Gabarito:</strong>
+                                <div class="rpg-markdown" data-rpg-markdown="true">{{ q.expected_answer }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-[#a39276] italic text-xs text-center py-4" id="manage-no-questions-label">Nenhuma pergunta cadastrada ainda.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
 
     </div>
+    {% endif %}
+
 </div>
 
+<!-- Scripts de Interatividade e Gerenciamento Rápido -->
 <script>
 const MAP_ID = "{{ map.id }}";
 const NODE_ID = "{{ node.id }}";
 let QUESTIONS = {{ questions | tojson if questions else '[]' }};
 let activeIndex = 0;
-let currentMode = 'reveal';
+let currentArenaMode = 'reveal';
 let mediaRecorder = null;
 let audioChunks = [];
+let extractedDocText = '';
+let extractedDocFileName = '';
 
-function toggleTheoryEditor() {
-    const editor = document.getElementById('theory-editor');
-    if (editor) editor.classList.toggle('hidden');
-}
+// --- Alternância entre Modo Estudo e Modo Gerenciamento ---
 
-function toggleNewMaterialForm() {
-    const form = document.getElementById('new-material-form');
-    if (form) form.classList.toggle('hidden');
-}
+function switchNodeView(view) {
+    const studyView = document.getElementById('view-study-mode');
+    const manageView = document.getElementById('view-manage-mode');
+    const btnStudy = document.getElementById('btn-tab-study-mode');
+    const btnManage = document.getElementById('btn-tab-manage-mode');
 
-function toggleNewQuestionForm() {
-    const form = document.getElementById('new-question-form');
-    if (form) form.classList.toggle('hidden');
-}
-
-function toggleMaterialText(matId) {
-    const textEl = document.getElementById(`mat-text-${matId}`);
-    const labelEl = document.getElementById(`mat-label-${matId}`);
-    const iconEl = document.getElementById(`mat-icon-${matId}`);
-    if (!textEl) return;
-    if (textEl.classList.contains('hidden')) {
-        textEl.classList.remove('hidden');
-        if (labelEl) labelEl.textContent = 'Ocultar Leitura';
-        if (iconEl) iconEl.textContent = '🙈';
+    if (view === 'manage') {
+        if (studyView) studyView.classList.add('hidden');
+        if (manageView) manageView.classList.remove('hidden');
+        if (btnManage) btnManage.className = 'px-4 py-2 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5';
+        if (btnStudy) btnStudy.className = 'px-4 py-2 font-medium font-cinzel rounded-lg text-[#a39276] hover:text-[#f0c869] transition-all flex items-center space-x-1.5';
+        location.hash = 'manage';
     } else {
-        textEl.classList.add('hidden');
-        if (labelEl) labelEl.textContent = 'Expandir Leitura Integral';
-        if (iconEl) iconEl.textContent = '👁️';
+        if (manageView) manageView.classList.add('hidden');
+        if (studyView) studyView.classList.remove('hidden');
+        if (btnStudy) btnStudy.className = 'px-4 py-2 font-bold font-cinzel rounded-lg transition-all bg-[#c89b3c] text-[#0c0908] shadow-sm flex items-center space-x-1.5';
+        if (btnManage) btnManage.className = 'px-4 py-2 font-medium font-cinzel rounded-lg text-[#a39276] hover:text-[#f0c869] transition-all flex items-center space-x-1.5';
+        location.hash = 'study';
     }
 }
 
+function switchManageSubTab(subTab) {
+    const contentTab = document.getElementById('manage-subtab-content');
+    const questionsTab = document.getElementById('manage-subtab-questions');
+    const btnContent = document.getElementById('btn-subtab-content');
+    const btnQuestions = document.getElementById('btn-subtab-questions');
+
+    if (subTab === 'questions') {
+        if (contentTab) contentTab.classList.add('hidden');
+        if (questionsTab) questionsTab.classList.remove('hidden');
+        if (btnQuestions) btnQuestions.className = 'px-4 py-2 text-xs font-cinzel font-bold rounded-lg bg-[#c89b3c] text-[#0c0908] transition-all shadow';
+        if (btnContent) btnContent.className = 'px-4 py-2 text-xs font-cinzel font-semibold rounded-lg bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] border border-[#785a28] transition-all';
+    } else {
+        if (questionsTab) questionsTab.classList.add('hidden');
+        if (contentTab) contentTab.classList.remove('hidden');
+        if (btnContent) btnContent.className = 'px-4 py-2 text-xs font-cinzel font-bold rounded-lg bg-[#c89b3c] text-[#0c0908] transition-all shadow';
+        if (btnQuestions) btnQuestions.className = 'px-4 py-2 text-xs font-cinzel font-semibold rounded-lg bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] border border-[#785a28] transition-all';
+    }
+}
+
+// Inicializa view com base na hash da URL
+window.addEventListener('DOMContentLoaded', () => {
+    if (location.hash === '#manage') {
+        switchNodeView('manage');
+    }
+    initBatchRows();
+});
+
+// --- Expansão de Materiais de Apoio ---
+
+function toggleMaterialText(elementId, btn) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    if (el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        if (btn) btn.innerHTML = '<span>🙈</span><span>Ocultar Leitura</span>';
+    } else {
+        el.classList.add('hidden');
+        if (btn) btn.innerHTML = '<span>👁️</span><span>Expandir Leitura</span>';
+    }
+}
+
+// --- Salvar Resumo do Tópico (saveNodeTheory) ---
+
 async function saveNodeTheory() {
-    const text = document.getElementById('theory-textarea').value;
+    const textarea = document.getElementById('theory-textarea') || document.getElementById('edit-theory-textarea');
+    const text = textarea ? textarea.value : '';
+    const btn = document.getElementById('btn-save-theory');
+    const statusEl = document.getElementById('save-theory-status');
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Salvando...';
+    }
+
     try {
         const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/theory`, {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({theory_content: text})
         });
+
         if (res.ok) {
-            window.location.reload();
+            // Atualiza a visualização do Modo Estudo em tempo real
+            const studyTheory = document.getElementById('theory-display-area') || document.getElementById('study-theory-content');
+            if (studyTheory) {
+                if (window.renderRpgMarkdown && text) {
+                    studyTheory.innerHTML = window.renderRpgMarkdown(text);
+                } else {
+                    studyTheory.textContent = text || 'Nenhum resumo cadastrado.';
+                }
+            }
+            if (statusEl) {
+                statusEl.classList.remove('hidden');
+                setTimeout(() => statusEl.classList.add('hidden'), 3000);
+            }
         } else {
-            alert('Falha ao salvar o Tomo de Sabedoria.');
+            alert('Falha ao salvar o resumo.');
         }
     } catch (err) {
-        console.error(err);
-        alert('Erro ao comunicar com o servidor.');
+        alert('Erro de conexão ao salvar resumo.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '💾 Salvar Resumo (Tomo)';
+        }
     }
 }
 
+// --- Upload e Extração de Documentos (PDF, DOCX, TXT, MD) ---
+
+async function handleFileSelected(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    const spinner = document.getElementById('file-extract-spinner');
+    const card = document.getElementById('file-extracted-card');
+    const nameEl = document.getElementById('extracted-file-name');
+    const charEl = document.getElementById('extracted-char-count');
+    const previewEl = document.getElementById('extracted-preview-box');
+
+    if (spinner) spinner.classList.remove('hidden');
+    if (card) card.classList.add('hidden');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch('/api/v1/knowledge/extract-file', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            extractedDocText = data.extracted_text || '';
+            extractedDocFileName = file.name;
+
+            if (nameEl) nameEl.textContent = file.name;
+            if (charEl) charEl.textContent = `${data.char_count} caracteres extraídos`;
+            if (previewEl) previewEl.textContent = (data.extracted_text || '').slice(0, 800) + '...';
+
+            if (card) card.classList.remove('hidden');
+        } else {
+            const err = await res.json();
+            alert('Falha na extração do documento: ' + (err.detail || 'Arquivo incompatível'));
+        }
+    } catch (err) {
+        alert('Erro ao enviar documento para extração: ' + err.message);
+    } finally {
+        if (spinner) spinner.classList.add('hidden');
+        input.value = '';
+    }
+}
+
+function applyExtractedToTheory() {
+    if (!extractedDocText) return;
+    const textarea = document.getElementById('theory-textarea') || document.getElementById('edit-theory-textarea');
+    if (textarea) {
+        if (textarea.value.trim()) {
+            textarea.value = textarea.value.trim() + '\n\n---\n\n' + extractedDocText;
+        } else {
+            textarea.value = extractedDocText;
+        }
+        alert('Texto extraído inserido no editor de resumo! Clique em "Salvar Resumo (Tomo)" para confirmar.');
+    }
+}
+
+async function createMaterialFromExtracted() {
+    if (!extractedDocText) return;
+    await createMaterialAsync(extractedDocFileName || 'Documento Extraído', extractedDocText);
+}
+
+// createNodeMaterial alias for manual material submission
 async function createNodeMaterial() {
-    const title = document.getElementById('material-title-input').value;
-    const raw_text = document.getElementById('material-text-input').value;
+    const titleEl = document.getElementById('material-title-input') || document.getElementById('manual-mat-title');
+    const textEl = document.getElementById('material-text-input') || document.getElementById('manual-mat-text');
+    const title = titleEl ? titleEl.value.trim() : '';
+    const text = textEl ? textEl.value.trim() : '';
+    if (!title || !text) return;
+    await createMaterialAsync(title, text);
+    if (titleEl) titleEl.value = '';
+    if (textEl) textEl.value = '';
+    const form = document.getElementById('new-material-form');
+    if (form) form.classList.add('hidden');
+}
+
+async function createMaterialAsync(title, raw_text) {
     try {
         const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/materials`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({title, raw_text, content_type: 'TEXT'})
         });
+
         if (res.ok) {
-            window.location.reload();
+            const mat = await res.json();
+            addMaterialToDOM(mat);
+            alert(`Material "${title}" anexado com sucesso!`);
         } else {
-            alert('Falha ao forjar novo pergaminho.');
+            alert('Erro ao anexar material.');
         }
     } catch (err) {
-        console.error(err);
-        alert('Erro ao comunicar com o servidor.');
+        alert('Erro de conexão ao salvar material: ' + err.message);
     }
 }
 
-async function deleteNodeMaterial(materialId) {
-    if (!confirm('Deseja dissipar este pergaminho permanentemente?')) return;
+function addMaterialToDOM(mat) {
+    const noMatLabel = document.getElementById('no-materials-label');
+    if (noMatLabel) noMatLabel.remove();
+
+    const manageList = document.getElementById('manage-materials-list');
+    if (manageList) {
+        const item = document.createElement('div');
+        item.className = 'p-3 rounded-xl bg-[#0c0908] border border-[#785a28]/40 flex items-center justify-between gap-3';
+        item.id = `manage-mat-item-${mat.id}`;
+        item.innerHTML = `
+            <div class="min-w-0">
+                <div class="text-xs font-bold text-[#f5ebd6] truncate font-cinzel">${escapeHtml(mat.title)}</div>
+                <div class="text-[10px] text-[#a39276]">${mat.char_count} caracteres • ${mat.content_type}</div>
+            </div>
+            <button
+                type="button"
+                onclick="deleteMaterialAsync('${mat.id}')"
+                class="text-xs text-[#a39276] hover:text-red-400 p-1 transition-colors"
+                title="Excluir Material"
+            >
+                🗑️
+            </button>
+        `;
+        manageList.prepend(item);
+    }
+}
+
+async function deleteMaterialAsync(materialId) {
+    if (!confirm('Deseja excluir este material didático?')) return;
     try {
         const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/materials/${materialId}`, {
             method: 'DELETE'
         });
         if (res.ok) {
-            const item = document.getElementById(`material-item-${materialId}`);
+            const item = document.getElementById(`manage-mat-item-${materialId}`);
             if (item) item.remove();
         } else {
-            alert('Falha ao dissipar pergaminho.');
+            alert('Falha ao excluir material.');
         }
     } catch (err) {
-        console.error(err);
-        alert('Erro ao comunicar com o servidor.');
+        alert('Erro de conexão: ' + err.message);
     }
 }
 
+// --- Métodos de Criação de Perguntas ---
+
+function switchQuestionCreateMode(mode) {
+    const formSingle = document.getElementById('new-question-form');
+    const formBatch = document.getElementById('form-batch-questions');
+    const formPaste = document.getElementById('form-paste-questions');
+    const btnSingle = document.getElementById('btn-create-mode-single');
+    const btnBatch = document.getElementById('btn-create-mode-batch');
+    const btnPaste = document.getElementById('btn-create-mode-paste');
+
+    [formSingle, formBatch, formPaste].forEach(f => f && f.classList.add('hidden'));
+    [btnSingle, btnBatch, btnPaste].forEach(b => {
+        if (b) b.className = 'px-3 py-1.5 text-xs font-cinzel font-semibold rounded-lg bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] border border-[#785a28]';
+    });
+
+    if (mode === 'batch') {
+        if (formBatch) formBatch.classList.remove('hidden');
+        if (btnBatch) btnBatch.className = 'px-3 py-1.5 text-xs font-cinzel font-bold rounded-lg bg-[#c89b3c] text-[#0c0908]';
+    } else if (mode === 'paste') {
+        if (formPaste) formPaste.classList.remove('hidden');
+        if (btnPaste) btnPaste.className = 'px-3 py-1.5 text-xs font-cinzel font-bold rounded-lg bg-[#c89b3c] text-[#0c0908]';
+    } else {
+        if (formSingle) formSingle.classList.remove('hidden');
+        if (btnSingle) btnSingle.className = 'px-3 py-1.5 text-xs font-cinzel font-bold rounded-lg bg-[#c89b3c] text-[#0c0908]';
+    }
+}
+
+// createNodeQuestion alias for question creation
 async function createNodeQuestion() {
-    const prompt = document.getElementById('question-prompt-input').value;
-    const expected_answer = document.getElementById('question-answer-input').value;
+    const promptInput = document.getElementById('question-prompt-input');
+    const answerInput = document.getElementById('question-answer-input');
+    const statusEl = document.getElementById('single-q-status');
+    const btn = document.getElementById('btn-submit-single-q');
+
+    const prompt = promptInput ? promptInput.value.trim() : '';
+    const expected_answer = answerInput ? answerInput.value.trim() : '';
+    if (!prompt || !expected_answer) return;
+
+    if (btn) btn.disabled = true;
+
     try {
         const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({prompt, expected_answer})
         });
+
         if (res.ok) {
-            window.location.reload();
+            const newQ = await res.json();
+            QUESTIONS.push(newQ);
+            addQuestionToManageDOM(newQ);
+            updateQuestionCounters();
+            if (promptInput) promptInput.value = '';
+            if (answerInput) answerInput.value = '';
+
+            if (statusEl) {
+                statusEl.classList.remove('hidden');
+                setTimeout(() => statusEl.classList.add('hidden'), 3000);
+            }
         } else {
-            alert('Falha ao selar nova provação.');
+            const err = await res.json();
+            alert('Falha ao cadastrar pergunta: ' + (err.detail || 'Erro'));
         }
     } catch (err) {
-        console.error(err);
-        alert('Erro ao comunicar com o servidor.');
+        alert('Erro de conexão ao salvar pergunta.');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 
-async function deleteNodeQuestion(questionId) {
-    if (!confirm('Deseja dissipar esta provação permanentemente?')) return;
+// Inicializa Linhas do Lote
+function initBatchRows() {
+    const container = document.getElementById('batch-rows-container');
+    if (!container || container.children.length > 0) return;
+    addBatchRow(2);
+}
+
+function addBatchRow(count = 1) {
+    const container = document.getElementById('batch-rows-container');
+    if (!container) return;
+
+    for (let i = 0; i < count; i++) {
+        const rowId = 'batch-row-' + Math.random().toString(36).substring(2, 9);
+        const div = document.createElement('div');
+        div.id = rowId;
+        div.className = 'p-3 bg-[#0c0908] rounded-xl border border-[#785a28]/40 grid grid-cols-1 md:grid-cols-12 gap-3 items-center';
+        div.innerHTML = `
+            <div class="md:col-span-5">
+                <input
+                    type="text"
+                    placeholder="Enunciado da pergunta..."
+                    class="batch-prompt-input w-full bg-[#14100d] border border-[#785a28]/60 rounded-lg px-3 py-1.5 text-xs text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none"
+                />
+            </div>
+            <div class="md:col-span-6">
+                <input
+                    type="text"
+                    placeholder="Gabarito esperado..."
+                    class="batch-answer-input w-full bg-[#14100d] border border-[#785a28]/60 rounded-lg px-3 py-1.5 text-xs text-[#f5ebd6] focus:border-[#f0c869] focus:outline-none"
+                />
+            </div>
+            <div class="md:col-span-1 text-right">
+                <button
+                    type="button"
+                    onclick="document.getElementById('${rowId}').remove()"
+                    class="text-xs text-[#a39276] hover:text-red-400 p-1"
+                    title="Remover linha"
+                >
+                    ✕
+                </button>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+}
+
+async function submitBatchQuestions() {
+    const prompts = document.querySelectorAll('.batch-prompt-input');
+    const answers = document.querySelectorAll('.batch-answer-input');
+    const batchList = [];
+
+    for (let i = 0; i < prompts.length; i++) {
+        const p = prompts[i].value.trim();
+        const a = answers[i].value.trim();
+        if (p && a) {
+            batchList.push({prompt: p, expected_answer: a});
+        }
+    }
+
+    if (batchList.length === 0) {
+        alert('Preencha ao menos uma pergunta e resposta para salvar em lote.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-save-batch-q');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Salvando lote...';
+    }
+
+    try {
+        const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions/batch`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({questions: batchList})
+        });
+
+        if (res.ok) {
+            const createdQuestions = await res.json();
+            createdQuestions.forEach(q => {
+                QUESTIONS.push(q);
+                addQuestionToManageDOM(q);
+            });
+            updateQuestionCounters();
+
+            const container = document.getElementById('batch-rows-container');
+            if (container) container.innerHTML = '';
+            addBatchRow(2);
+
+            alert(`${createdQuestions.length} perguntas salvas com sucesso no nó!`);
+        } else {
+            const err = await res.json();
+            alert('Erro ao salvar perguntas em lote: ' + (err.detail || 'Falha de validação'));
+        }
+    } catch (err) {
+        alert('Erro de conexão: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '💾 Salvar Todas as Perguntas em Lote';
+        }
+    }
+}
+
+window.copyGrimoireAiJsonPrompt = async function () {
+    const nodeTitle = (typeof NODE_TITLE !== 'undefined' && NODE_TITLE) ? NODE_TITLE : '{{ node.title }}';
+    const promptText = `---
+name: study-questions-json
+description: Generates deep, complex active-recall study questions in strict JSON format with rich GitHub Flavored Markdown (code snippets, tables, bold concepts, lists, headings) for import into the RPG Study Tree / Grimoire.
+---
+
+# Study Questions JSON Generator
+
+Você é um especialista em Ciência da Computação e Engenharia de Software encarregado de gerar questões de recordação ativa de alto nível para o sistema de repetição espaçada (SRS).
+
+Gere de 3 a 5 questões aprofundadas sobre o tópico solicitado.
+
+### Critérios Obrigatórios:
+1. **Nível Avançado**: Foque em cenários reais, depuração de código, trade-offs arquiteturais, falhas em produção ou casos de borda.
+2. **Formato Exclusivo**: Retorne EXCLUSIVAMENTE um array JSON no formato:
+[
+  {
+    "prompt": "Enunciado contextualizado em Markdown...",
+    "expected_answer": "### Critérios de Avaliação\\n- **Ponto 1:** Explicação...\\n- **Ponto 2:** Detalhe técnico..."
+  }
+]
+3. **Markdown Rico**:
+   - Use '###' para estruturar cabeçalhos.
+   - Use '**negrito**' para conceitos capitais.
+   - Use blocos de código com identificador de linguagem (\`\`\`python, \`\`\`sql, etc.).
+   - Use listas com '-' e citações '>' para notas críticas ou nuances.
+4. **Strings JSON Válidas**: Escape quebras de linha com '\\n' e aspas duplas com '\\"'.
+
+---
+### Tópico Alvo para Estudo:
+"${nodeTitle}"`;
+
+    const statusEl = document.getElementById('grimoire-copy-prompt-status');
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(promptText);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = promptText;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        if (statusEl) {
+            statusEl.classList.remove('hidden');
+            setTimeout(() => statusEl.classList.add('hidden'), 2500);
+        }
+    } catch (err) {
+        console.error('Erro ao copiar prompt:', err);
+        prompt('Copie o prompt abaixo:', promptText);
+    }
+};
+
+async function importPastedQuestions() {
+    const textarea = document.getElementById('paste-questions-textarea');
+    const rawText = textarea ? textarea.value.trim() : '';
+    if (!rawText) return;
+
+    let parsed = [];
+    const trimmed = rawText.trim();
+    const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    const candidateJson = fenceMatch ? fenceMatch[1].trim() : trimmed;
+
+    if (candidateJson.startsWith('[') || candidateJson.startsWith('{')) {
+        try {
+            const parsedJson = JSON.parse(candidateJson);
+            const arr = Array.isArray(parsedJson)
+                ? parsedJson
+                : (parsedJson.questions || parsedJson.items || [parsedJson]);
+
+            if (Array.isArray(arr)) {
+                for (const item of arr) {
+                    if (!item || typeof item !== 'object') continue;
+                    const prompt = String(item.prompt || item.question || item.pergunta || item.enunciado || '').trim();
+                    const expected_answer = String(item.expected_answer || item.answer || item.resposta || item.gabarito || '').trim();
+                    if (prompt && expected_answer) {
+                        parsed.push({ prompt, expected_answer });
+                    }
+                }
+            }
+        } catch (err) {
+            alert('Formato JSON inválido: ' + err.message);
+            return;
+        }
+    }
+
+    if (parsed.length === 0) {
+        // Fallback para o formato Pergunta | Resposta linha por linha
+        const lines = rawText.split('\n');
+        lines.forEach(line => {
+            const parts = line.split('|');
+            if (parts.length >= 2) {
+                const p = parts[0].trim();
+                const a = parts.slice(1).join('|').trim();
+                if (p && a) parsed.push({ prompt: p, expected_answer: a });
+            }
+        });
+    }
+
+    if (parsed.length === 0) {
+        alert('Não foi possível identificar questões válidas. Cole um array JSON no formato [{"prompt": "...", "expected_answer": "..."}].');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questions: parsed })
+        });
+
+        if (res.ok) {
+            const created = await res.json();
+            created.forEach(q => {
+                QUESTIONS.push(q);
+                addQuestionToManageDOM(q);
+            });
+            updateQuestionCounters();
+            if (textarea) textarea.value = '';
+            alert(`${created.length} perguntas importadas e cadastradas com sucesso!`);
+        } else {
+            const errData = await res.json().catch(() => ({}));
+            alert('Falha ao cadastrar perguntas coladas: ' + (errData.detail || 'Erro no servidor'));
+        }
+    } catch (err) {
+        alert('Erro ao comunicar com o servidor: ' + err.message);
+    }
+}
+window.importPastedQuestions = importPastedQuestions;
+
+function addQuestionToManageDOM(q) {
+    const noQLabel = document.getElementById('manage-no-questions-label');
+    if (noQLabel) noQLabel.remove();
+
+    const list = document.getElementById('manage-questions-list');
+    if (list) {
+        const card = document.createElement('div');
+        card.id = `manage-q-card-${q.id}`;
+        card.className = 'p-4 rounded-xl bg-[#0c0908] border border-[#785a28]/40 space-y-2 shadow-sm';
+        const promptVal = q.statement || q.prompt || '';
+        const answerVal = q.expected_answer || '';
+        const promptHtml = (typeof window.renderRpgMarkdown === 'function')
+            ? window.renderRpgMarkdown(promptVal)
+            : escapeHtml(promptVal);
+        const ansHtml = (typeof window.renderRpgMarkdown === 'function')
+            ? window.renderRpgMarkdown(answerVal)
+            : escapeHtml(answerVal);
+
+        card.innerHTML = `
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center space-x-2">
+                    <span class="text-[10px] font-black uppercase text-[#f0c869] bg-[#1c1612] px-2 py-0.5 rounded border border-[#785a28]/60 font-cinzel">
+                        RANK ${q.current_level || 0}
+                    </span>
+                    <span class="text-[10px] text-[#a39276]">
+                        ${q.is_due ? '🔥 Vencida' : ('Próxima revisão: ' + (q.next_review_date || 'Hoje'))}
+                    </span>
+                </div>
+                <button
+                    type="button"
+                    onclick="deleteQuestionAsync('${q.id}')"
+                    class="text-xs text-[#a39276] hover:text-red-400 p-1 transition-colors"
+                    title="Excluir Pergunta"
+                >
+                    🗑️ Excluir
+                </button>
+            </div>
+            <h4 class="font-semibold text-[#f5ebd6] text-xs sm:text-sm rpg-markdown" data-rpg-markdown="true">
+                ${promptHtml}
+            </h4>
+            <div class="text-xs text-[#a39276] font-tome text-sm bg-[#14100d] p-2.5 rounded border border-[#785a28]/20">
+                <strong class="font-cinzel text-[10px] text-[#c89b3c] block uppercase mb-0.5">Gabarito:</strong>
+                <div class="rpg-markdown" data-rpg-markdown="true">
+                    ${ansHtml}
+                </div>
+            </div>
+        `;
+        list.prepend(card);
+    }
+}
+
+function updateQuestionCounters() {
+    const c1 = document.getElementById('manage-questions-count');
+    const c2 = document.getElementById('manage-questions-count-bottom');
+    if (c1) c1.textContent = QUESTIONS.length;
+    if (c2) c2.textContent = QUESTIONS.length;
+    updateStudyArena();
+}
+
+async function deleteQuestionAsync(questionId) {
+    if (!confirm('Deseja excluir esta pergunta permanentemente?')) return;
     try {
         const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions/${questionId}`, {
             method: 'DELETE'
         });
         if (res.ok) {
-            const item = document.getElementById(`question-card-item-${questionId}`);
-            if (item) item.remove();
+            const card = document.getElementById(`manage-q-card-${questionId}`);
+            if (card) card.remove();
             QUESTIONS = QUESTIONS.filter(q => q.id !== questionId);
             if (activeIndex >= QUESTIONS.length) activeIndex = Math.max(0, QUESTIONS.length - 1);
-            updateArena();
+            updateQuestionCounters();
         } else {
-            alert('Falha ao dissipar provação.');
+            alert('Falha ao excluir pergunta.');
         }
     } catch (err) {
-        console.error(err);
-        alert('Erro ao comunicar com o servidor.');
+        alert('Erro de conexão: ' + err.message);
     }
 }
 
-function updateArena() {
-    if (!QUESTIONS || QUESTIONS.length === 0) {
-        const arena = document.getElementById('active-srs-arena');
-        if (arena) arena.innerHTML = '<p class="text-[#a39276] italic text-sm text-center py-6">Nenhuma provação SRS cadastrada para este nó.</p>';
-        return;
-    }
-    const q = QUESTIONS[activeIndex];
+// --- Arena de Estudo Ativa (Modo Estudo) ---
+
+function renderCurrentQuestion() {
+    updateStudyArena();
+}
+window.renderCurrentQuestion = renderCurrentQuestion;
+
+function updateStudyArena() {
     const counterEl = document.getElementById('arena-question-counter');
     const rankEl = document.getElementById('arena-question-rank');
     const dueEl = document.getElementById('arena-question-due');
-    const promptEl = document.getElementById('arena-prompt');
+    const promptEl = document.getElementById('arena-question-prompt') || document.getElementById('arena-prompt');
     const answerEl = document.getElementById('arena-expected-answer');
 
-    if (counterEl) counterEl.textContent = `Provação ${activeIndex + 1} de ${QUESTIONS.length}`;
-    if (rankEl) rankEl.textContent = `RANK ${q.current_level}`;
-    if (dueEl) dueEl.textContent = q.is_due ? '🔥 VENCIDA' : `Próxima: ${q.next_review_date}`;
-    if (promptEl) promptEl.textContent = q.statement || q.prompt;
-    if (answerEl) answerEl.textContent = q.expected_answer;
+    if (!QUESTIONS || QUESTIONS.length === 0) {
+        const arena = document.getElementById('active-study-arena');
+        if (arena) {
+            arena.innerHTML = `
+                <div class="p-8 rounded-xl bg-[#0c0908]/60 border border-dashed border-[#785a28]/40 text-center space-y-3">
+                    <span class="text-3xl block">🎯</span>
+                    <p class="text-xs text-[#a39276] italic font-sans">Nenhuma questão cadastrada para este nó ainda.</p>
+                </div>
+            `;
+        }
+        return;
+    }
 
-    // Reseta estado de revelação
+    const q = QUESTIONS[activeIndex];
+    if (counterEl) counterEl.textContent = `Pergunta ${activeIndex + 1} de ${QUESTIONS.length}`;
+    if (rankEl) rankEl.textContent = `RANK ${q.current_level}`;
+    if (dueEl) dueEl.textContent = q.is_due ? '🔥 Vencida' : `Próxima: ${q.next_review_date}`;
+
+    const promptVal = q.statement || q.prompt || '';
+    const answerVal = q.expected_answer || '';
+    if (promptEl) {
+        promptEl.innerHTML = (typeof window.renderRpgMarkdown === 'function')
+            ? window.renderRpgMarkdown(promptVal)
+            : escapeHtml(promptVal);
+    }
+    if (answerEl) {
+        answerEl.innerHTML = (typeof window.renderRpgMarkdown === 'function')
+            ? window.renderRpgMarkdown(answerVal)
+            : escapeHtml(answerVal);
+    }
+
+    // Reseta estado da revelação
     const ansBox = document.getElementById('active-expected-answer-box');
     const revBtn = document.getElementById('reveal-btn-container');
     if (ansBox) ansBox.classList.add('hidden');
@@ -806,11 +1605,11 @@ function updateArena() {
 function navigateQuestion(delta) {
     if (!QUESTIONS || QUESTIONS.length === 0) return;
     activeIndex = (activeIndex + delta + QUESTIONS.length) % QUESTIONS.length;
-    updateArena();
+    updateStudyArena();
 }
 
 function selectArenaMode(mode) {
-    currentMode = mode;
+    currentArenaMode = mode;
     const tabRev = document.getElementById('tab-reveal');
     const tabConj = document.getElementById('tab-conjure');
     const tabVoice = document.getElementById('tab-voice');
@@ -820,20 +1619,20 @@ function selectArenaMode(mode) {
 
     [tabRev, tabConj, tabVoice].forEach(t => {
         if (!t) return;
-        t.className = 'py-2 px-2 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all';
+        t.className = 'py-2 px-1 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all text-center';
     });
     [pRev, pConj, pVoice].forEach(p => {
         if (p) p.classList.add('hidden');
     });
 
     if (mode === 'reveal') {
-        if (tabRev) tabRev.className = 'py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow';
+        if (tabRev) tabRev.className = 'py-2 px-1 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow text-center';
         if (pRev) pRev.classList.remove('hidden');
     } else if (mode === 'conjure') {
-        if (tabConj) tabConj.className = 'py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow';
+        if (tabConj) tabConj.className = 'py-2 px-1 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow text-center';
         if (pConj) pConj.classList.remove('hidden');
     } else if (mode === 'voice') {
-        if (tabVoice) tabVoice.className = 'py-2 px-2 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow';
+        if (tabVoice) tabVoice.className = 'py-2 px-1 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow text-center';
         if (pVoice) pVoice.classList.remove('hidden');
     }
 }
@@ -849,54 +1648,88 @@ async function submitNodeReview(questionId, difficulty, score) {
     const qid = questionId || (QUESTIONS[activeIndex] ? QUESTIONS[activeIndex].id : null);
     if (!qid) return;
 
+    const conjureTextarea = document.getElementById('conjure-textarea');
+    const conjureFeedback = document.getElementById('conjure-feedback');
+    const voiceFeedback = document.getElementById('voice-feedback');
+
+    let student_answer = null;
+    let ai_feedback = null;
+    let evaluation_mode = 'MANUAL';
+
+    if (currentArenaMode === 'conjure') {
+        evaluation_mode = 'AI_TEXT';
+        if (conjureTextarea && conjureTextarea.value.trim()) {
+            student_answer = conjureTextarea.value.trim();
+        }
+        if (conjureFeedback && conjureFeedback.textContent.trim()) {
+            ai_feedback = conjureFeedback.textContent.trim();
+        }
+    } else if (currentArenaMode === 'voice') {
+        evaluation_mode = 'AI_VOICE';
+        if (voiceFeedback && voiceFeedback.textContent.trim()) {
+            ai_feedback = voiceFeedback.textContent.trim();
+        }
+    } else {
+        if (conjureTextarea && conjureTextarea.value.trim()) {
+            student_answer = conjureTextarea.value.trim();
+        }
+        if (conjureFeedback && conjureFeedback.textContent.trim()) {
+            ai_feedback = conjureFeedback.textContent.trim();
+        }
+    }
+
+    const payload = {
+        score,
+        difficulty: difficulty || null,
+        student_answer: student_answer || null,
+        ai_feedback: ai_feedback || null,
+        evaluation_mode: evaluation_mode || 'MANUAL'
+    };
+
     try {
         const res = await fetch(`/api/v1/study-maps/${MAP_ID}/nodes/${NODE_ID}/questions/${qid}/review`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({score, difficulty})
+            body: JSON.stringify(payload)
         });
 
         if (res.ok) {
             const data = await res.json();
 
-            // Atualiza objeto em memória
             if (QUESTIONS[activeIndex] && QUESTIONS[activeIndex].id === qid) {
                 QUESTIONS[activeIndex].current_level = data.new_level;
                 QUESTIONS[activeIndex].next_review_date = data.next_review_date;
                 QUESTIONS[activeIndex].is_due = false;
             }
 
-            // Banner Treino Livre
             const trainBanner = document.getElementById('training-mode-banner');
             const trainText = document.getElementById('training-mode-banner-text');
             if (data.is_training_only) {
-                if (trainText) trainText.textContent = `Modo Treino Livre — Provação já agendada para ${data.next_review_date}. Nível mantido sem penalidade.`;
+                if (trainText) trainText.textContent = `Modo Treino Livre — Revisão já realizada para hoje (próxima: ${data.next_review_date}). Nível mantido sem penalidade.`;
                 if (trainBanner) trainBanner.classList.remove('hidden');
             } else if (trainBanner) {
                 trainBanner.classList.add('hidden');
             }
 
-            // Banner Rank Up
             const rankBanner = document.getElementById('rankup-banner');
             const rankText = document.getElementById('rankup-banner-text');
             if (data.leveled_up || data.new_node_level >= 1) {
                 if (rankText) {
-                    rankText.textContent = `Nó ascendeu ao Nível ${data.new_node_level}! Novos caminhos foram destrancados na Árvore de Conhecimento!`;
+                    rankText.textContent = `Nó subiu para o Nível ${data.new_node_level}! Novos caminhos foram destrancados na Árvore!`;
                 }
                 if (rankBanner) rankBanner.classList.remove('hidden');
             }
 
-            // Atualiza progresso do nó no HUD
-            const summaryEl = document.getElementById('node-progress-summary');
             const barEl = document.getElementById('node-progress-bar');
+            const lblEl = document.getElementById('study-progress-label');
             if (barEl) barEl.style.width = `${data.node_progress_percent}%`;
+            if (lblEl) lblEl.textContent = `Domínio: ${data.node_progress_percent}%`;
 
-            updateArena();
+            updateStudyArena();
         } else {
-            alert('Falha ao submeter revisão SRS.');
+            alert('Falha ao submeter revisão.');
         }
     } catch (err) {
-        console.error(err);
         alert('Erro ao comunicar com o servidor.');
     }
 }
@@ -926,15 +1759,12 @@ async function evaluateTextAnswer() {
             if (feedEl) feedEl.textContent = data.feedback || 'Resposta avaliada com sucesso.';
             if (box) box.classList.remove('hidden');
 
-            // Atualiza maestria no nó
             await submitNodeReview(q.id, null, data.score);
         } else {
-            // Fallback direto
             revealActiveRunes();
             selectArenaMode('reveal');
         }
     } catch (err) {
-        console.error(err);
         revealActiveRunes();
         selectArenaMode('reveal');
     }
@@ -967,7 +1797,6 @@ async function toggleAudioRecording() {
         if (labelEl) labelEl.textContent = 'Parar Gravação';
         if (iconEl) iconEl.textContent = '⏹️';
     } catch (err) {
-        console.warn('Microfone não acessível ou sem permissão:', err);
         alert('Permissão de microfone não concedida ou dispositivo indisponível.');
     }
 }
@@ -998,10 +1827,26 @@ async function submitAudioForEvaluation(audioBlob) {
             selectArenaMode('reveal');
         }
     } catch (err) {
-        console.error(err);
         revealActiveRunes();
         selectArenaMode('reveal');
     }
 }
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof window.applyRpgMarkdownAll === 'function') {
+        window.applyRpgMarkdownAll();
+    }
+    if (typeof updateStudyArena === 'function' && typeof QUESTIONS !== 'undefined' && QUESTIONS && QUESTIONS.length > 0) {
+        updateStudyArena();
+    }
+});
 </script>
+<script src="/static/js/rpg_icons.js"></script>
 {% endblock %}

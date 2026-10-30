@@ -14,6 +14,8 @@ from src.application.ports.repositories import (
     IQuestionProgressRepository,
     IQuestionRepository,
     IReviewAuditRepository,
+    IStudyMapRepository,
+    IStudyNodeRepository,
     ISubjectRepository,
     ITopicRepository,
     IUnitOfWork,
@@ -310,6 +312,8 @@ class ReviewQuestionUseCase:
         clock: IClockService,
         audit_repo: IReviewAuditRepository | None = None,
         uow: IUnitOfWork | None = None,
+        node_repo: IStudyNodeRepository | None = None,
+        map_repo: IStudyMapRepository | None = None,
     ) -> None:
         self._progress_repo = progress_repo
         self._question_repo = question_repo
@@ -318,19 +322,37 @@ class ReviewQuestionUseCase:
         self._clock = clock
         self._audit_repo = audit_repo
         self._uow = uow
+        self._node_repo = node_repo
+        self._map_repo = map_repo
 
     def execute(self, dto: ReviewQuestionInputDTO, user_id: UUID) -> ReviewQuestionResultDTO:
         question = self._question_repo.get_by_id(dto.question_id)
         if not question:
             raise QuestionNotFoundError("Pergunta não encontrada.")
 
-        topic = self._topic_repo.get_by_id(question.topic_id)
-        if not topic:
-            raise EntityNotFoundError("Tema não encontrado.")
+        topic = None
+        subject = None
+        historical_subject_name = "Árvore de Conhecimento"
+        historical_topic_name = "Nó de Estudo"
 
-        subject = self._subject_repo.get_by_id(topic.subject_id)
-        if not subject or not subject.can_be_studied_by(user_id):
-            raise ResourceOwnershipError("Acesso negado para estudar esta pergunta.")
+        if question.node_id is None:
+            topic = self._topic_repo.get_by_id(question.topic_id)
+            if not topic:
+                raise EntityNotFoundError("Tema não encontrado.")
+
+            subject = self._subject_repo.get_by_id(topic.subject_id)
+            if not subject or not subject.can_be_studied_by(user_id):
+                raise ResourceOwnershipError("Acesso negado para estudar esta pergunta.")
+
+            historical_subject_name = subject.name
+            historical_topic_name = topic.name
+        elif self._node_repo is not None and self._map_repo is not None:
+            node = self._node_repo.get_by_id(question.node_id)
+            if node is not None:
+                study_map = self._map_repo.get_by_id(node.map_id)
+                if study_map is not None:
+                    historical_subject_name = study_map.title
+                    historical_topic_name = node.title
 
         progress = self._progress_repo.get_by_user_and_question(user_id, dto.question_id)
         if progress is None:
@@ -384,16 +406,18 @@ class ReviewQuestionUseCase:
                 audit_log = ReviewAuditLog(
                     user_id=user_id,
                     question_id=dto.question_id,
-                    subject_id=subject.id,
-                    topic_id=topic.id,
-                    historical_subject_name=subject.name,
-                    historical_topic_name=topic.name,
+                    subject_id=subject.id if subject is not None else None,
+                    topic_id=topic.id if topic is not None else None,
+                    historical_subject_name=historical_subject_name,
+                    historical_topic_name=historical_topic_name,
                     review_date=today,
                     score=dto.score,
                     level_before=previous_level,
                     level_after=new_level,
-                    evaluation_mode="MANUAL",
+                    evaluation_mode=dto.evaluation_mode,
                     logged_at=now,
+                    student_answer=dto.student_answer,
+                    ai_feedback=dto.ai_feedback,
                 )
                 self._audit_repo.save(audit_log)
 

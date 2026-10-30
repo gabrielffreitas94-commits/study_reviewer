@@ -381,6 +381,8 @@ class ReviewAuditLog:
     evaluation_mode: str = "MANUAL"
     logged_at: datetime | None = None
     id: UUID = field(default_factory=uuid4)
+    student_answer: str | None = None
+    ai_feedback: str | None = None
 
     def __post_init__(self) -> None:
         if not (0 <= self.score <= 100):
@@ -397,7 +399,14 @@ class ReviewAuditLog:
             raise DomainValidationError("O nome histórico da matéria não pode ser vazio.")
         if not self.historical_topic_name or not self.historical_topic_name.strip():
             raise DomainValidationError("O nome histórico do tema não pode ser vazio.")
-        if self.evaluation_mode not in ("MANUAL", "AI_TEXT", "AI_AUDIO", "MULTIAGENT_DISPUTE"):
+        if self.evaluation_mode not in (
+            "MANUAL",
+            "AI_TEXT",
+            "AI_AUDIO",
+            "MULTIAGENT_DISPUTE",
+            "TEXT_AI",
+            "VOICE_AI",
+        ):
             raise DomainValidationError(f"Modo de avaliação inválido: {self.evaluation_mode}")
 
     @property
@@ -741,12 +750,15 @@ class StudyEdge:
     map_id: UUID
     source_node_id: UUID
     target_node_id: UUID
+    required_level: int = 1
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
         if self.source_node_id == self.target_node_id:
             raise SelfReferencingEdgeError("Um nó não pode ter dependência de si mesmo.")
+        if self.required_level < 1:
+            raise ValueError("required_level deve ser maior ou igual a 1")
 
 
 @dataclass(slots=True)

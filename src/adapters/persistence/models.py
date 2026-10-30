@@ -328,7 +328,9 @@ class ReviewAuditLogModel(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     level_before: Mapped[int] = mapped_column(Integer, nullable=False)
     level_after: Mapped[int] = mapped_column(Integer, nullable=False)
-    evaluation_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
+    evaluation_mode: Mapped[str] = mapped_column(String(50), nullable=False, default="MANUAL")
+    student_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
     logged_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
@@ -592,6 +594,7 @@ class StudyEdgeModel(Base):
     target_node_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("study_nodes.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    required_level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )

@@ -127,12 +127,11 @@ jobs:
           aws ecr describe-repositories --repository-names study-reviewer --region $AWS_REGION || \
           aws ecr create-repository --repository-name study-reviewer --region $AWS_REGION
 
-      - name: Log in to Amazon ECR Public (Avoid 429 Rate Limits)
+      - name: Ensure AWS Lambda Adapter Binary
         if: github.event.inputs.fetch_logs_only != 'true'
-        continue-on-error: true
         run: |
-          echo "==> Autenticando no Amazon ECR Public para evitar rate limit 429 no download da base image..."
-          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws || true
+          echo "==> Garantindo binário do Lambda Adapter local..."
+          uv run python scripts/fetch_lambda_adapter.py
 
       - name: Build, Tag and Push Container Image to ECR
         if: github.event.inputs.fetch_logs_only != 'true'

@@ -23,6 +23,7 @@ from src.application.dto.study_tree_dto import (
     CreateStudyMapDTO,
     CreateStudyNodeDTO,
     NodePositionDTO,
+    UpdateStudyEdgeDTO,
     UpdateStudyNodeDTO,
 )
 from src.application.use_cases.study_tree_use_cases import (
@@ -42,6 +43,7 @@ from src.application.use_cases.study_tree_use_cases import (
     ReviewNodeQuestionUseCase,
     UpdateNodePositionsBatchUseCase,
     UpdateNodeTheoryUseCase,
+    UpdateStudyEdgeUseCase,
     UpdateStudyNodeUseCase,
 )
 from src.domain.entities import User
@@ -97,9 +99,16 @@ class CreateNodeQuestionRequest(BaseModel):
     expected_answer: str = Field(..., min_length=1, max_length=5000)
 
 
+class BatchCreateNodeQuestionsRequest(BaseModel):
+    questions: list[CreateNodeQuestionRequest] = Field(..., min_length=1)
+
+
 class ReviewNodeQuestionRequest(BaseModel):
     score: int = Field(default=100, ge=0, le=100)
     difficulty: str | None = Field(default=None, max_length=20)
+    student_answer: str | None = Field(default=None)
+    ai_feedback: str | None = Field(default=None)
+    evaluation_mode: str = Field(default="MANUAL", max_length=50)
 
 
 class CreateNodeMaterialRequest(BaseModel):
@@ -121,6 +130,11 @@ class UpdatePositionsBatchRequest(BaseModel):
 class ConnectNodesRequest(BaseModel):
     source_node_id: UUID
     target_node_id: UUID
+    required_level: int = Field(default=1, ge=1, le=6)
+
+
+class UpdateStudyEdgeRequest(BaseModel):
+    required_level: int = Field(..., ge=1, le=6)
 
 
 class AttachContentRequest(BaseModel):
@@ -149,6 +163,17 @@ def _serialize_node(node: Any) -> dict[str, Any]:
         "questions_count": getattr(node, "questions_count", 0),
         "flashcards_count": getattr(node, "flashcards_count", 0),
         "theory_content": getattr(node, "theory_content", ""),
+    }
+
+
+def _serialize_edge(edge: Any) -> dict[str, Any]:
+    """Serializa dados de aresta para JSON da API REST."""
+    return {
+        "id": str(edge.id),
+        "map_id": str(edge.map_id),
+        "source_node_id": str(edge.source_node_id),
+        "target_node_id": str(edge.target_node_id),
+        "required_level": getattr(edge, "required_level", 1),
     }
 
 
@@ -307,15 +332,7 @@ def get_study_map_graph(
                 else None,
             },
             "nodes": [_serialize_node(n) for n in graph.nodes],
-            "edges": [
-                {
-                    "id": str(e.id),
-                    "map_id": str(e.map_id),
-                    "source_node_id": str(e.source_node_id),
-                    "target_node_id": str(e.target_node_id),
-                }
-                for e in graph.edges
-            ],
+            "edges": [_serialize_edge(e) for e in graph.edges],
         }
     except StudyMapNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -508,6 +525,7 @@ def create_node_question(
             prompt=effective_prompt,
             expected_answer=payload.expected_answer.strip(),
         )
+        db.commit()
         return {
             "id": str(res["id"]),
             "question_id": str(res["id"]),
@@ -519,6 +537,64 @@ def create_node_question(
             "next_review_date": res["next_review_date"],
             "created_at": res["created_at"],
         }
+    except (StudyMapNotFoundError, StudyNodeNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@_study_tree_base_router.post(
+    "/study-maps/{map_id}/nodes/{node_id}/questions/batch",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_node_questions_batch(
+    map_id: UUID,
+    node_id: UUID,
+    payload: BatchCreateNodeQuestionsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Cria múltiplas perguntas SRS em lote diretamente no nó."""
+    use_case = CreateNodeQuestionUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        node_repo=SqlAlchemyStudyNodeRepository(db),
+        question_repo=SqlAlchemyQuestionRepository(db),
+        progress_repo=SqlAlchemyQuestionProgressRepository(db),
+        content_repo=SqlAlchemyNodeContentRepository(db),
+    )
+    results: list[dict[str, Any]] = []
+    try:
+        for q_req in payload.questions:
+            effective_prompt = (q_req.prompt or q_req.statement).strip()
+            if not effective_prompt:
+                continue
+            res = use_case.execute(
+                map_id=map_id,
+                node_id=node_id,
+                user_id=current_user.id,
+                prompt=effective_prompt,
+                expected_answer=q_req.expected_answer.strip(),
+            )
+            results.append(
+                {
+                    "id": str(res["id"]),
+                    "question_id": str(res["id"]),
+                    "node_id": str(res["node_id"]),
+                    "prompt": res["prompt"],
+                    "statement": res["statement"],
+                    "expected_answer": res["expected_answer"],
+                    "current_level": res["current_level"],
+                    "next_review_date": res["next_review_date"],
+                    "created_at": res["created_at"],
+                }
+            )
+        if not results:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Nenhuma pergunta com enunciado válido foi enviada no lote.",
+            )
+        db.commit()
+        return results
     except (StudyMapNotFoundError, StudyNodeNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ResourceOwnershipError as exc:
@@ -585,7 +661,11 @@ def review_node_question(
             question_id=question_id,
             score=payload.score,
             difficulty=payload.difficulty,
+            student_answer=payload.student_answer,
+            ai_feedback=payload.ai_feedback,
+            evaluation_mode=payload.evaluation_mode,
         )
+        db.commit()
         return {k: (str(v) if isinstance(v, UUID) else v) for k, v in res.items()}
     except (StudyMapNotFoundError, StudyNodeNotFoundError, QuestionNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -684,20 +764,46 @@ def connect_study_nodes(
         dto = ConnectNodesDTO(
             source_node_id=payload.source_node_id,
             target_node_id=payload.target_node_id,
+            required_level=payload.required_level,
         )
         edge = use_case.execute(map_id=map_id, user_id=current_user.id, dto=dto)
-        return {
-            "id": str(edge.id),
-            "map_id": str(edge.map_id),
-            "source_node_id": str(edge.source_node_id),
-            "target_node_id": str(edge.target_node_id),
-        }
+        return _serialize_edge(edge)
     except (StudyMapNotFoundError, StudyNodeNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except (CyclicDependencyError, SelfReferencingEdgeError, CrossMapEdgeError) as exc:
+    except (
+        CyclicDependencyError,
+        SelfReferencingEdgeError,
+        CrossMapEdgeError,
+        DomainValidationError,
+    ) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ResourceOwnershipError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+
+@_study_tree_base_router.patch("/study-maps/{map_id}/edges/{edge_id}")
+def update_study_edge(
+    map_id: UUID,
+    edge_id: UUID,
+    payload: UpdateStudyEdgeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Atualiza o nível de maestria requerido em uma dependência orientada."""
+    use_case = UpdateStudyEdgeUseCase(
+        map_repo=SqlAlchemyStudyMapRepository(db),
+        edge_repo=SqlAlchemyStudyEdgeRepository(db),
+    )
+    try:
+        dto = UpdateStudyEdgeDTO(required_level=payload.required_level)
+        edge = use_case.execute(map_id=map_id, edge_id=edge_id, user_id=current_user.id, dto=dto)
+        return _serialize_edge(edge)
+    except (StudyMapNotFoundError, StudyEdgeNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ResourceOwnershipError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except DomainValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @_study_tree_base_router.delete(
@@ -835,4 +941,7 @@ __all__ = [
     "api_study_tree_router",
     "api_study_tree_compat_router",
     "_serialize_node",
+    "_serialize_edge",
+    "UpdateStudyEdgeRequest",
+    "BatchCreateNodeQuestionsRequest",
 ]

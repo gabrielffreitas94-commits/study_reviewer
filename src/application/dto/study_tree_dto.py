@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from pydantic import BaseModel, Field
+
 
 @dataclass(slots=True, frozen=True)
 class CreateStudyMapDTO:
@@ -66,6 +68,7 @@ class ConnectNodesDTO:
 
     source_node_id: UUID
     target_node_id: UUID
+    required_level: int = 1
 
 
 @dataclass(slots=True, frozen=True)
@@ -76,6 +79,13 @@ class StudyEdgeDTO:
     map_id: UUID
     source_node_id: UUID
     target_node_id: UUID
+    required_level: int = 1
+
+
+class UpdateStudyEdgeDTO(BaseModel):
+    """DTO de atualização de nível requerido de uma aresta de pré-requisito."""
+
+    required_level: int = Field(default=1, ge=1, le=6)
 
 
 @dataclass(slots=True, frozen=True)

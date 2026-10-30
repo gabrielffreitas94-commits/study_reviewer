@@ -88,7 +88,7 @@ def cadastros_hub_view(
 @web_router.get("/", response_class=RedirectResponse)
 def index() -> RedirectResponse:
     """Redireciona a raiz para a tela principal de estudo."""
-    return RedirectResponse(url="/study", status_code=303)
+    return RedirectResponse(url="/questions/study", status_code=303)
 
 
 @web_router.get("/study", response_class=HTMLResponse)

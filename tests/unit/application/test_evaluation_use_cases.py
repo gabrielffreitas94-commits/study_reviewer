@@ -868,3 +868,55 @@ def test_evaluate_student_answer_with_embedding_service_exception_fallback() -> 
     # Fallback determinístico acionado
     context_passed = eval_svc.evaluate_answer.call_args.kwargs["context_chunks"]
     assert context_passed == ["Conteúdo de fallback"]
+
+
+def test_evaluate_student_answer_rag_context_exception_refunds_hold() -> None:
+    """Verifica que erro inesperado na recuperação RAG estorna o hold sem vazamento de saldo."""
+    (
+        q_repo,
+        t_repo,
+        s_repo,
+        p_repo,
+        k_repo,
+        l_repo,
+        eval_svc,
+        audit_repo,
+        uow,
+        clock,
+    ) = create_mock_repos()
+    user_id = uuid4()
+    q_id = uuid4()
+    t_id = uuid4()
+    s_id = uuid4()
+
+    q_repo.get_by_id.return_value = Question(
+        id=q_id, topic_id=t_id, prompt="Pergunta?", expected_answer="Gabarito"
+    )
+    t_repo.get_by_id.return_value = Topic(id=t_id, subject_id=s_id, name="Tema")
+    subject = Subject(id=s_id, owner_id=user_id, name="Minha Matéria", is_public=False)
+    s_repo.get_by_id.return_value = subject
+    p_repo.get_by_user_and_question.return_value = None
+
+    ledger = TokenLedger(user_id=user_id, balance=1000)
+    l_repo.get_by_user_id.return_value = ledger
+    # Falha de I/O / banco no repositório de chunks
+    k_repo.list_by_topic.side_effect = RuntimeError("Falha de I/O no banco ao listar chunks RAG")
+
+    use_case = EvaluateStudentAnswerUseCase(
+        q_repo, t_repo, s_repo, p_repo, k_repo, l_repo, eval_svc, clock, audit_repo, uow
+    )
+
+    with pytest.raises(EvaluationServiceError, match="Falha de I/O no banco"):
+        asyncio.run(
+            use_case.execute(
+                EvaluateAnswerInputDTO(
+                    question_id=q_id, student_answer="Minha resposta dissertativa"
+                ),
+                user_id=user_id,
+            )
+        )
+
+    # Verifica que o hold foi estornado mesmo com falha no RAG (sem vazamento)
+    assert ledger.held_balance == 0
+    assert ledger.balance == 1000
+    assert ledger.available_balance == 1000

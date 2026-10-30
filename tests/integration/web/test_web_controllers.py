@@ -65,11 +65,11 @@ def client(test_user: User) -> Generator[TestClient]:
 
 
 @pytest.mark.integration
-def test_root_redirects_to_study(client: TestClient) -> None:
-    """Verifica se a rota raiz '/' redireciona para '/study'."""
+def test_root_redirects_to_study_maps(client: TestClient) -> None:
+    """Verifica se a rota raiz '/' redireciona para as Provações Diárias '/questions/study'."""
     response = client.get("/", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/study"
+    assert response.headers["location"] == "/questions/study"
 
 
 @pytest.mark.integration

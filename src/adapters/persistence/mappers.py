@@ -253,6 +253,8 @@ class ReviewAuditLogMapper:
             level_after=model.level_after,
             evaluation_mode=model.evaluation_mode,
             logged_at=model.logged_at,
+            student_answer=model.student_answer,
+            ai_feedback=model.ai_feedback,
         )
 
     @staticmethod
@@ -271,6 +273,8 @@ class ReviewAuditLogMapper:
             level_after=entity.level_after,
             evaluation_mode=entity.evaluation_mode,
             logged_at=entity.logged_at or datetime.now(UTC),
+            student_answer=entity.student_answer,
+            ai_feedback=entity.ai_feedback,
         )
 
 
@@ -470,6 +474,7 @@ class StudyEdgeMapper:
             map_id=model.map_id,
             source_node_id=model.source_node_id,
             target_node_id=model.target_node_id,
+            required_level=getattr(model, "required_level", 1) or 1,
             created_at=model.created_at,
         )
 
@@ -480,5 +485,6 @@ class StudyEdgeMapper:
             map_id=entity.map_id,
             source_node_id=entity.source_node_id,
             target_node_id=entity.target_node_id,
+            required_level=entity.required_level,
             created_at=entity.created_at,
         )

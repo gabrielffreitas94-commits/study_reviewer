@@ -21,13 +21,14 @@ from src.domain.services import SpacingPolicyService
         (6, 6, 180),  # Teto do nível 6
     ],
 )
-def test_spacing_policy_promotion_with_perfect_score(
-    current_level: int, expected_new_level: int, expected_days: int
+@pytest.mark.parametrize("score", [50, 75, 85, 100])
+def test_spacing_policy_promotion_with_score_above_or_equal_50(
+    current_level: int, expected_new_level: int, expected_days: int, score: int
 ) -> None:
-    """Verifica avanço estrito de nível quando score == 100."""
+    """Verifica avanço estrito de nível quando score >= 50."""
     review_date = date(2026, 10, 10)
     new_level, next_date = SpacingPolicyService.calculate_next_schedule(
-        current_level=current_level, score=100, review_date=review_date
+        current_level=current_level, score=score, review_date=review_date
     )
 
     assert new_level == expected_new_level
@@ -39,21 +40,21 @@ def test_spacing_policy_promotion_with_perfect_score(
 @pytest.mark.parametrize(
     ("current_level", "score", "expected_days"),
     [
-        (0, 99, 1),
-        (0, 50, 1),
+        (0, 49, 1),
+        (0, 25, 1),
         (0, 0, 1),
-        (1, 99, 7),
-        (1, 75, 7),
-        (2, 50, 15),
+        (1, 49, 7),
+        (1, 10, 7),
+        (2, 25, 15),
         (3, 25, 30),
         (4, 0, 60),
-        (5, 99, 90),
+        (5, 49, 90),
     ],
 )
-def test_spacing_policy_retention_when_score_below_100_levels_0_to_5(
+def test_spacing_policy_retention_when_score_below_50_levels_0_to_5(
     current_level: int, score: int, expected_days: int
 ) -> None:
-    """Verifica que pontuações < 100 mantêm o nível atual nos níveis 0 a 5."""
+    """Verifica que pontuações < 50 mantêm o nível atual nos níveis 0 a 5."""
     review_date = date(2026, 10, 10)
     new_level, next_date = SpacingPolicyService.calculate_next_schedule(
         current_level=current_level, score=score, review_date=review_date
@@ -65,9 +66,9 @@ def test_spacing_policy_retention_when_score_below_100_levels_0_to_5(
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("score", [99, 75, 50, 25, 1, 0])
+@pytest.mark.parametrize("score", [49, 25, 10, 1, 0])
 def test_spacing_policy_level_6_penalty_regression(score: int) -> None:
-    """Verifica a penalidade de regressão severa no nível 6 quando score < 100."""
+    """Verifica a penalidade de regressão severa no nível 6 quando score < 50."""
     review_date = date(2026, 10, 10)
     new_level, next_date = SpacingPolicyService.calculate_next_schedule(
         current_level=6, score=score, review_date=review_date
@@ -96,9 +97,9 @@ def test_spacing_policy_overdue_card_calculates_from_real_review_date() -> None:
 @pytest.mark.unit
 def test_spacing_policy_leap_year_and_year_rollover() -> None:
     """Verifica cálculos através de viradas de mês bissexto e viradas de ano."""
-    # Ano bissexto 2028-02-28 + 1 dia
+    # Ano bissexto 2028-02-28 + 1 dia (retenção nível 0 com score < 50)
     _, next_date_leap = SpacingPolicyService.calculate_next_schedule(
-        current_level=0, score=50, review_date=date(2028, 2, 28)
+        current_level=0, score=25, review_date=date(2028, 2, 28)
     )
     assert next_date_leap == date(2028, 2, 29)
 

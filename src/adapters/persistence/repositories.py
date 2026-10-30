@@ -576,16 +576,22 @@ class SqlAlchemyQuestionProgressRepository(IQuestionProgressRepository):
         stmt = (
             select(
                 QuestionModel.id,
-                SubjectModel.name.label("subject_name"),
-                TopicModel.name.label("topic_name"),
+                func.coalesce(
+                    SubjectModel.name, StudyMapModel.title, "Árvore de Conhecimento"
+                ).label("subject_name"),
+                func.coalesce(TopicModel.name, StudyNodeModel.title, "Nó de Estudo").label(
+                    "topic_name"
+                ),
                 QuestionModel.prompt,
                 QuestionModel.expected_answer,
                 UserQuestionProgressModel.current_level,
                 UserQuestionProgressModel.next_review_date,
             )
             .join(QuestionModel, UserQuestionProgressModel.question_id == QuestionModel.id)
-            .join(TopicModel, QuestionModel.topic_id == TopicModel.id)
-            .join(SubjectModel, TopicModel.subject_id == SubjectModel.id)
+            .outerjoin(TopicModel, QuestionModel.topic_id == TopicModel.id)
+            .outerjoin(SubjectModel, TopicModel.subject_id == SubjectModel.id)
+            .outerjoin(StudyNodeModel, QuestionModel.node_id == StudyNodeModel.id)
+            .outerjoin(StudyMapModel, StudyNodeModel.map_id == StudyMapModel.id)
             .where(
                 UserQuestionProgressModel.user_id == user_id,
                 UserQuestionProgressModel.next_review_date <= reference_date,
@@ -1107,10 +1113,21 @@ class SqlAlchemyStudyEdgeRepository(IStudyEdgeRepository):
         return StudyEdgeMapper.to_domain(model) if model else None
 
     def save(self, edge: StudyEdge) -> StudyEdge:
+        existing = self._session.get(StudyEdgeModel, edge.id)
+        if existing:
+            existing.required_level = edge.required_level
+            self._session.commit()
+            return StudyEdgeMapper.to_domain(existing)
         model = StudyEdgeMapper.to_model(edge)
         self._session.add(model)
         self._session.commit()
         return StudyEdgeMapper.to_domain(model)
+
+    def update(self, edge: StudyEdge) -> StudyEdge:
+        return self.save(edge)
+
+    def update_edge(self, edge: StudyEdge) -> StudyEdge:
+        return self.save(edge)
 
     def delete(self, edge_id: UUID) -> None:
         model = self._session.get(StudyEdgeModel, edge_id)

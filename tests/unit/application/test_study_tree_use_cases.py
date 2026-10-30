@@ -10,6 +10,7 @@ from src.application.dto.study_tree_dto import (
     CreateStudyMapDTO,
     CreateStudyNodeDTO,
     NodePositionDTO,
+    UpdateStudyEdgeDTO,
     UpdateStudyNodeDTO,
 )
 from src.application.ports.repositories import (
@@ -29,6 +30,7 @@ from src.application.use_cases.study_tree_use_cases import (
     GetNodeStudyHubUseCase,
     GetStudyMapGraphUseCase,
     UpdateNodePositionsBatchUseCase,
+    UpdateStudyEdgeUseCase,
     UpdateStudyNodeUseCase,
 )
 from src.domain.entities import (
@@ -102,6 +104,13 @@ class FakeStudyEdgeRepository(IStudyEdgeRepository):
     def save(self, edge: StudyEdge) -> StudyEdge:
         self.edges[edge.id] = edge
         return edge
+
+    def update(self, edge: StudyEdge) -> StudyEdge:
+        self.edges[edge.id] = edge
+        return edge
+
+    def update_edge(self, edge: StudyEdge) -> StudyEdge:
+        return self.save(edge)
 
     def delete(self, edge_id: UUID) -> None:
         self.edges.pop(edge_id, None)
@@ -572,6 +581,56 @@ class TestStudyTreeUseCasesEdgeCasesAndBranches:
 
         use_case.execute(s_map.id, owner_id, edge.id)
         assert edge_repo.get_by_id(edge.id) is None
+
+    def test_update_study_edge_use_case(self) -> None:
+        owner_id = uuid4()
+        map_repo = FakeStudyMapRepository()
+        edge_repo = FakeStudyEdgeRepository()
+        s_map = map_repo.save(StudyMap(owner_id=owner_id, title="Mapa"))
+        edge = edge_repo.save(
+            StudyEdge(
+                map_id=s_map.id, source_node_id=uuid4(), target_node_id=uuid4(), required_level=1
+            )
+        )
+
+        use_case = UpdateStudyEdgeUseCase(map_repo, edge_repo)
+
+        # 404: mapa inexistente
+        with pytest.raises(StudyMapNotFoundError):
+            use_case.execute(uuid4(), edge.id, owner_id, UpdateStudyEdgeDTO(required_level=2))
+
+        # 403: usuário não é dono
+        with pytest.raises(ResourceOwnershipError):
+            use_case.execute(s_map.id, edge.id, uuid4(), UpdateStudyEdgeDTO(required_level=2))
+
+        # 404: aresta inexistente
+        with pytest.raises(StudyEdgeNotFoundError):
+            use_case.execute(s_map.id, uuid4(), owner_id, UpdateStudyEdgeDTO(required_level=2))
+
+        # 404: aresta pertence a outro mapa
+        other_map = map_repo.save(StudyMap(owner_id=owner_id, title="Outro Mapa"))
+        with pytest.raises(StudyEdgeNotFoundError):
+            use_case.execute(other_map.id, edge.id, owner_id, UpdateStudyEdgeDTO(required_level=2))
+
+        # 400 DomainValidationError: required_level inválido (ex: bypass de pydantic)
+        dto_invalid = object.__new__(UpdateStudyEdgeDTO)
+        object.__setattr__(dto_invalid, "required_level", 0)
+        with pytest.raises(DomainValidationError):
+            use_case.execute(s_map.id, edge.id, owner_id, dto_invalid)
+
+        dto_invalid_high = object.__new__(UpdateStudyEdgeDTO)
+        object.__setattr__(dto_invalid_high, "required_level", 7)
+        with pytest.raises(DomainValidationError):
+            use_case.execute(s_map.id, edge.id, owner_id, dto_invalid_high)
+
+        # Sucesso
+        updated_dto = use_case.execute(
+            s_map.id, edge.id, owner_id, UpdateStudyEdgeDTO(required_level=4)
+        )
+        assert updated_dto.required_level == 4
+        reloaded = edge_repo.get_by_id(edge.id)
+        assert reloaded is not None
+        assert reloaded.required_level == 4
 
     def test_attach_and_detach_content_validation_and_ownership(self) -> None:
         owner_id = uuid4()

@@ -126,13 +126,19 @@ class EvaluateStudentAnswerUseCase:
         if not question:
             raise QuestionNotFoundError("Pergunta não encontrada.")
 
-        topic = self._topic_repo.get_by_id(question.topic_id)
-        if not topic:
-            raise EntityNotFoundError("Tema não encontrado.")
+        topic = None
+        subject = None
+        if question.node_id is not None:
+            target_topic_id = question.node_id
+        else:
+            topic = self._topic_repo.get_by_id(question.topic_id)
+            if not topic:
+                raise EntityNotFoundError("Tema não encontrado.")
 
-        subject = self._subject_repo.get_by_id(topic.subject_id)
-        if not subject or not subject.can_be_studied_by(user_id):
-            raise ResourceOwnershipError("Acesso negado para estudar esta pergunta.")
+            subject = self._subject_repo.get_by_id(topic.subject_id)
+            if not subject or not subject.can_be_studied_by(user_id):
+                raise ResourceOwnershipError("Acesso negado para estudar esta pergunta.")
+            target_topic_id = topic.id
 
         # 3. Verificação de repetição espaçada (SRS)
         today = self._clock.today()
@@ -171,17 +177,15 @@ class EvaluateStudentAnswerUseCase:
         if self._uow is not None:
             self._uow.commit()
 
-        # 5. Recuperação de contexto RAG com fallback para Cold-Start
-        context_chunks = await _retrieve_rag_context(
-            chunk_repo=self._chunk_repo,
-            embedding_service=self._embedding_service,
-            topic_id=topic.id,
-            query_text=f"{clean_answer} {question.prompt}",
-            expected_answer=question.expected_answer,
-        )
-
-        # 6. Avaliação semântica via IA com estorno em caso de falha
+        # 5. Avaliação semântica via IA com estorno em caso de falha
         try:
+            context_chunks = await _retrieve_rag_context(
+                chunk_repo=self._chunk_repo,
+                embedding_service=self._embedding_service,
+                topic_id=target_topic_id,
+                query_text=f"{clean_answer} {question.prompt}",
+                expected_answer=question.expected_answer,
+            )
             eval_result = await self._evaluation_service.evaluate_answer(
                 prompt=question.prompt,
                 expected_answer=question.expected_answer,
@@ -239,10 +243,12 @@ class EvaluateStudentAnswerUseCase:
             audit_log = ReviewAuditLog(
                 user_id=user_id,
                 question_id=dto.question_id,
-                subject_id=subject.id,
-                topic_id=topic.id,
-                historical_subject_name=subject.name,
-                historical_topic_name=topic.name,
+                subject_id=subject.id if subject is not None else None,
+                topic_id=topic.id if topic is not None else None,
+                historical_subject_name=(
+                    subject.name if subject is not None else "Árvore de Conhecimento"
+                ),
+                historical_topic_name=(topic.name if topic is not None else "Nó de Estudo"),
                 review_date=today,
                 score=eval_result.score,
                 level_before=previous_level,
@@ -422,13 +428,19 @@ class EvaluateAudioAnswerUseCase:
         if not question:
             raise QuestionNotFoundError("Pergunta não encontrada.")
 
-        topic = self._topic_repo.get_by_id(question.topic_id)
-        if not topic:
-            raise EntityNotFoundError("Tema não encontrado.")
+        topic = None
+        subject = None
+        if question.node_id is not None:
+            target_topic_id = question.node_id
+        else:
+            topic = self._topic_repo.get_by_id(question.topic_id)
+            if not topic:
+                raise EntityNotFoundError("Tema não encontrado.")
 
-        subject = self._subject_repo.get_by_id(topic.subject_id)
-        if not subject or not subject.can_be_studied_by(user_id):
-            raise ResourceOwnershipError("Acesso negado para estudar esta pergunta.")
+            subject = self._subject_repo.get_by_id(topic.subject_id)
+            if not subject or not subject.can_be_studied_by(user_id):
+                raise ResourceOwnershipError("Acesso negado para estudar esta pergunta.")
+            target_topic_id = topic.id
 
         # 3. Verificação de repetição espaçada (SRS)
         today = self._clock.today()
@@ -467,17 +479,15 @@ class EvaluateAudioAnswerUseCase:
         if self._uow is not None:
             self._uow.commit()
 
-        # 5. Recuperação de contexto RAG com fallback para Cold-Start
-        context_chunks = await _retrieve_rag_context(
-            chunk_repo=self._chunk_repo,
-            embedding_service=self._embedding_service,
-            topic_id=topic.id,
-            query_text=question.prompt,
-            expected_answer=question.expected_answer,
-        )
-
-        # 6. Avaliação multimodal efêmera com estorno em caso de falha
+        # 5. Avaliação multimodal efêmera com estorno em caso de falha
         try:
+            context_chunks = await _retrieve_rag_context(
+                chunk_repo=self._chunk_repo,
+                embedding_service=self._embedding_service,
+                topic_id=target_topic_id,
+                query_text=question.prompt,
+                expected_answer=question.expected_answer,
+            )
             eval_result = await self._audio_service.evaluate_audio_answer(
                 prompt=question.prompt,
                 expected_answer=question.expected_answer,
@@ -537,10 +547,12 @@ class EvaluateAudioAnswerUseCase:
             audit_log = ReviewAuditLog(
                 user_id=user_id,
                 question_id=dto.question_id,
-                subject_id=subject.id,
-                topic_id=topic.id,
-                historical_subject_name=subject.name,
-                historical_topic_name=topic.name,
+                subject_id=subject.id if subject is not None else None,
+                topic_id=topic.id if topic is not None else None,
+                historical_subject_name=(
+                    subject.name if subject is not None else "Árvore de Conhecimento"
+                ),
+                historical_topic_name=(topic.name if topic is not None else "Nó de Estudo"),
                 review_date=today,
                 score=eval_result.score,
                 level_before=previous_level,
@@ -629,13 +641,19 @@ class DisputeEvaluationUseCase:
         if not question:
             raise QuestionNotFoundError("Pergunta não encontrada.")
 
-        topic = self._topic_repo.get_by_id(question.topic_id)
-        if not topic:
-            raise EntityNotFoundError("Tema não encontrado.")
+        topic = None
+        subject = None
+        if question.node_id is not None:
+            target_topic_id = question.node_id
+        else:
+            topic = self._topic_repo.get_by_id(question.topic_id)
+            if not topic:
+                raise EntityNotFoundError("Tema não encontrado.")
 
-        subject = self._subject_repo.get_by_id(topic.subject_id)
-        if not subject or not subject.can_be_studied_by(user_id):
-            raise ResourceOwnershipError("Acesso negado para contestar esta pergunta.")
+            subject = self._subject_repo.get_by_id(topic.subject_id)
+            if not subject or not subject.can_be_studied_by(user_id):
+                raise ResourceOwnershipError("Acesso negado para contestar esta pergunta.")
+            target_topic_id = topic.id
 
         # 3. Progresso SRS do estudante
         today = self._clock.today()
@@ -668,17 +686,15 @@ class DisputeEvaluationUseCase:
         if self._uow is not None:
             self._uow.commit()
 
-        # 5. RAG Chunks com fallback Cold-Start
-        context_chunks = await _retrieve_rag_context(
-            chunk_repo=self._chunk_repo,
-            embedding_service=self._embedding_service,
-            topic_id=topic.id,
-            query_text=f"{clean_arg} {clean_answer} {question.prompt}",
-            expected_answer=question.expected_answer,
-        )
-
-        # 6. Deliberação da Câmara Multiagente
+        # 5. Deliberação da Câmara Multiagente com estorno em caso de falha
         try:
+            context_chunks = await _retrieve_rag_context(
+                chunk_repo=self._chunk_repo,
+                embedding_service=self._embedding_service,
+                topic_id=target_topic_id,
+                query_text=f"{clean_arg} {clean_answer} {question.prompt}",
+                expected_answer=question.expected_answer,
+            )
             dispute_result = await self._dispute_service.dispute_evaluation(
                 prompt=question.prompt,
                 expected_answer=question.expected_answer,
@@ -741,10 +757,12 @@ class DisputeEvaluationUseCase:
                 audit_log = ReviewAuditLog(
                     user_id=user_id,
                     question_id=dto.question_id,
-                    subject_id=subject.id,
-                    topic_id=topic.id,
-                    historical_subject_name=subject.name,
-                    historical_topic_name=topic.name,
+                    subject_id=subject.id if subject is not None else None,
+                    topic_id=topic.id if topic is not None else None,
+                    historical_subject_name=(
+                        subject.name if subject is not None else "Árvore de Conhecimento"
+                    ),
+                    historical_topic_name=(topic.name if topic is not None else "Nó de Estudo"),
                     review_date=today,
                     score=dispute_result.revised_score,
                     level_before=previous_level,

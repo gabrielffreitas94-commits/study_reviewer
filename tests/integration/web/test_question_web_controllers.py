@@ -94,7 +94,7 @@ def test_study_page_onboarding_state_when_empty_catalog(client: TestClient) -> N
     res = client.get("/questions/study")
     assert res.status_code == 200
     assert "Comece seu Estudo Ativo" in res.text
-    assert "Ir para Matérias & Temas" in res.text
+    assert "Explorar Códice de Habilidades" in res.text
 
 
 @pytest.mark.integration

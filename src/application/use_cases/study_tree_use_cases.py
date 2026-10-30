@@ -14,6 +14,7 @@ from src.application.dto.study_tree_dto import (
     StudyGraphDTO,
     StudyMapDTO,
     StudyNodeDTO,
+    UpdateStudyEdgeDTO,
     UpdateStudyNodeDTO,
 )
 from src.application.ports.repositories import (
@@ -188,6 +189,7 @@ class GetStudyMapGraphUseCase:
                 map_id=e.map_id,
                 source_node_id=e.source_node_id,
                 target_node_id=e.target_node_id,
+                required_level=e.required_level,
             )
             for e in edges
         ]
@@ -438,6 +440,7 @@ class ConnectStudyNodesUseCase:
             map_id=map_id,
             source_node_id=dto.source_node_id,
             target_node_id=dto.target_node_id,
+            required_level=dto.required_level,
         )
         saved = self.edge_repo.save(edge)
         return StudyEdgeDTO(
@@ -445,6 +448,7 @@ class ConnectStudyNodesUseCase:
             map_id=saved.map_id,
             source_node_id=saved.source_node_id,
             target_node_id=saved.target_node_id,
+            required_level=saved.required_level,
         )
 
 
@@ -471,6 +475,44 @@ class DisconnectStudyNodesUseCase:
             raise StudyEdgeNotFoundError(f"Aresta '{edge_id}' não encontrada no mapa.")
 
         self.edge_repo.delete(edge_id)
+
+
+class UpdateStudyEdgeUseCase:
+    """Caso de uso para atualizar o nível requerido de uma aresta de pré-requisito."""
+
+    def __init__(
+        self,
+        map_repo: IStudyMapRepository,
+        edge_repo: IStudyEdgeRepository,
+    ) -> None:
+        self.map_repo = map_repo
+        self.edge_repo = edge_repo
+
+    def execute(
+        self, map_id: UUID, edge_id: UUID, user_id: UUID, dto: UpdateStudyEdgeDTO
+    ) -> StudyEdgeDTO:
+        study_map = self.map_repo.get_by_id(map_id)
+        if study_map is None:
+            raise StudyMapNotFoundError("Mapa não encontrado.")
+        if study_map.owner_id != user_id:
+            raise ResourceOwnershipError("Sem permissão para alterar dependências deste mapa.")
+
+        edge = self.edge_repo.get_by_id(edge_id)
+        if edge is None or edge.map_id != map_id:
+            raise StudyEdgeNotFoundError(f"Aresta '{edge_id}' não encontrada no mapa.")
+
+        if not (1 <= dto.required_level <= 6):
+            raise DomainValidationError("Nível requerido deve estar entre 1 e 6.")
+
+        edge.required_level = dto.required_level
+        saved = self.edge_repo.save(edge)
+        return StudyEdgeDTO(
+            id=saved.id,
+            map_id=saved.map_id,
+            source_node_id=saved.source_node_id,
+            target_node_id=saved.target_node_id,
+            required_level=saved.required_level,
+        )
 
 
 class AttachContentToNodeUseCase:
@@ -816,6 +858,9 @@ class ReviewNodeQuestionUseCase:
         question_id: UUID,
         score: int = 100,
         difficulty: str | None = None,
+        student_answer: str | None = None,
+        ai_feedback: str | None = None,
+        evaluation_mode: str = "MANUAL",
     ) -> dict[str, Any]:
         study_map = self.map_repo.get_by_id(map_id)
         if study_map is None:
@@ -835,12 +880,14 @@ class ReviewNodeQuestionUseCase:
         now = self.clock.now() if self.clock is not None else datetime.now(UTC)
 
         effective_score = score
-        if difficulty is not None and score == 100:
+        if difficulty is not None:
             diff_upper = difficulty.upper().strip()
-            if diff_upper in ("EASY", "GOOD", "PERFECT"):
+            if diff_upper == "EASY":
                 effective_score = 100
+            elif diff_upper in ("GOOD", "PERFECT"):
+                effective_score = score if (score != 100 and score is not None) else 85
             elif diff_upper == "HARD":
-                effective_score = 50
+                effective_score = 25
             elif diff_upper == "AGAIN":
                 effective_score = 0
 
@@ -905,8 +952,10 @@ class ReviewNodeQuestionUseCase:
                     score=effective_score,
                     level_before=old_q_level,
                     level_after=new_q_level,
-                    evaluation_mode="MANUAL",
+                    evaluation_mode=evaluation_mode,
                     logged_at=now,
+                    student_answer=student_answer,
+                    ai_feedback=ai_feedback,
                 )
                 self.audit_repo.save(audit_log)
 
