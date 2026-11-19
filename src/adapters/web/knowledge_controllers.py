@@ -19,9 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from src.adapters.ai.gemini_adapters import GeminiEmbeddingAdapter
 from src.adapters.persistence.repositories import (
-    SqlAlchemyKnowledgeChunkRepository,
     SqlAlchemyKnowledgeSourceRepository,
     SqlAlchemyQuestionProgressRepository,
     SqlAlchemySubjectRepository,
@@ -41,7 +39,6 @@ from src.domain.exceptions import (
 )
 from src.domain.services import DocumentTextExtractorService
 from src.infrastructure.clock import system_clock
-from src.infrastructure.config import settings
 from src.infrastructure.database import get_db
 from src.infrastructure.security.dependencies import get_current_user
 
@@ -145,17 +142,13 @@ async def create_knowledge_source_web(
         )
 
     source_repo = SqlAlchemyKnowledgeSourceRepository(db)
-    chunk_repo = SqlAlchemyKnowledgeChunkRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
     subject_repo = SqlAlchemySubjectRepository(db)
-    embedding_service = GeminiEmbeddingAdapter(api_key=getattr(settings, "GEMINI_API_KEY", None))
 
     use_case = IngestKnowledgeSourceUseCase(
         source_repo=source_repo,
-        chunk_repo=chunk_repo,
         topic_repo=topic_repo,
         subject_repo=subject_repo,
-        embedding_service=embedding_service,
     )
 
     req = CreateKnowledgeSourceRequest(
@@ -191,15 +184,13 @@ async def delete_knowledge_source_web(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Response:
-    """Exclui uma fonte de conhecimento e seus chunks associados."""
+    """Exclui uma fonte de conhecimento."""
     source_repo = SqlAlchemyKnowledgeSourceRepository(db)
-    chunk_repo = SqlAlchemyKnowledgeChunkRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
     subject_repo = SqlAlchemySubjectRepository(db)
 
     use_case = DeleteKnowledgeSourceUseCase(
         source_repo=source_repo,
-        chunk_repo=chunk_repo,
         topic_repo=topic_repo,
         subject_repo=subject_repo,
     )

@@ -187,7 +187,7 @@
 
         <div class="border-t border-[#785a28]/40 my-1"></div>
 
-        <!-- Grupo 2: Alimentar com IA -->
+        <!-- Grupo 2: Anotações e Conteúdo Local -->
         <div class="px-1 space-y-0.5">
             <button
                 type="button"
@@ -417,7 +417,7 @@
     </div>
 </div>
 
-<!-- Slide-Over Side Drawer Interativo do Nó (Dual-Screen com IA) -->
+<!-- Slide-Over Side Drawer Interativo do Nó (Estudo e Edição Local) -->
 <div
     id="node-side-drawer"
     class="fixed top-16 right-0 w-full sm:w-[480px] lg:w-[540px] h-[calc(100vh-4rem)] bg-[#14100d]/98 border-l border-[#785a28]/70 shadow-2xl z-40 flex flex-col transition-transform duration-300 transform translate-x-full text-[#f5ebd6] backdrop-blur-md"
@@ -503,12 +503,12 @@
                 <label for="drawer-theory-input" class="text-xs font-bold font-cinzel text-[#f0c869] uppercase tracking-wider">
                     Tomo de Sabedoria &amp; Teoria
                 </label>
-                <span class="text-[10px] font-tome text-[#a39276]">Cole resumos de IA ou anotações</span>
+                <span class="text-[10px] font-tome text-[#a39276]">Anotações e Resumos</span>
             </div>
             <textarea
                 id="drawer-theory-input"
                 rows="9"
-                placeholder="Cole aqui o resumo gerado pela IA, anotações ou conceitos deste tópico..."
+                placeholder="Cole aqui seu resumo de estudos, anotações ou conceitos deste tópico..."
                 class="w-full px-4 py-3 rounded-xl border border-[#785a28] bg-[#0c0908] text-[#f5ebd6] placeholder-[#a39276]/60 focus:border-[#f0c869] focus:outline-none text-sm font-tome leading-relaxed resize-y shadow-inner"
             ></textarea>
         </div>
@@ -543,18 +543,6 @@
                 <label for="drawer-bulk-questions-input" class="text-xs font-bold font-cinzel text-[#f0c869] uppercase tracking-wider">
                     ⚡ Questões em Lote (JSON)
                 </label>
-                <div class="flex items-center space-x-1.5">
-                    <span id="copy-ai-prompt-status" class="hidden text-[10px] text-emerald-400 font-cinzel">✓ copiado</span>
-                    <button
-                        type="button"
-                        id="btn-copy-ai-json-prompt"
-                        onclick="copyAiJsonPrompt()"
-                        class="px-2 py-0.5 rounded bg-[#14100d] hover:bg-[#251c14] text-[#a39276] hover:text-[#f0c869] border border-[#785a28]/40 hover:border-[#c89b3c]/60 text-[10px] font-mono tracking-tight transition-all cursor-pointer opacity-80 hover:opacity-100"
-                        title="Copiar Skill para gerar questões em JSON na IA"
-                    >
-                        skill
-                    </button>
-                </div>
             </div>
             <textarea
                 id="drawer-bulk-questions-input"

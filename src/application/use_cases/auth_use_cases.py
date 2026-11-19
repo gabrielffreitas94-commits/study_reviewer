@@ -1,18 +1,20 @@
 import logging
+import secrets
 from uuid import UUID
 
 from src.application.dto.auth_dto import (
     AuthResultDTO,
-    GoogleAuthInputDTO,
-    GoogleUserInfoDTO,
+    LocalLoginInputDTO,
+    LocalRegisterInputDTO,
     UserDTO,
 )
 from src.application.dto.subject_dto import SubjectDTO
-from src.application.ports.auth import IGoogleAuthClient, ISessionTokenService
+from src.application.ports.auth import IPasswordHasher, ISessionTokenService
 from src.application.ports.repositories import ISubjectRepository, IUserRepository
 from src.domain.entities import User
 from src.domain.exceptions import (
     DomainValidationError,
+    DuplicateEntityError,
     EntityNotFoundError,
     ResourceOwnershipError,
     UnauthorizedError,
@@ -20,66 +22,130 @@ from src.domain.exceptions import (
 
 logger = logging.getLogger("study_reviewer.auth")
 
+DEMO_EMAIL = "demo@studyreviewer.local"
+DEMO_NAME = "Estudante Demo"
+DEMO_GOOGLE_SUB = "local:demo@studyreviewer.local"
 
-class AuthenticateWithGoogleUseCase:
-    """Caso de uso para autenticação via Google OAuth2 / OIDC com JIT Provisioning."""
+
+class RegisterLocalUserUseCase:
+    """Caso de uso para cadastro de nova conta local com e-mail e senha."""
 
     def __init__(
         self,
-        google_client: IGoogleAuthClient,
         user_repo: IUserRepository,
+        password_hasher: IPasswordHasher,
         token_service: ISessionTokenService,
     ) -> None:
-        self._google_client = google_client
         self._user_repo = user_repo
+        self._password_hasher = password_hasher
         self._token_service = token_service
 
-    def execute(self, input_dto: GoogleAuthInputDTO) -> AuthResultDTO:
-        user_info: GoogleUserInfoDTO
-        if input_dto.code:
-            user_info = self._google_client.exchange_code_for_user_info(
-                code=input_dto.code,
-                redirect_uri=input_dto.redirect_uri,
-            )
-        elif input_dto.id_token:
-            user_info = self._google_client.verify_id_token(input_dto.id_token)
-        else:
-            raise DomainValidationError(
-                "Código ou ID Token do Google é obrigatório para autenticação."
-            )
+    def execute(self, input_dto: LocalRegisterInputDTO) -> AuthResultDTO:
+        if len(input_dto.password.strip()) < 8 or len(input_dto.password) > 128:
+            raise DomainValidationError("A senha deve ter entre 8 e 128 caracteres.")
 
-        # Localiza por google_sub ou email
-        user = self._user_repo.get_by_google_sub(user_info.sub)
+        clean_email = input_dto.email.strip().lower()
+        clean_name = input_dto.name.strip()
+
+        if self._user_repo.get_by_email(clean_email) is not None:
+            raise DuplicateEntityError("Já existe uma conta cadastrada com este e-mail.")
+
+        hashed_password = self._password_hasher.hash_password(input_dto.password)
+        user = User(
+            google_sub=f"local:{clean_email}",
+            email=clean_email,
+            name=clean_name,
+            password_hash=hashed_password,
+        )
+        self._user_repo.save(user)
+
+        session_token = self._token_service.create_session_token(
+            user_id=user.id,
+            email=user.email,
+        )
+
+        return AuthResultDTO(
+            user_id=user.id,
+            email=user.email,
+            name=user.name,
+            avatar_url=user.avatar_url,
+            session_token=session_token,
+            is_new_user=True,
+        )
+
+
+class AuthenticateLocalUserUseCase:
+    """Caso de uso para autenticação local com e-mail e senha."""
+
+    def __init__(
+        self,
+        user_repo: IUserRepository,
+        password_hasher: IPasswordHasher,
+        token_service: ISessionTokenService,
+    ) -> None:
+        self._user_repo = user_repo
+        self._password_hasher = password_hasher
+        self._token_service = token_service
+
+    def execute(self, input_dto: LocalLoginInputDTO) -> AuthResultDTO:
+        clean_email = input_dto.email.strip().lower()
+        user = self._user_repo.get_by_email(clean_email)
+
+        if (
+            user is None
+            or not user.password_hash
+            or not self._password_hasher.verify_password(input_dto.password, user.password_hash)
+        ):
+            raise UnauthorizedError("E-mail ou senha inválidos.")
+
+        session_token = self._token_service.create_session_token(
+            user_id=user.id,
+            email=user.email,
+        )
+
+        return AuthResultDTO(
+            user_id=user.id,
+            email=user.email,
+            name=user.name,
+            avatar_url=user.avatar_url,
+            session_token=session_token,
+            is_new_user=False,
+        )
+
+
+class AuthenticateDemoUserUseCase:
+    """Caso de uso para acesso instantâneo offline como Estudante Demo."""
+
+    DEMO_EMAIL = DEMO_EMAIL
+    DEMO_NAME = DEMO_NAME
+    DEMO_GOOGLE_SUB = DEMO_GOOGLE_SUB
+
+    def __init__(
+        self,
+        user_repo: IUserRepository,
+        password_hasher: IPasswordHasher,
+        token_service: ISessionTokenService,
+    ) -> None:
+        self._user_repo = user_repo
+        self._password_hasher = password_hasher
+        self._token_service = token_service
+
+    def execute(self) -> AuthResultDTO:
+        user = self._user_repo.get_by_email(self.DEMO_EMAIL)
+        if user is None:
+            user = self._user_repo.get_by_google_sub(self.DEMO_GOOGLE_SUB)
+
         is_new_user = False
-
         if user is None:
-            # Tenta vincular por e-mail caso exista
-            user = self._user_repo.get_by_email(user_info.email)
-
-        if user is None:
-            # JIT Provisioning de novo usuário
+            hashed_password = self._password_hasher.hash_password(secrets.token_urlsafe(24))
             user = User(
-                google_sub=user_info.sub,
-                email=user_info.email,
-                name=user_info.name,
-                avatar_url=user_info.avatar_url,
+                google_sub=self.DEMO_GOOGLE_SUB,
+                email=self.DEMO_EMAIL,
+                name=self.DEMO_NAME,
+                password_hash=hashed_password,
             )
             self._user_repo.save(user)
             is_new_user = True
-        else:
-            # Sincronização de perfil para usuário existente
-            changed = False
-            if user.google_sub != user_info.sub:
-                user.google_sub = user_info.sub
-                changed = True
-            if user_info.name and user.name != user_info.name:
-                user.name = user_info.name.strip()
-                changed = True
-            if user_info.avatar_url is not None and user.avatar_url != user_info.avatar_url:
-                user.avatar_url = user_info.avatar_url.strip() or None
-                changed = True
-            if changed:
-                self._user_repo.save(user)
 
         session_token = self._token_service.create_session_token(
             user_id=user.id,

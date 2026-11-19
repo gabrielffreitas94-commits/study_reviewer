@@ -49,7 +49,7 @@ from src.infrastructure.database import Base
 
 
 @pytest.fixture
-def db_session() -> Generator[Session]:
+def db_session() -> Generator[Session, None, None]:
     """Cria banco SQLite em memória isolado para os testes unitários do Tomo do Nó."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -659,7 +659,7 @@ def test_node_use_cases_edge_cases_and_error_branches(db_session: Session) -> No
 
 
 def test_review_node_question_audit_logging_and_difficulty_matrix(db_session: Session) -> None:
-    """Verifica que ReviewNodeQuestionUseCase salva student_answer, ai_feedback e evaluation_mode no audit log
+    """Verifica que ReviewNodeQuestionUseCase salva student_answer e evaluation_mode no audit log
 
     e respeita a matriz de pontuação por dificuldade (EASY=100, GOOD=85, HARD=25, AGAIN=0).
     """
@@ -712,8 +712,7 @@ def test_review_node_question_audit_logging_and_difficulty_matrix(db_session: Se
         question_id=q["id"],
         difficulty="GOOD",
         student_answer="Yavanna Kementári com o pranto de Nienna",
-        ai_feedback="Resposta precisa e abrangente.",
-        evaluation_mode="TEXT_AI",
+        evaluation_mode="WRITTEN_SELF_REVIEW",
     )
 
     assert res["new_level"] == 1
@@ -726,5 +725,4 @@ def test_review_node_question_audit_logging_and_difficulty_matrix(db_session: Se
     assert log.historical_topic_name == "Telperion e Laurelin"
     assert log.score == 85
     assert log.student_answer == "Yavanna Kementári com o pranto de Nienna"
-    assert log.ai_feedback == "Resposta precisa e abrangente."
-    assert log.evaluation_mode == "TEXT_AI"
+    assert log.evaluation_mode == "WRITTEN_SELF_REVIEW"

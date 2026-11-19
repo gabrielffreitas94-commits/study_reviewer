@@ -16,7 +16,7 @@ logger = logging.getLogger("study_reviewer")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Gerencia o ciclo de vida da aplicação (startup e shutdown)."""
     Base.metadata.create_all(bind=engine)
     yield
@@ -85,7 +85,6 @@ def create_app() -> FastAPI:
     # Registra rotas web (Jinja2 / HTMX) e API REST (JSON)
 
     from src.adapters.api.auth_controllers import api_auth_router
-    from src.adapters.api.evaluation_controllers import api_evaluation_router
     from src.adapters.api.knowledge_controllers import api_knowledge_router
     from src.adapters.api.performance_controllers import api_performance_router
     from src.adapters.api.question_controllers import api_question_router
@@ -174,7 +173,6 @@ def create_app() -> FastAPI:
     app.include_router(api_question_router)
     app.include_router(web_knowledge_router)
     app.include_router(api_knowledge_router)
-    app.include_router(api_evaluation_router)
     app.include_router(web_performance_router)
     app.include_router(api_performance_router)
     app.include_router(api_studio_router)
@@ -185,11 +183,12 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["Health"])
     async def health_check() -> dict[str, str]:
         """Endpoint público de monitoramento de integridade e liveness (R$ 0,00)."""
+        storage = "sqlite" if settings.DATABASE_URL.startswith("sqlite") else "postgresql"
         return {
             "status": "healthy",
             "app": settings.APP_NAME,
             "environment": settings.ENVIRONMENT,
-            "storage": settings.STUDY_EVENTS_BACKEND,
+            "storage": storage,
         }
 
     @app.get("/health/logs", tags=["Health"])

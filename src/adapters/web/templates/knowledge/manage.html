@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Bases de Conhecimento (RAG) — Study Reviewer{% endblock %}
+{% block title %}Biblioteca de Materiais — Study Reviewer{% endblock %}
 
 {% block content %}
 <div class="max-w-5xl mx-auto w-full py-4 space-y-8">
@@ -9,16 +9,16 @@
         <nav class="flex text-xs text-slate-500 dark:text-slate-400 space-x-2 mb-2" aria-label="Breadcrumb">
             <a href="/cadastros" class="hover:text-indigo-600 dark:hover:text-indigo-400">Cadastros</a>
             <span>/</span>
-            <span class="text-slate-800 dark:text-slate-200 font-semibold">Bases de Conhecimento (RAG)</span>
+            <span class="text-slate-800 dark:text-slate-200 font-semibold">Biblioteca de Materiais</span>
         </nav>
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900 dark:text-white flex items-center space-x-2.5">
                     <span aria-hidden="true">📚</span>
-                    <span>Bases de Conhecimento (RAG)</span>
+                    <span>Biblioteca de Materiais</span>
                 </h1>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    Cadastre materiais didáticos colando texto ou enviando PDFs/DOCX e vincule-os a múltiplos temas para fundamentar a avaliação por IA.
+                    Cadastre materiais de estudo colando texto ou enviando PDFs/DOCX e vincule-os a múltiplos temas para consulta local.
                 </p>
             </div>
             <a href="/questions/manage" class="inline-flex items-center px-4 py-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm shrink-0 self-start sm:self-auto min-h-[44px]">
@@ -62,11 +62,11 @@
     </div>
     {% else %}
 
-    <!-- Card de Cadastro de Nova Base de Conhecimento -->
+    <!-- Card de Cadastro de Novo Material de Estudo -->
     <div class="bg-white dark:bg-slate-800 p-6 sm:p-7 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
             <span aria-hidden="true">➕</span>
-            <span>Cadastrar Novo Material Didático</span>
+            <span>Cadastrar Novo Material de Estudo</span>
         </h2>
 
         <form id="knowledge-form" method="POST" action="/knowledge/manage" enctype="multipart/form-data" class="space-y-6">
@@ -229,7 +229,7 @@
                     id="submit-source-btn"
                     class="min-h-[44px] px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition shadow text-sm flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                    <span>Salvar e Vetorizar Material (RAG)</span>
+                    <span>Salvar Material de Estudo</span>
                     <span aria-hidden="true">➔</span>
                 </button>
             </div>
@@ -277,9 +277,9 @@
                         </span>
                     </div>
 
-                    <!-- Metadados de Chunks e Caracteres -->
+                    <!-- Metadados de Blocos e Caracteres -->
                     <div class="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-                        <span>🧩 <strong>{{ src.total_chunks }}</strong> fragmentos (vetores)</span>
+                        <span>🧩 <strong>{{ src.total_chunks }}</strong> blocos de texto</span>
                         <span>📏 <strong>{{ src.char_count }}</strong> caracteres</span>
                     </div>
 
@@ -299,7 +299,7 @@
 
                 <div class="flex items-center space-x-2 self-end md:self-start">
                     <!-- Formulário de Exclusão -->
-                    <form method="POST" action="/knowledge/manage/{{ src.id }}/delete" onsubmit="return confirm('Deseja realmente excluir este material didático e todos os seus fragmentos vetoriais?');">
+                    <form method="POST" action="/knowledge/manage/{{ src.id }}/delete" onsubmit="return confirm('Deseja realmente excluir este material de estudo?');">
                         <button
                             type="submit"
                             class="p-2 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer flex items-center space-x-1"
@@ -314,7 +314,7 @@
         </div>
         {% else %}
         <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-sm text-slate-500 dark:text-slate-400">
-            Nenhuma base de conhecimento cadastrada ainda. Utilize o formulário acima para colar um texto ou enviar um arquivo didático.
+            Nenhum material de estudo cadastrado ainda. Utilize o formulário acima para colar um texto ou enviar um arquivo didático.
         </div>
         {% endif %}
     </div>

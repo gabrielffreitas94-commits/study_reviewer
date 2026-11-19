@@ -463,7 +463,9 @@ class FakeReviewAuditRepository(IReviewAuditRepository):
     def get_all_by_user(self, user_id: UUID) -> list[ReviewAuditLog]:
         return [log for log in self.logs if log.user_id == user_id]
 
-    def stream_by_user(self, user_id: UUID, chunk_size: int = 1000) -> Generator[ReviewAuditLog]:
+    def stream_by_user(
+        self, user_id: UUID, chunk_size: int = 1000
+    ) -> Generator[ReviewAuditLog, None, None]:
         user_logs = [log for log in self.logs if log.user_id == user_id]
         for i in range(0, len(user_logs), chunk_size):
             yield from user_logs[i : i + chunk_size]

@@ -2,8 +2,7 @@
 
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import AsyncMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,8 +10,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.adapters.ai.gemini_adapters import GeminiEmbeddingAdapter
 from src.adapters.persistence.repositories import (
+    SqlAlchemyKnowledgeSourceRepository,
+    SqlAlchemyQuestionRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
     SqlAlchemyUserRepository,
@@ -27,7 +27,7 @@ from src.infrastructure.web.app import app
 def test_user() -> User:
     return User(
         id=uuid4(),
-        google_sub="sub-studio-1",
+        google_sub="local:studio.user@studyreviewer.local",
         email="studio.user@studyreviewer.local",
         name="Studio User",
     )
@@ -37,14 +37,14 @@ def test_user() -> User:
 def other_user() -> User:
     return User(
         id=uuid4(),
-        google_sub="sub-studio-2",
+        google_sub="local:other.studio@studyreviewer.local",
         email="other.studio@studyreviewer.local",
         name="Other Studio User",
     )
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -57,7 +57,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def db_session(db_engine: Any) -> Generator[Session]:
+def db_session(db_engine: Any) -> Generator[Session, None, None]:
     TestingSession = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
     session = TestingSession()
     try:
@@ -67,8 +67,8 @@ def db_session(db_engine: Any) -> Generator[Session]:
 
 
 @pytest.fixture
-def client(db_session: Session, test_user: User) -> Generator[TestClient]:
-    def override_get_db() -> Generator[Session]:
+def client(db_session: Session, test_user: User) -> Generator[TestClient, None, None]:
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     def override_get_current_user() -> User:
@@ -88,18 +88,13 @@ def test_studio_batch_publish_success(
     client: TestClient,
     db_session: Session,
     test_user: User,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Mock do serviço de embeddings para não bater na API externa durante os testes
-    monkeypatch.setattr(
-        GeminiEmbeddingAdapter,
-        "generate_embeddings_batch",
-        AsyncMock(side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts]),
-    )
-
+    """Valida publicação atômica em lote de novos temas, fontes locais e perguntas."""
     user_repo = SqlAlchemyUserRepository(db_session)
     subj_repo = SqlAlchemySubjectRepository(db_session)
     top_repo = SqlAlchemyTopicRepository(db_session)
+    source_repo = SqlAlchemyKnowledgeSourceRepository(db_session)
+    q_repo = SqlAlchemyQuestionRepository(db_session)
 
     user_repo.save(test_user)
     subj = Subject(name="Direito Constitucional", owner_id=test_user.id)
@@ -146,13 +141,23 @@ def test_studio_batch_publish_success(
     assert len(data["source_ids"]) == 1
     assert len(data["question_ids"]) == 2
 
-    # Verifica persistência no banco
-    all_q = top_repo.list_by_subject(subj.id)
-    assert len(all_q) == 3  # 1 existente + 2 novos
+    # Verifica persistência no banco (temas, fonte local e perguntas)
+    all_topics = top_repo.list_by_subject(subj.id)
+    assert len(all_topics) == 3  # 1 existente + 2 novos
+
+    saved_source = source_repo.get_by_id(UUID(data["source_ids"][0]))
+    assert saved_source is not None
+    assert saved_source.title == "Doutrina Gilmar Mendes"
+    assert "controle concentrado" in saved_source.raw_text
+
+    saved_q1 = q_repo.get_by_id(UUID(data["question_ids"][0]))
+    assert saved_q1 is not None
+    assert "ADI" in saved_q1.prompt
 
 
 @pytest.mark.integration
 def test_studio_batch_publish_subject_not_found(client: TestClient) -> None:
+    """Retorna 404 quando a matéria informada no lote não existe."""
     fake_id = uuid4()
     payload = {
         "subject_id": str(fake_id),
@@ -208,6 +213,7 @@ def test_studio_batch_publish_validation_error(
     db_session: Session,
     test_user: User,
 ) -> None:
+    """Retorna 400 quando nenhuma pergunta possui tema válido vinculado."""
     user_repo = SqlAlchemyUserRepository(db_session)
     subj_repo = SqlAlchemySubjectRepository(db_session)
 

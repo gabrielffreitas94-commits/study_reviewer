@@ -478,7 +478,7 @@
             return;
         }
 
-        // Abre o Slide-Over Side Drawer para estudo dual-screen / anotações / IA
+        // Abre o Slide-Over Side Drawer para estudo e anotações locais
         openNodeSideDrawer(node);
     }
 
@@ -938,7 +938,7 @@
         }
     }
 
-    // --- Side Drawer Interativo do Nó (Dual-Screen com IA) ---
+    // --- Side Drawer Interativo do Nó (Estudo e Edição Local) ---
 
     window.openNodeSideDrawer = async function (nodeOrId) {
         if (!nodeOrId) return;
@@ -1068,61 +1068,6 @@
         } catch (err) {
             console.error('Erro ao salvar teoria:', err);
             alert('Erro ao salvar resumo: ' + err.message);
-        }
-    };
-
-    window.copyAiJsonPrompt = async function () {
-        const nodeTitle = state.selectedNode ? state.selectedNode.title : 'este tópico';
-        const promptText = `---
-name: study-questions-json
-description: Generates deep, complex active-recall study questions in strict JSON format with rich GitHub Flavored Markdown (code snippets, tables, bold concepts, lists, headings) for import into the RPG Study Tree / Grimoire.
----
-
-# Study Questions JSON Generator
-
-Você é um especialista em Ciência da Computação e Engenharia de Software encarregado de gerar questões de recordação ativa de alto nível para o sistema de repetição espaçada (SRS).
-
-Gere de 3 a 5 questões aprofundadas sobre o tópico solicitado.
-
-### Critérios Obrigatórios:
-1. **Nível Avançado**: Foque em cenários reais, depuração de código, trade-offs arquiteturais, falhas em produção ou casos de borda.
-2. **Formato Exclusivo**: Retorne EXCLUSIVAMENTE um array JSON no formato:
-[
-  {
-    "prompt": "Enunciado contextualizado em Markdown...",
-    "expected_answer": "### Critérios de Avaliação\\n- **Ponto 1:** Explicação...\\n- **Ponto 2:** Detalhe técnico..."
-  }
-]
-3. **Markdown Rico**:
-   - Use '###' para estruturar cabeçalhos.
-   - Use '**negrito**' para conceitos capitais.
-   - Use blocos de código com identificador de linguagem (\`\`\`python, \`\`\`sql, etc.).
-   - Use listas com '-' e citações '>' para notas críticas ou nuances.
-4. **Strings JSON Válidas**: Escape quebras de linha com '\\n' e aspas duplas com '\\"'.
-
----
-### Tópico Alvo para Estudo:
-"${nodeTitle}"`;
-
-        const statusEl = document.getElementById('copy-ai-prompt-status');
-        try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(promptText);
-            } else {
-                const ta = document.createElement('textarea');
-                ta.value = promptText;
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-            }
-            if (statusEl) {
-                statusEl.classList.remove('hidden');
-                setTimeout(() => statusEl.classList.add('hidden'), 2500);
-            }
-        } catch (err) {
-            console.error('Erro ao copiar prompt:', err);
-            prompt('Copie o prompt abaixo:', promptText);
         }
     };
 
@@ -1656,7 +1601,6 @@ Gere de 3 a 5 questões aprofundadas sobre o tópico solicitado.
     window.renderDrawerPrerequisites = renderDrawerPrerequisites;
     window.renderDrawerQuestions = renderDrawerQuestionsList;
     window.renderDrawerQuestionsList = renderDrawerQuestionsList;
-    window.copyAiJsonPrompt = copyAiJsonPrompt;
 
     // Menus de Contexto do Canvas & Nós
     window.closeContextMenus = closeContextMenus;

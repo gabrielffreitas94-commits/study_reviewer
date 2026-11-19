@@ -54,7 +54,6 @@ from src.domain.exceptions import (
     EntityNotFoundError,
     ResourceOwnershipError,
 )
-from src.infrastructure.config import settings
 from src.infrastructure.database import get_db
 from src.infrastructure.rng import default_rng
 from src.infrastructure.security.dependencies import get_current_user
@@ -218,13 +217,7 @@ def mark_card_read_api(
 
 
 def get_study_event_repo(db: Session = Depends(get_db)) -> IStudyEventRepository:
-    """Resolve o repositório de eventos de estudo (DynamoDB ou PostgreSQL)."""
-    if settings.STUDY_EVENTS_BACKEND == "dynamodb":
-        from src.adapters.persistence.dynamodb_study_event_repository import (
-            DynamoDbStudyEventRepository,
-        )
-
-        return DynamoDbStudyEventRepository()
+    """Resolve o repositório de eventos de estudo local (SQLAlchemy)."""
     return SqlAlchemyStudyEventRepository(db)
 
 

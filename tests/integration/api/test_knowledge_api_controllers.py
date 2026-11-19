@@ -1,8 +1,8 @@
-"""Testes de integração para os controladores REST de Base de Conhecimento e RAG (Sprint 07)."""
+"""Testes de integração para os controladores REST de Materiais Didáticos Locais."""
 
 from collections.abc import Generator
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.adapters.persistence.repositories import (
-    SqlAlchemyKnowledgeChunkRepository,
     SqlAlchemyKnowledgeSourceRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
@@ -27,7 +26,7 @@ from src.infrastructure.web.app import app
 def test_user() -> User:
     return User(
         id=uuid4(),
-        google_sub="sub-api-know-1",
+        google_sub="local:know.user@studyreviewer.local",
         email="know.user@studyreviewer.local",
         name="Knowledge Owner",
     )
@@ -37,14 +36,14 @@ def test_user() -> User:
 def other_user() -> User:
     return User(
         id=uuid4(),
-        google_sub="sub-api-know-2",
+        google_sub="local:other.know@studyreviewer.local",
         email="other.know@studyreviewer.local",
         name="Other Knowledge User",
     )
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -57,7 +56,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def db_session(db_engine: Any) -> Generator[Session]:
+def db_session(db_engine: Any) -> Generator[Session, None, None]:
     TestingSession = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
     session = TestingSession()
     try:
@@ -67,8 +66,8 @@ def db_session(db_engine: Any) -> Generator[Session]:
 
 
 @pytest.fixture
-def client(db_session: Session, test_user: User) -> Generator[TestClient]:
-    def override_get_db() -> Generator[Session]:
+def client(db_session: Session, test_user: User) -> Generator[TestClient, None, None]:
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     def override_get_current_user() -> User:
@@ -89,9 +88,11 @@ def test_knowledge_api_full_lifecycle(
     db_session: Session,
     test_user: User,
 ) -> None:
+    """Valida criação, listagem e exclusão de material didático local via API REST."""
     user_repo = SqlAlchemyUserRepository(db_session)
     subj_repo = SqlAlchemySubjectRepository(db_session)
     top_repo = SqlAlchemyTopicRepository(db_session)
+    source_repo = SqlAlchemyKnowledgeSourceRepository(db_session)
 
     user_repo.save(test_user)
     subj = Subject(name="Direito Administrativo", owner_id=test_user.id)
@@ -100,7 +101,7 @@ def test_knowledge_api_full_lifecycle(
     top_repo.save(topic)
     db_session.commit()
 
-    # 1. Ingerir material didático
+    # 1. Cadastrar material didático local
     ingest_payload = {
         "title": "Manual de Atos Administrativos",
         "content": (
@@ -113,8 +114,14 @@ def test_knowledge_api_full_lifecycle(
     assert resp.status_code == 201
     data = resp.json()
     assert data["title"] == "Manual de Atos Administrativos"
-    assert data["total_chunks"] >= 1
+    assert data["content_type"] == "SUMMARY"
+    assert data["char_count"] == len(ingest_payload["content"])
     source_id = data["id"]
+
+    # Confirma persistência do texto bruto no repositório local
+    persisted = source_repo.get_by_id(UUID(source_id))
+    assert persisted is not None
+    assert "presunção de legitimidade" in persisted.raw_text
 
     # 2. Listar materiais do tema
     resp_list = client.get(f"/api/v1/topics/{topic.id}/knowledge")
@@ -123,25 +130,11 @@ def test_knowledge_api_full_lifecycle(
     assert len(sources) == 1
     assert sources[0]["id"] == source_id
 
-    # 3. Validar questão grounded
-    val_payload = {
-        "prompt": "Quais são os atributos do ato administrativo?",
-        "expected_answer": (
-            "Presunção de legitimidade, imperatividade, autoexecutoriedade e tipicidade."
-        ),
-    }
-    resp_val = client.post(f"/api/v1/topics/{topic.id}/validate-question", json=val_payload)
-    assert resp_val.status_code == 200
-    val_data = resp_val.json()
-    assert val_data["is_grounded"] is True
-    assert val_data["confidence_score"] >= 0.85
-    assert len(val_data["evidence_chunk_ids"]) >= 1
-
-    # 4. Deletar material didático
+    # 3. Deletar material didático
     resp_del = client.delete(f"/api/v1/knowledge/{source_id}")
     assert resp_del.status_code == 204
 
-    # 5. Listar novamente (deve estar vazio)
+    # 4. Listar novamente (deve estar vazio)
     resp_list_after = client.get(f"/api/v1/topics/{topic.id}/knowledge")
     assert resp_list_after.status_code == 200
     assert len(resp_list_after.json()) == 0
@@ -153,6 +146,7 @@ def test_knowledge_api_validation_errors_and_not_found(
     db_session: Session,
     test_user: User,
 ) -> None:
+    """Valida erros 422, 400 e 404 nos endpoints de materiais didáticos."""
     user_repo = SqlAlchemyUserRepository(db_session)
     subj_repo = SqlAlchemySubjectRepository(db_session)
     top_repo = SqlAlchemyTopicRepository(db_session)
@@ -191,13 +185,6 @@ def test_knowledge_api_validation_errors_and_not_found(
     resp_list_404 = client.get(f"/api/v1/topics/{fake_topic_id}/knowledge")
     assert resp_list_404.status_code == 404
 
-    # Validação em tema inexistente -> 404
-    resp_val_404 = client.post(
-        f"/api/v1/topics/{fake_topic_id}/validate-question",
-        json={"prompt": "P", "expected_answer": "R"},
-    )
-    assert resp_val_404.status_code == 404
-
     # Fonte inexistente no delete -> 404
     fake_source_id = uuid4()
     resp_del_404 = client.delete(f"/api/v1/knowledge/{fake_source_id}")
@@ -226,11 +213,16 @@ def test_security_knowledge_idor_prevention(
     other_topic = Topic(subject_id=other_subj.id, name="Segredo")
     top_repo.save(other_topic)
 
-    other_source = KnowledgeSource(topic_id=other_topic.id, title="Material Privado")
+    other_source = KnowledgeSource(
+        topic_id=other_topic.id,
+        title="Material Privado",
+        raw_text="Conteúdo privado exclusivo do proprietário da matéria.",
+        char_count=54,
+    )
     source_repo.save(other_source)
     db_session.commit()
 
-    # 1. Tentativa de ingestão no tema alheio -> 403
+    # 1. Tentativa de cadastro no tema alheio -> 403
     resp_ingest = client.post(
         f"/api/v1/topics/{other_topic.id}/knowledge",
         json={"title": "Hack", "content": "Tentativa de injeção de conhecimento no tema alheio."},
@@ -245,13 +237,6 @@ def test_security_knowledge_idor_prevention(
     resp_del = client.delete(f"/api/v1/knowledge/{other_source.id}")
     assert resp_del.status_code == 403
 
-    # 4. Tentativa de validação no tema privado alheio -> 403
-    resp_val_idor = client.post(
-        f"/api/v1/topics/{other_topic.id}/validate-question",
-        json={"prompt": "P", "expected_answer": "R"},
-    )
-    assert resp_val_idor.status_code == 403
-
 
 @pytest.mark.security
 def test_security_knowledge_content_sanitization(
@@ -262,12 +247,12 @@ def test_security_knowledge_content_sanitization(
     """Vulnerabilidade prevenida: Stored Cross-Site Scripting (XSS) e HTML Injection.
 
     Garantia de segurança: Tags HTML perigosas como <script>, <iframe> e manipuladores
-    de eventos (onload, onclick) são sumariamente expurgadas antes da fragmentação e persistência.
+    de eventos (onload, onclick) são sumariamente expurgadas antes da persistência local.
     """
     user_repo = SqlAlchemyUserRepository(db_session)
     subj_repo = SqlAlchemySubjectRepository(db_session)
     top_repo = SqlAlchemyTopicRepository(db_session)
-    chunk_repo = SqlAlchemyKnowledgeChunkRepository(db_session)
+    source_repo = SqlAlchemyKnowledgeSourceRepository(db_session)
 
     user_repo.save(test_user)
     subj = Subject(name="Segurança", owner_id=test_user.id)
@@ -289,23 +274,26 @@ def test_security_knowledge_content_sanitization(
 
     resp = client.post(f"/api/v1/topics/{topic.id}/knowledge", json=malicious_payload)
     assert resp.status_code == 201
+    source_id = UUID(resp.json()["id"])
 
-    chunks = chunk_repo.list_by_topic(topic.id)
-    assert len(chunks) >= 1
-    for chunk in chunks:
-        assert "<script>" not in chunk.content
-        assert "onerror" not in chunk.content
-        assert "alert(" not in chunk.content
+    saved_source = source_repo.get_by_id(source_id)
+    assert saved_source is not None
+    assert "<script>" not in saved_source.raw_text
+    assert "onerror" not in saved_source.raw_text
+    assert "alert(" not in saved_source.raw_text
+    assert "Texto legítimo com conteúdo acadêmico suficiente." in saved_source.raw_text
 
 
 @pytest.mark.integration
 def test_knowledge_api_extract_file_endpoint(client: TestClient) -> None:
+    """Valida extração de texto local via POST /api/v1/knowledge/extract-file."""
     sample_text = "Texto de teste para validação de extração via upload multipart."
     files = {"file": ("documento.txt", sample_text.encode("utf-8"), "text/plain")}
     resp = client.post("/api/v1/knowledge/extract-file", files=files)
     assert resp.status_code == 200
     data = resp.json()
     assert data["filename"] == "documento.txt"
+    assert data["extracted_text"] == sample_text
     assert data["char_count"] == len(sample_text)
     assert "Texto de teste" in data["text_preview"]
 
@@ -314,6 +302,11 @@ def test_knowledge_api_extract_file_endpoint(client: TestClient) -> None:
     resp_empty = client.post("/api/v1/knowledge/extract-file", files=files_empty)
     assert resp_empty.status_code == 400
 
+    # Formato não suportado -> 400
+    files_bad = {"file": ("binario.exe", b"MZ\x90\x00", "application/octet-stream")}
+    resp_bad = client.post("/api/v1/knowledge/extract-file", files=files_bad)
+    assert resp_bad.status_code == 400
+
 
 @pytest.mark.integration
 def test_knowledge_api_link_topics_endpoint(
@@ -321,6 +314,7 @@ def test_knowledge_api_link_topics_endpoint(
     db_session: Session,
     test_user: User,
 ) -> None:
+    """Valida atualização de vínculos N:N via PUT /api/v1/knowledge/{source_id}/topics."""
     user_repo = SqlAlchemyUserRepository(db_session)
     subj_repo = SqlAlchemySubjectRepository(db_session)
     top_repo = SqlAlchemyTopicRepository(db_session)
@@ -338,6 +332,8 @@ def test_knowledge_api_link_topics_endpoint(
         title="Manual de Penal",
         content_type="TEXT",
         topic_ids=(t1.id,),
+        raw_text="Manual completo sobre teoria do crime e aplicação das penas.",
+        char_count=60,
     )
     source_repo.save(source)
     db_session.commit()

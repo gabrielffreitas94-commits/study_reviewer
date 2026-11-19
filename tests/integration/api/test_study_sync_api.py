@@ -28,7 +28,7 @@ from src.infrastructure.web.app import app
 
 
 @pytest.fixture(autouse=True)
-def _clear_rate_limiter() -> Generator[None]:
+def _clear_rate_limiter() -> Generator[None, None, None]:
     """Limpa a janela deslizante de rate limiting antes e depois de cada teste."""
     reset_rate_limits()
     yield
@@ -58,7 +58,7 @@ def other_user() -> User:
 
 
 @pytest.fixture
-def db_session() -> Generator[Session]:
+def db_session() -> Generator[Session, None, None]:
     """Cria uma sessão SQLite isolada em memória para cada teste."""
     engine = create_engine(
         "sqlite:///:memory:",
@@ -77,13 +77,15 @@ def db_session() -> Generator[Session]:
 
 
 @pytest.fixture
-def client(db_session: Session, test_user: User, other_user: User) -> Generator[TestClient]:
+def client(
+    db_session: Session, test_user: User, other_user: User
+) -> Generator[TestClient, None, None]:
     """Cria TestClient com injeção de dependências e usuários persistidos no banco."""
     user_repo = SqlAlchemyUserRepository(db_session)
     user_repo.save(test_user)
     user_repo.save(other_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     def override_get_current_user() -> User:

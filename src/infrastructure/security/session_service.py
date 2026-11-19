@@ -50,25 +50,3 @@ class AesGcmSessionTokenService(ISessionTokenService):
             )
         except (CryptoError, ValueError, KeyError, json.JSONDecodeError):
             return None
-
-    def create_oauth_state(self, next_url: str = "") -> str:
-        """Gera um state CSRF criptografado contendo o timestamp e a rota de retorno."""
-        now = int(time.time())
-        payload = {
-            "type": "oauth_state",
-            "next": next_url,
-            "exp": now + 600,  # 10 minutos
-        }
-        return self._cipher.encrypt(json.dumps(payload))
-
-    def verify_oauth_state(self, state: str) -> str | None:
-        """Valida o state CSRF e recupera a rota de retorno next_url caso válido."""
-        try:
-            plaintext = self._cipher.decrypt(state)
-            data = json.loads(plaintext)
-            now = int(time.time())
-            if data.get("type") != "oauth_state" or data.get("exp", 0) <= now:
-                return None
-            return str(data.get("next", ""))
-        except (CryptoError, ValueError, KeyError, json.JSONDecodeError):
-            return None

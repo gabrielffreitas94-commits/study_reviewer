@@ -16,7 +16,7 @@ from src.infrastructure.database import Base
 
 
 @pytest.fixture
-def db_session() -> Generator[Session]:
+def db_session() -> Generator[Session, None, None]:
     """Fixture de sessão de banco em memória para testes de repositório."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)

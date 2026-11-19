@@ -9,18 +9,15 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from src.adapters.persistence.repositories import SqlAlchemyUserRepository
-from src.application.ports.auth import IGoogleAuthClient, ISessionTokenService
+from src.application.ports.auth import IPasswordHasher, ISessionTokenService
 from src.domain.entities import User
 from src.infrastructure.config import settings
 from src.infrastructure.database import get_db
-from src.infrastructure.security.google_client import GoogleOAuthClient
+from src.infrastructure.security.password_hasher import Pbkdf2PasswordHasher
 from src.infrastructure.security.session_service import AesGcmSessionTokenService
 
 _session_service = AesGcmSessionTokenService(settings.SECRET_KEY)
-_google_client = GoogleOAuthClient(
-    client_id=settings.GOOGLE_CLIENT_ID,
-    client_secret=settings.GOOGLE_CLIENT_SECRET,
-)
+_password_hasher = Pbkdf2PasswordHasher()
 
 
 def get_session_service() -> ISessionTokenService:
@@ -28,9 +25,9 @@ def get_session_service() -> ISessionTokenService:
     return _session_service
 
 
-def get_google_client() -> IGoogleAuthClient:
-    """Retorna o cliente de integração com o Google OIDC."""
-    return _google_client
+def get_password_hasher() -> IPasswordHasher:
+    """Retorna o serviço singleton de hash de senhas PBKDF2-HMAC-SHA256."""
+    return _password_hasher
 
 
 def get_current_user_optional(

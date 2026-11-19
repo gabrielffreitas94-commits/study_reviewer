@@ -46,7 +46,7 @@ def other_user() -> User:
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -59,7 +59,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestClient]:
+def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestClient, None, None]:
     TestingSession = sessionmaker(bind=db_engine)
 
     with TestingSession() as session:
@@ -67,7 +67,7 @@ def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestC
         u_repo.save(test_user)
         u_repo.save(other_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         session = TestingSession()
         try:
             yield session
@@ -132,8 +132,10 @@ def test_study_page_renders_due_question_card_and_active_recall(
     assert "pointer-events-none" in res.text
     assert 'id="tab-mode-text"' in res.text
     assert 'id="student-text-answer"' in res.text
-    assert 'id="btn-submit-text-eval"' in res.text
-    assert 'id="ai-eval-feedback-panel"' in res.text
+    assert 'id="btn-reveal-written-compare"' in res.text
+    assert 'id="panel-mode-text"' in res.text
+    assert 'id="panel-mode-manual"' in res.text
+    assert "WRITTEN_SELF_REVIEW" in res.text
 
 
 @pytest.mark.integration
@@ -484,11 +486,11 @@ def test_navigation_three_tabs_and_active_highlighting(client: TestClient) -> No
 
 
 @pytest.mark.integration
-def test_study_page_question_card_audio_and_dispute_accessible_features(
+def test_study_page_question_card_accessible_self_review_features(
     client: TestClient, test_user: User, db_engine: Any
 ) -> None:
-    """Verifica presença dos botões acessíveis de áudio e contestação (WCAG 2.1 AA)
-    e nota de privacidade LGPD."""
+    """Verifica presença dos controles acessíveis locais de autoavaliação (WCAG 2.1 AA)
+    sem modais externos de IA ou áudio."""
     with Session(db_engine) as session:
         subj = Subject(name="Direito Constitucional", owner_id=test_user.id)
         SqlAlchemySubjectRepository(session).save(subj)
@@ -509,22 +511,24 @@ def test_study_page_question_card_audio_and_dispute_accessible_features(
 
     res = client.get("/questions/study")
     assert res.status_code == 200
-    # Botão e Modal de Áudio
-    assert "btn-audio-answer" in res.text
-    assert "Responder por Áudio" in res.text
-    assert "audio-answer-modal" in res.text
-    assert 'aria-haspopup="dialog"' in res.text
-    assert 'role="dialog"' in res.text
-    assert "Privacidade Efêmera (LGPD Art. 16)" in res.text
+    # Tabs acessíveis de modo local (Escrito vs Gabarito Direto)
+    assert 'role="tablist"' in res.text
+    assert 'id="tab-mode-text"' in res.text
+    assert 'id="tab-mode-manual"' in res.text
+    assert "Responder por Escrito" in res.text
+    assert "Gabarito Direto" in res.text
+    assert 'id="btn-reveal-written-compare"' in res.text
 
-    # Botão e Modal de Contestação (Conselho Multiagente)
-    assert "btn-dispute-evaluation" in res.text
-    assert "Contestar Avaliação" in res.text
-    assert "dispute-modal" in res.text
-    assert "Conselho Multiagente" in res.text
-    assert "Advogado do Estudante" in res.text
-    assert "Crítico Técnico" in res.text
-    assert "Árbitro Imparcial" in res.text
+    # Controles acessíveis de autoavaliação
+    assert 'role="group"' in res.text
+    assert 'id="score-slider"' in res.text
+    assert 'id="score-display"' in res.text
+    assert 'aria-live="polite"' in res.text
+    assert 'id="srs-announcer"' in res.text
+
+    # Sem botões/modais de áudio ou disputa IA
+    assert "btn-audio-answer" not in res.text
+    assert "btn-dispute-evaluation" not in res.text
 
 
 @pytest.mark.integration

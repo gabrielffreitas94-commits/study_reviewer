@@ -262,11 +262,9 @@ def test_review_audit_log_invalid_evaluation_mode_raises_error(invalid_mode: str
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    "valid_mode", ["MANUAL", "AI_TEXT", "AI_AUDIO", "MULTIAGENT_DISPUTE", "TEXT_AI", "VOICE_AI"]
-)
+@pytest.mark.parametrize("valid_mode", ["MANUAL", "WRITTEN_SELF_REVIEW"])
 def test_review_audit_log_valid_evaluation_modes_and_student_answer(valid_mode: str) -> None:
-    """Verifica aceitação de todos os modos válidos e persistência de student_answer e ai_feedback."""
+    """Verifica aceitação de todos os modos válidos e persistência de student_answer."""
     log = ReviewAuditLog(
         user_id=uuid4(),
         question_id=uuid4(),
@@ -280,8 +278,6 @@ def test_review_audit_log_valid_evaluation_modes_and_student_answer(valid_mode: 
         level_after=2,
         evaluation_mode=valid_mode,
         student_answer="Resposta do estudante sobre a monarquia brasileira.",
-        ai_feedback="Excelente fundamentação factual.",
     )
     assert log.evaluation_mode == valid_mode
     assert log.student_answer == "Resposta do estudante sobre a monarquia brasileira."
-    assert log.ai_feedback == "Excelente fundamentação factual."

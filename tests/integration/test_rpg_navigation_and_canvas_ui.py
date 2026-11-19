@@ -33,7 +33,7 @@ def test_user() -> User:
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -46,7 +46,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def db_session(db_engine: Any) -> Generator[Session]:
+def db_session(db_engine: Any) -> Generator[Session, None, None]:
     testing_session = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
     session = testing_session()
     try:
@@ -56,11 +56,11 @@ def db_session(db_engine: Any) -> Generator[Session]:
 
 
 @pytest.fixture
-def authenticated_client(db_session: Session, test_user: User) -> Generator[TestClient]:
+def authenticated_client(db_session: Session, test_user: User) -> Generator[TestClient, None, None]:
     user_repo = SqlAlchemyUserRepository(db_session)
     user_repo.save(test_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     def override_get_current_user() -> User:
@@ -81,9 +81,9 @@ def test_rpg_grimoire_topbar_and_navigation(authenticated_client: TestClient) ->
     res = authenticated_client.get("/study-maps")
     assert res.status_code == 200
 
-    # Fontes do Grimório
-    assert "Cinzel" in res.text
-    assert "Cormorant+Garamond" in res.text or "Cormorant Garamond" in res.text
+    # Fontes/classes locais do Grimório (sem dependências externas)
+    assert "Cinzel" in res.text or "font-cinzel" in res.text
+    assert "font-tome" in res.text
 
     # 3 Abas RPG
     assert "Códice de Habilidades" in res.text

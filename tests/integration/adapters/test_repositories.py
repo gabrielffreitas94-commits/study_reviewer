@@ -19,7 +19,7 @@ from src.infrastructure.database import Base
 
 
 @pytest.fixture
-def db_session() -> Generator[Session]:
+def db_session() -> Generator[Session, None, None]:
     """Cria banco SQLite em memória isolado para os testes de integração."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)

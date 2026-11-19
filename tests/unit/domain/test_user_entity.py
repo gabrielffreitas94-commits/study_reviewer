@@ -46,6 +46,20 @@ def test_user_creation_defaults() -> None:
     assert isinstance(user.id, UUID)
     assert isinstance(user.created_at, date)
     assert user.avatar_url is None
+    assert user.password_hash is None
+
+
+@pytest.mark.unit
+def test_user_creation_with_password_hash() -> None:
+    """Valida armazenamento opcional do campo password_hash para autenticação local."""
+    stored_hash = "pbkdf2_sha256$100000$abcd$1234"
+    user = User(
+        google_sub="local:maria@teste.com",
+        email="maria@teste.com",
+        name="Maria",
+        password_hash=stored_hash,
+    )
+    assert user.password_hash == stored_hash
 
 
 @pytest.mark.unit

@@ -8,13 +8,13 @@
     <div class="border-b border-slate-200 dark:border-slate-800 pb-6">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 mb-3">
             <span>🛡️</span>
-            <span>Conformidade LGPD (Lei 13.709/2018) &amp; Google Play Data Safety</span>
+            <span>Conformidade LGPD (Lei 13.709/2018) &amp; Execução 100% Local Offline</span>
         </div>
         <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             Política de Privacidade e Tratamento de Dados Pessoais
         </h1>
         <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            Última atualização: Outubro de 2026 • Transparência, segurança e respeito integral à privacidade do estudante.
+            Última atualização: Novembro de 2026 • Soberania de dados, persistência local e zero telemetria externa.
         </p>
     </div>
 
@@ -25,9 +25,9 @@
             <span>1. Nosso Compromisso com a Privacidade</span>
         </h2>
         <p class="text-slate-600 dark:text-slate-300 leading-relaxed text-sm sm:text-base">
-            O <strong>Study Reviewer</strong> foi desenvolvido sob o princípio do <em>Privacy by Design</em> e <em>Privacy by Default</em>.
-            Nosso único objetivo é fornecer a estudantes uma plataforma de repetição espaçada (SRS) e revisão ativa de alto rendimento.
-            Não monetizamos seus dados, não exibimos anúncios direcionados e não compartilhamos suas informações com corretores de dados.
+            O <strong>Study Reviewer</strong> foi desenvolvido sob o princípio do <em>Privacy by Design</em> e <em>Local-First</em>.
+            A aplicação executa integralmente em seu ambiente local (sem integração com nuvem, provedores de IA externos ou redes de publicidade).
+            Todos os seus cadernos, mapas de habilidades, flashcards e registros de revisão permanecem sob seu controle exclusivo.
         </p>
     </section>
 
@@ -35,23 +35,23 @@
     <section class="bg-white dark:bg-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80 dark:border-slate-700/60 space-y-4">
         <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <span aria-hidden="true">🔍</span>
-            <span>2. Dados Coletados e Finalidade Específica</span>
+            <span>2. Dados Armazenados Localmente e Finalidade</span>
         </h2>
         <p class="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
-            Coletamos exclusivamente os dados estritamente necessários para viabilizar o login seguro e calcular seus intervalos ideais de revisão:
+            Persistimos no banco de dados local (SQLite ou PostgreSQL configurado na sua máquina) exclusivamente os dados necessários para o funcionamento do seu espaço de estudos:
         </p>
         <ul class="list-disc list-inside text-sm sm:text-base text-slate-600 dark:text-slate-300 space-y-2 pl-2">
             <li>
-                <strong>Identificação Pessoal (Google Sign-In):</strong> Nome, endereço de e-mail e URL do avatar público, fornecidos diretamente pelo Google OAuth2/OIDC.
-                <em>Finalidade:</em> Autenticar com segurança, prevenir fraudes e vincular suas matérias e flashcards ao seu perfil individual.
+                <strong>Credenciais Locais de Workspace:</strong> Nome, endereço de e-mail e hash criptográfico da senha cadastrada localmente.
+                <em>Finalidade:</em> Autenticar sua conta no ambiente local e isolar suas matérias, mapas e histórico por usuário.
             </li>
             <li>
-                <strong>Conteúdo de Estudo:</strong> Títulos de matérias, temas, perguntas abertas cadastradas e flashcards criados por você.
-                <em>Finalidade:</em> Permitir a personalização dos seus cadernos de estudo.
+                <strong>Conteúdo de Estudo:</strong> Matérias, temas, nós do Códice de Habilidades, perguntas abertas, respostas escritas para autoavaliação, flashcards e materiais de estudo anexados.
+                <em>Finalidade:</em> Estruturar e apresentar seu acervo pessoal de revisão ativa.
             </li>
             <li>
-                <strong>Métricas de Aprendizagem e Telemetria de Sessão:</strong> Pontuações obtidas nas revisões, nível SRS (0 a 5), intervalos de repetição e registros de revisão.
-                <em>Finalidade:</em> Alimentar o algoritmo de repetição espaçada e prover relatórios analíticos de retenção de memória.
+                <strong>Métricas de Aprendizagem e Auditoria:</strong> Pontuações de autoavaliação, nível SRS (0 a 6), intervalos de repetição e histórico imutável de revisões.
+                <em>Finalidade:</em> Calcular o algoritmo de repetição espaçada e gerar seus relatórios locais de retenção.
             </li>
         </ul>
     </section>
@@ -60,36 +60,36 @@
     <section class="bg-white dark:bg-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80 dark:border-slate-700/60 space-y-4">
         <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <span aria-hidden="true">🔒</span>
-            <span>3. Criptografia Avançada e Segurança da Informação</span>
+            <span>3. Criptografia e Segurança Local</span>
         </h2>
         <p class="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
-            Adotamos medidas técnicas e administrativas rigorosas para proteção dos seus dados:
+            Mesmo operando em ambiente local, adotamos padrões rigorosos de proteção das sessões e isolamento de dados:
         </p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
                 <h3 class="font-semibold text-sm text-indigo-600 dark:text-indigo-400">Criptografia AES-256-GCM</h3>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Tokens de autenticação e cookies de sessão utilizam cifra simétrica autenticada AES-256-GCM com vetores de inicialização únicos de 96 bits e verificação de integridade tag 128-bit.
+                    Cookies de sessão (<code>HttpOnly</code>, <code>SameSite=Lax</code>) e tokens Bearer utilizam cifra autenticada AES-256-GCM com vetores de inicialização únicos de 96 bits e tag de integridade de 128 bits.
                 </p>
             </div>
             <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-                <h3 class="font-semibold text-sm text-indigo-600 dark:text-indigo-400">Proteção Anti-CSRF &amp; Anti-IDOR</h3>
+                <h3 class="font-semibold text-sm text-indigo-600 dark:text-indigo-400">Higienização &amp; Anti-IDOR</h3>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    States OIDC criptografados efêmeros e autorização estrita baseada exclusivamente na chave primária do usuário autenticado impedem manipulação indevida de dados de terceiros.
+                    Senhas são protegidas com hash criptográfico seguro com salt aleatório, entradas passam por sanitização contra XSS e toda consulta valida a titularidade do usuário autenticado.
                 </p>
             </div>
         </div>
     </section>
 
-    <!-- 4. Compartilhamento de Dados -->
+    <!-- 4. Ausência de Tráfego Externo -->
     <section class="bg-white dark:bg-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80 dark:border-slate-700/60 space-y-4">
         <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <span aria-hidden="true">🤝</span>
-            <span>4. Compartilhamento com Terceiros</span>
+            <span aria-hidden="true">💻</span>
+            <span>4. Zero Compartilhamento com Terceiros ou Nuvem</span>
         </h2>
         <p class="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
-            Seus dados pessoais <strong>jamais</strong> são comercializados, alugados, cedidos ou transferidos a redes de publicidade ou terceiros.
-            As únicas interações com serviços externos decorrem do provedor de identidade escolhido por você (Google OIDC para autenticação) e provedores de infraestrutura estritamente subordinados a termos de confidencialidade técnica.
+            O <strong>Study Reviewer</strong> não envia dados para APIs externas, serviços de inteligência artificial, provedores de autenticação de terceiros ou CDNs remotas.
+            Todos os assets estáticos (HTML, CSS, JavaScript e ícones vetoriais) são servidos localmente pela própria aplicação.
         </p>
     </section>
 
@@ -100,62 +100,51 @@
             <span>5. Seus Direitos como Titular (Art. 18 da LGPD)</span>
         </h2>
         <p class="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
-            Em conformidade com a legislação brasileira, você possui total controle sobre seus dados:
+            Você mantém controle total sobre os seus dados armazenados localmente:
         </p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
             <div class="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200/70 dark:border-slate-800">
-                <strong>Acesso e Confirmação:</strong> Visualizar todos os dados pessoais e matérias a qualquer momento.
+                <strong>Acesso e Confirmação:</strong> Visualizar todas as matérias, mapas, questões e logs a qualquer momento.
             </div>
             <div class="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200/70 dark:border-slate-800">
-                <strong>Portabilidade:</strong> Exportar seu histórico completo de estudos e auditoria em formato estruturado.
+                <strong>Portabilidade:</strong> Exportar seu histórico completo de estudos e auditoria em formatos estruturados (JSON e CSV).
             </div>
             <div class="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200/70 dark:border-slate-800">
-                <strong>Correção:</strong> Atualizar suas informações cadastrais a partir do perfil do Google.
+                <strong>Edição e Correção:</strong> Editar diretamente seus enunciados, gabaritos, resumos e materiais de estudo.
             </div>
             <div class="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200/70 dark:border-slate-800">
-                <strong>Eliminação e Revogação:</strong> Excluir sua conta e revogar qualquer consentimento a qualquer instante.
+                <strong>Eliminação e Anonimização:</strong> Excluir sua conta local e apagar ou anonimizar seus registros a qualquer instante.
             </div>
         </div>
     </section>
 
-    <!-- 6. Exclusão de Conta e Dados Pessoais (Google Play Data Safety) -->
+    <!-- 6. Exclusão de Conta e Dados Pessoais -->
     <section class="bg-white dark:bg-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80 dark:border-slate-700/60 space-y-4">
         <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <span aria-hidden="true">🗑️</span>
             <span>6. Exclusão de Conta e Anonimização (Art. 16, IV da LGPD)</span>
         </h2>
         <p class="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
-            Respeitamos integralmente seu direito ao esquecimento. Quando você solicita a exclusão da sua conta:
+            Quando você solicita a exclusão da sua conta local:
         </p>
         <ul class="list-disc list-inside text-sm sm:text-base text-slate-600 dark:text-slate-300 space-y-2 pl-2">
             <li>
-                <strong>Exclusão Imediata em Cascata:</strong> Seus dados pessoais (nome, e-mail, avatar, identificador Google sub), suas matérias particulares, temas, flashcards e progresso em perguntas são apagados de forma irreversível.
+                <strong>Exclusão Imediata em Cascata:</strong> Seus dados pessoais (nome, e-mail, credenciais), matérias particulares, temas, mapas, flashcards e progresso em perguntas são removidos do banco local.
             </li>
             <li>
-                <strong>Anonimização de Histórico Analítico (Art. 16, IV da LGPD):</strong> Logs de auditoria agregados têm a referência de usuário desvinculada (definida como <code>NULL</code>), mantendo apenas estatísticas desprovidas de qualquer identificador pessoal ou rastreabilidade.
+                <strong>Anonimização de Histórico Analítico (Art. 16, IV da LGPD):</strong> Registros agregados de auditoria têm a referência de usuário desvinculada (<code>NULL</code>), removendo qualquer identificador pessoal.
             </li>
         </ul>
         <div class="pt-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-            <a href="/privacy/account-deletion-request" 
+            <a href="/privacy/account-deletion-request"
                class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                 <span aria-hidden="true">⚠️</span>
-                <span>Solicitação Externa de Exclusão de Conta</span>
+                <span>Solicitar Exclusão de Conta Local</span>
             </a>
             <span class="text-xs text-slate-500 dark:text-slate-400">
-                Disponível publicamente via web (conformidade Google Play Data Safety).
+                Operação executada diretamente sobre a instância local.
             </span>
         </div>
-    </section>
-
-    <!-- 7. Contato e DPO -->
-    <section class="bg-slate-100 dark:bg-slate-900/60 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 text-sm text-slate-600 dark:text-slate-400 space-y-2">
-        <h2 class="text-base font-semibold text-slate-800 dark:text-slate-200">
-            Dúvidas ou Requisições LGPD?
-        </h2>
-        <p>
-            Caso deseje exercer algum de seus direitos ou esclarecer dúvidas sobre o tratamento de seus dados, entre em contato com nosso Encarregado de Proteção de Dados (DPO) através do e-mail:
-            <a href="mailto:privacidade@studyreviewer.com" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">privacidade@studyreviewer.com</a>.
-        </p>
     </section>
 
     <div class="pt-4 flex justify-between items-center text-xs text-slate-500 dark:text-slate-500">

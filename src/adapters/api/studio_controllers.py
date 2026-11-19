@@ -7,9 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.adapters.ai.gemini_adapters import GeminiEmbeddingAdapter
 from src.adapters.persistence.repositories import (
-    SqlAlchemyKnowledgeChunkRepository,
     SqlAlchemyKnowledgeSourceRepository,
     SqlAlchemyQuestionProgressRepository,
     SqlAlchemyQuestionRepository,
@@ -32,7 +30,6 @@ from src.domain.exceptions import (
     ResourceOwnershipError,
 )
 from src.infrastructure.clock import system_clock
-from src.infrastructure.config import settings
 from src.infrastructure.database import get_db
 from src.infrastructure.security.dependencies import get_current_user
 from src.infrastructure.security.sanitization import MarkdownSanitizerService
@@ -81,20 +78,16 @@ async def batch_studio_publish(
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     source_repo = SqlAlchemyKnowledgeSourceRepository(db)
-    chunk_repo = SqlAlchemyKnowledgeChunkRepository(db)
     topic_repo = SqlAlchemyTopicRepository(db)
     subject_repo = SqlAlchemySubjectRepository(db)
     question_repo = SqlAlchemyQuestionRepository(db)
     progress_repo = SqlAlchemyQuestionProgressRepository(db)
     uow = SqlAlchemyUnitOfWork(db)
 
-    embedding_service = GeminiEmbeddingAdapter(api_key=getattr(settings, "GEMINI_API_KEY", None))
     ingest_use_case = IngestKnowledgeSourceUseCase(
         source_repo=source_repo,
-        chunk_repo=chunk_repo,
         topic_repo=topic_repo,
         subject_repo=subject_repo,
-        embedding_service=embedding_service,
     )
 
     batch_use_case = BatchStudioPublishUseCase(

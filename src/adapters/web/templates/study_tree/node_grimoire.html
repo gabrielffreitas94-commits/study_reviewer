@@ -293,36 +293,20 @@
                             {{ questions[0].statement or questions[0].prompt }}
                         </div>
 
-                        <!-- Seletor das 3 Formas de Resposta -->
-                        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-[#785a28]/30">
-                            <button
-                                type="button"
-                                id="tab-reveal"
-                                onclick="selectArenaMode('reveal')"
-                                class="py-2 px-1 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow text-center"
-                            >
-                                👁️ Revelar Runas & Gabarito
-                            </button>
-                            <button
-                                type="button"
-                                id="tab-conjure"
-                                onclick="selectArenaMode('conjure')"
-                                class="py-2 px-1 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all text-center"
-                            >
-                                ✍️ Conjurar Resposta
-                            </button>
-                            <button
-                                type="button"
-                                id="tab-voice"
-                                onclick="selectArenaMode('voice')"
-                                class="py-2 px-1 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all text-center"
-                            >
-                                🎙️ Voz Arcana
-                            </button>
-                        </div>
+                        <!-- Rascunho Opcional & Revelação de Gabarito (Autoavaliação SRS) -->
+                        <div id="panel-reveal" class="space-y-4 pt-2 border-t border-[#785a28]/30">
+                            <div class="space-y-1.5">
+                                <label for="scratchpad-textarea" class="block text-xs font-cinzel font-bold uppercase text-[#a39276]">
+                                    ✍️ Rascunho de Resposta (Opcional)
+                                </label>
+                                <textarea
+                                    id="scratchpad-textarea"
+                                    rows="3"
+                                    class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869] font-sans leading-relaxed"
+                                    placeholder="Anote sua resposta com suas palavras antes de comparar com o gabarito..."
+                                ></textarea>
+                            </div>
 
-                        <!-- PAINEL 1: 👁️ Ver Gabarito Direto (Autoavaliação SRS) -->
-                        <div id="panel-reveal" class="space-y-4 pt-2">
                             <div class="text-center" id="reveal-btn-container">
                                 <button
                                     type="button"
@@ -330,7 +314,7 @@
                                     onclick="revealActiveRunes()"
                                     class="rpg-btn-gold text-xs px-6 py-2.5"
                                 >
-                                    👁️ Revelar Resposta &amp; Gabarito
+                                    👁️ Anotar Resposta e Revelar Gabarito
                                 </button>
                             </div>
 
@@ -378,65 +362,6 @@
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- PAINEL 2: ✍️ Responder por Texto (com Avaliação por IA) -->
-                        <div id="panel-conjure" class="hidden space-y-3 pt-2">
-                            <label for="conjure-textarea" class="block text-xs font-cinzel font-bold uppercase text-[#a39276]">
-                                Digite sua resposta dissertativa:
-                            </label>
-                            <textarea
-                                id="conjure-textarea"
-                                rows="4"
-                                class="w-full bg-[#0c0908] border border-[#785a28]/80 rounded-xl p-3 text-sm text-[#f5ebd6] focus:outline-none focus:ring-1 focus:ring-[#f0c869] font-sans leading-relaxed"
-                                placeholder="Explique os conceitos com suas palavras..."
-                            ></textarea>
-                            <div class="flex items-center justify-between">
-                                <span class="text-[11px] text-[#a39276]">Avaliação semântica com IA</span>
-                                <button
-                                    type="button"
-                                    id="btn-evaluate-text"
-                                    onclick="evaluateTextAnswer()"
-                                    class="rpg-btn-gold text-xs px-4 py-2"
-                                >
-                                    ✨ Avaliar com IA
-                                </button>
-                            </div>
-                            <div id="conjure-feedback-box" class="hidden p-4 rounded-xl bg-[#0c0908] border border-[#785a28] space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-cinzel font-bold text-xs text-[#f0c869]">Feedback da IA</span>
-                                    <span class="text-xs font-bold text-emerald-400" id="conjure-score">100%</span>
-                                </div>
-                                <p class="text-xs text-[#f5ebd6] leading-relaxed" id="conjure-feedback"></p>
-                            </div>
-                        </div>
-
-                        <!-- PAINEL 3: 🎙️ Gravar Voz (Multimodal IA) -->
-                        <div id="panel-voice" class="hidden space-y-3 pt-2 text-center">
-                            <p class="text-xs text-[#a39276] leading-relaxed max-w-md mx-auto">
-                                Fale sua resposta em voz alta. O modelo transcreverá e julgará seu entendimento.
-                            </p>
-                            <div class="py-2">
-                                <button
-                                    type="button"
-                                    id="btn-record-audio"
-                                    onclick="toggleAudioRecording()"
-                                    class="rpg-btn-bronze text-xs px-5 py-2.5 flex items-center justify-center gap-2 mx-auto"
-                                >
-                                    <span id="audio-rec-icon" aria-hidden="true">🔴</span>
-                                    <span id="audio-rec-label">Iniciar Gravação de Voz</span>
-                                </button>
-                            </div>
-                            <div id="voice-status" class="text-xs text-[#f0c869] font-mono hidden">
-                                Gravando áudio... Clique para finalizar.
-                            </div>
-                            <div id="voice-feedback-box" class="hidden text-left p-4 rounded-xl bg-[#0c0908] border border-[#785a28] space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-cinzel font-bold text-xs text-[#f0c869]">Avaliação por Voz</span>
-                                    <span class="text-xs font-bold text-emerald-400" id="voice-score">100%</span>
-                                </div>
-                                <p class="text-xs text-[#f5ebd6] leading-relaxed" id="voice-feedback"></p>
                             </div>
                         </div>
 
@@ -810,18 +735,6 @@
                         <label for="paste-questions-textarea" class="block text-xs font-cinzel font-bold text-[#a39276] uppercase">
                             Cole suas questões em JSON (<code class="text-[#f0c869]">array de objetos</code>):
                         </label>
-                        <div class="flex items-center space-x-1.5">
-                            <span id="grimoire-copy-prompt-status" class="hidden text-[10px] text-emerald-400 font-cinzel">✓ copiado</span>
-                            <button
-                                type="button"
-                                id="btn-grimoire-copy-ai-json"
-                                onclick="copyGrimoireAiJsonPrompt()"
-                                class="px-2 py-0.5 rounded bg-[#14100d] hover:bg-[#251c14] text-[#a39276] hover:text-[#f0c869] border border-[#785a28]/40 hover:border-[#c89b3c]/60 text-[10px] font-mono tracking-tight transition-all cursor-pointer opacity-80 hover:opacity-100"
-                                title="Copiar Skill para gerar questões em JSON na IA"
-                            >
-                                skill
-                            </button>
-                        </div>
                     </div>
                     <textarea
                         id="paste-questions-textarea"
@@ -901,9 +814,6 @@ const MAP_ID = "{{ map.id }}";
 const NODE_ID = "{{ node.id }}";
 let QUESTIONS = {{ questions | tojson if questions else '[]' }};
 let activeIndex = 0;
-let currentArenaMode = 'reveal';
-let mediaRecorder = null;
-let audioChunks = [];
 let extractedDocText = '';
 let extractedDocFileName = '';
 
@@ -1334,61 +1244,6 @@ async function submitBatchQuestions() {
     }
 }
 
-window.copyGrimoireAiJsonPrompt = async function () {
-    const nodeTitle = (typeof NODE_TITLE !== 'undefined' && NODE_TITLE) ? NODE_TITLE : '{{ node.title }}';
-    const promptText = `---
-name: study-questions-json
-description: Generates deep, complex active-recall study questions in strict JSON format with rich GitHub Flavored Markdown (code snippets, tables, bold concepts, lists, headings) for import into the RPG Study Tree / Grimoire.
----
-
-# Study Questions JSON Generator
-
-Você é um especialista em Ciência da Computação e Engenharia de Software encarregado de gerar questões de recordação ativa de alto nível para o sistema de repetição espaçada (SRS).
-
-Gere de 3 a 5 questões aprofundadas sobre o tópico solicitado.
-
-### Critérios Obrigatórios:
-1. **Nível Avançado**: Foque em cenários reais, depuração de código, trade-offs arquiteturais, falhas em produção ou casos de borda.
-2. **Formato Exclusivo**: Retorne EXCLUSIVAMENTE um array JSON no formato:
-[
-  {
-    "prompt": "Enunciado contextualizado em Markdown...",
-    "expected_answer": "### Critérios de Avaliação\\n- **Ponto 1:** Explicação...\\n- **Ponto 2:** Detalhe técnico..."
-  }
-]
-3. **Markdown Rico**:
-   - Use '###' para estruturar cabeçalhos.
-   - Use '**negrito**' para conceitos capitais.
-   - Use blocos de código com identificador de linguagem (\`\`\`python, \`\`\`sql, etc.).
-   - Use listas com '-' e citações '>' para notas críticas ou nuances.
-4. **Strings JSON Válidas**: Escape quebras de linha com '\\n' e aspas duplas com '\\"'.
-
----
-### Tópico Alvo para Estudo:
-"${nodeTitle}"`;
-
-    const statusEl = document.getElementById('grimoire-copy-prompt-status');
-    try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(promptText);
-        } else {
-            const ta = document.createElement('textarea');
-            ta.value = promptText;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-        }
-        if (statusEl) {
-            statusEl.classList.remove('hidden');
-            setTimeout(() => statusEl.classList.add('hidden'), 2500);
-        }
-    } catch (err) {
-        console.error('Erro ao copiar prompt:', err);
-        prompt('Copie o prompt abaixo:', promptText);
-    }
-};
-
 async function importPastedQuestions() {
     const textarea = document.getElementById('paste-questions-textarea');
     const rawText = textarea ? textarea.value.trim() : '';
@@ -1590,51 +1445,19 @@ function updateStudyArena() {
             : escapeHtml(answerVal);
     }
 
-    // Reseta estado da revelação
+    // Reseta estado da revelação e rascunho
     const ansBox = document.getElementById('active-expected-answer-box');
     const revBtn = document.getElementById('reveal-btn-container');
+    const scratchpad = document.getElementById('scratchpad-textarea');
     if (ansBox) ansBox.classList.add('hidden');
     if (revBtn) revBtn.classList.remove('hidden');
-
-    const conjureBox = document.getElementById('conjure-feedback-box');
-    if (conjureBox) conjureBox.classList.add('hidden');
-    const voiceBox = document.getElementById('voice-feedback-box');
-    if (voiceBox) voiceBox.classList.add('hidden');
+    if (scratchpad) scratchpad.value = '';
 }
 
 function navigateQuestion(delta) {
     if (!QUESTIONS || QUESTIONS.length === 0) return;
     activeIndex = (activeIndex + delta + QUESTIONS.length) % QUESTIONS.length;
     updateStudyArena();
-}
-
-function selectArenaMode(mode) {
-    currentArenaMode = mode;
-    const tabRev = document.getElementById('tab-reveal');
-    const tabConj = document.getElementById('tab-conjure');
-    const tabVoice = document.getElementById('tab-voice');
-    const pRev = document.getElementById('panel-reveal');
-    const pConj = document.getElementById('panel-conjure');
-    const pVoice = document.getElementById('panel-voice');
-
-    [tabRev, tabConj, tabVoice].forEach(t => {
-        if (!t) return;
-        t.className = 'py-2 px-1 text-xs font-cinzel font-semibold rounded-lg border border-[#785a28] bg-[#1c1612] text-[#a39276] hover:text-[#f0c869] transition-all text-center';
-    });
-    [pRev, pConj, pVoice].forEach(p => {
-        if (p) p.classList.add('hidden');
-    });
-
-    if (mode === 'reveal') {
-        if (tabRev) tabRev.className = 'py-2 px-1 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow text-center';
-        if (pRev) pRev.classList.remove('hidden');
-    } else if (mode === 'conjure') {
-        if (tabConj) tabConj.className = 'py-2 px-1 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow text-center';
-        if (pConj) pConj.classList.remove('hidden');
-    } else if (mode === 'voice') {
-        if (tabVoice) tabVoice.className = 'py-2 px-1 text-xs font-cinzel font-bold rounded-lg border border-[#f0c869] bg-[#c89b3c] text-[#0c0908] transition-all shadow text-center';
-        if (pVoice) pVoice.classList.remove('hidden');
-    }
 }
 
 function revealActiveRunes() {
@@ -1648,42 +1471,17 @@ async function submitNodeReview(questionId, difficulty, score) {
     const qid = questionId || (QUESTIONS[activeIndex] ? QUESTIONS[activeIndex].id : null);
     if (!qid) return;
 
-    const conjureTextarea = document.getElementById('conjure-textarea');
-    const conjureFeedback = document.getElementById('conjure-feedback');
-    const voiceFeedback = document.getElementById('voice-feedback');
+    const scratchpadTextarea = document.getElementById('scratchpad-textarea');
+    const scratchpadVal = scratchpadTextarea ? scratchpadTextarea.value.trim() : '';
 
-    let student_answer = null;
-    let ai_feedback = null;
-    let evaluation_mode = 'MANUAL';
-
-    if (currentArenaMode === 'conjure') {
-        evaluation_mode = 'AI_TEXT';
-        if (conjureTextarea && conjureTextarea.value.trim()) {
-            student_answer = conjureTextarea.value.trim();
-        }
-        if (conjureFeedback && conjureFeedback.textContent.trim()) {
-            ai_feedback = conjureFeedback.textContent.trim();
-        }
-    } else if (currentArenaMode === 'voice') {
-        evaluation_mode = 'AI_VOICE';
-        if (voiceFeedback && voiceFeedback.textContent.trim()) {
-            ai_feedback = voiceFeedback.textContent.trim();
-        }
-    } else {
-        if (conjureTextarea && conjureTextarea.value.trim()) {
-            student_answer = conjureTextarea.value.trim();
-        }
-        if (conjureFeedback && conjureFeedback.textContent.trim()) {
-            ai_feedback = conjureFeedback.textContent.trim();
-        }
-    }
+    const student_answer = scratchpadVal || null;
+    const evaluation_mode = scratchpadVal ? 'WRITTEN_SELF_REVIEW' : 'MANUAL';
 
     const payload = {
         score,
         difficulty: difficulty || null,
-        student_answer: student_answer || null,
-        ai_feedback: ai_feedback || null,
-        evaluation_mode: evaluation_mode || 'MANUAL'
+        student_answer,
+        evaluation_mode
     };
 
     try {
@@ -1731,104 +1529,6 @@ async function submitNodeReview(questionId, difficulty, score) {
         }
     } catch (err) {
         alert('Erro ao comunicar com o servidor.');
-    }
-}
-
-async function evaluateTextAnswer() {
-    const q = QUESTIONS[activeIndex];
-    if (!q) return;
-    const answer = document.getElementById('conjure-textarea').value;
-    if (!answer.trim()) {
-        alert('Digite sua resposta antes de avaliar.');
-        return;
-    }
-
-    try {
-        const res = await fetch(`/api/v1/questions/${q.id}/evaluate-text`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({student_answer: answer})
-        });
-
-        if (res.ok) {
-            const data = await res.json();
-            const box = document.getElementById('conjure-feedback-box');
-            const scoreEl = document.getElementById('conjure-score');
-            const feedEl = document.getElementById('conjure-feedback');
-            if (scoreEl) scoreEl.textContent = `${data.score}%`;
-            if (feedEl) feedEl.textContent = data.feedback || 'Resposta avaliada com sucesso.';
-            if (box) box.classList.remove('hidden');
-
-            await submitNodeReview(q.id, null, data.score);
-        } else {
-            revealActiveRunes();
-            selectArenaMode('reveal');
-        }
-    } catch (err) {
-        revealActiveRunes();
-        selectArenaMode('reveal');
-    }
-}
-
-async function toggleAudioRecording() {
-    const statusEl = document.getElementById('voice-status');
-    const labelEl = document.getElementById('audio-rec-label');
-    const iconEl = document.getElementById('audio-rec-icon');
-
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        if (statusEl) statusEl.classList.add('hidden');
-        if (labelEl) labelEl.textContent = 'Iniciar Gravação de Voz';
-        if (iconEl) iconEl.textContent = '🔴';
-        return;
-    }
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-        mediaRecorder.onstop = async () => {
-            const blob = new Blob(audioChunks, { type: 'audio/webm' });
-            await submitAudioForEvaluation(blob);
-        };
-        mediaRecorder.start();
-        if (statusEl) statusEl.classList.remove('hidden');
-        if (labelEl) labelEl.textContent = 'Parar Gravação';
-        if (iconEl) iconEl.textContent = '⏹️';
-    } catch (err) {
-        alert('Permissão de microfone não concedida ou dispositivo indisponível.');
-    }
-}
-
-async function submitAudioForEvaluation(audioBlob) {
-    const q = QUESTIONS[activeIndex];
-    if (!q) return;
-    const formData = new FormData();
-    formData.append('audio_file', audioBlob, 'answer.webm');
-
-    try {
-        const res = await fetch(`/api/v1/questions/${q.id}/evaluate-audio`, {
-            method: 'POST',
-            body: formData
-        });
-        if (res.ok) {
-            const data = await res.json();
-            const box = document.getElementById('voice-feedback-box');
-            const scoreEl = document.getElementById('voice-score');
-            const feedEl = document.getElementById('voice-feedback');
-            if (scoreEl) scoreEl.textContent = `${data.score}%`;
-            if (feedEl) feedEl.textContent = data.feedback || 'Áudio avaliado com sucesso.';
-            if (box) box.classList.remove('hidden');
-
-            await submitNodeReview(q.id, null, data.score);
-        } else {
-            revealActiveRunes();
-            selectArenaMode('reveal');
-        }
-    } catch (err) {
-        revealActiveRunes();
-        selectArenaMode('reveal');
     }
 }
 

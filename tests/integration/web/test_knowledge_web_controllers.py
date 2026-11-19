@@ -1,8 +1,7 @@
-"""Testes de integração para os controladores Web e templates de Base de Conhecimento (Camada 3)."""
+"""Testes de integração para os controladores Web e templates de Biblioteca de Materiais (Camada 3)."""
 
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -11,7 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.adapters.ai.gemini_adapters import GeminiEmbeddingAdapter
 from src.adapters.persistence.repositories import (
     SqlAlchemyKnowledgeSourceRepository,
     SqlAlchemySubjectRepository,
@@ -28,7 +26,7 @@ from src.infrastructure.web.app import app
 def test_user() -> User:
     return User(
         id=uuid4(),
-        google_sub="sub-web-k-1",
+        google_sub="local:know.web@studyreviewer.local",
         email="know.web@studyreviewer.local",
         name="Web Knowledge User",
     )
@@ -38,14 +36,14 @@ def test_user() -> User:
 def other_user() -> User:
     return User(
         id=uuid4(),
-        google_sub="sub-web-k-2",
+        google_sub="local:other.k@studyreviewer.local",
         email="other.k@studyreviewer.local",
         name="Other User",
     )
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -58,7 +56,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestClient]:
+def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestClient, None, None]:
     TestingSession = sessionmaker(bind=db_engine)
 
     with TestingSession() as session:
@@ -66,7 +64,7 @@ def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestC
         u_repo.save(test_user)
         u_repo.save(other_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         session = TestingSession()
         try:
             yield session
@@ -87,9 +85,10 @@ def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestC
 
 @pytest.mark.integration
 def test_manage_knowledge_view_empty_state(client: TestClient) -> None:
+    """Valida estado vazio da tela /knowledge/manage quando não há matérias."""
     resp = client.get("/knowledge/manage")
     assert resp.status_code == 200
-    assert "Bases de Conhecimento (RAG)" in resp.text
+    assert "Biblioteca de Materiais" in resp.text
     assert "Nenhuma Matéria ou Tema Cadastrado" in resp.text
 
 
@@ -99,6 +98,7 @@ def test_manage_knowledge_view_with_subjects(
     db_engine: Any,
     test_user: User,
 ) -> None:
+    """Valida exibição do formulário de cadastro de material com matérias e temas."""
     TestingSession = sessionmaker(bind=db_engine)
     with TestingSession() as session:
         subj_repo = SqlAlchemySubjectRepository(session)
@@ -113,7 +113,7 @@ def test_manage_knowledge_view_with_subjects(
     assert resp.status_code == 200
     assert "Direito Civil" in resp.text
     assert "Parte Geral" in resp.text
-    assert "Cadastrar Novo Material Didático" in resp.text
+    assert "Cadastrar Novo Material de Estudo" in resp.text
 
 
 @pytest.mark.integration
@@ -121,14 +121,8 @@ def test_create_knowledge_source_web_text_success(
     client: TestClient,
     db_engine: Any,
     test_user: User,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        GeminiEmbeddingAdapter,
-        "generate_embeddings_batch",
-        AsyncMock(side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts]),
-    )
-
+    """Valida cadastro de material de texto local via POST /knowledge/manage."""
     TestingSession = sessionmaker(bind=db_engine)
     with TestingSession() as session:
         subj_repo = SqlAlchemySubjectRepository(session)
@@ -149,20 +143,20 @@ def test_create_knowledge_source_web_text_success(
     assert resp.status_code == 200
     assert "Apostila de Sociedades" in resp.text
 
+    with TestingSession() as session:
+        sources = SqlAlchemyKnowledgeSourceRepository(session).list_by_topic(topic_id)
+        assert len(sources) == 1
+        assert sources[0].title == "Apostila de Sociedades"
+        assert "quotas" in sources[0].raw_text
+
 
 @pytest.mark.integration
 def test_create_knowledge_source_web_file_upload_success(
     client: TestClient,
     db_engine: Any,
     test_user: User,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        GeminiEmbeddingAdapter,
-        "generate_embeddings_batch",
-        AsyncMock(side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts]),
-    )
-
+    """Valida upload de arquivo .txt via POST /knowledge/manage com extração local."""
     TestingSession = sessionmaker(bind=db_engine)
     with TestingSession() as session:
         subj_repo = SqlAlchemySubjectRepository(session)
@@ -186,9 +180,16 @@ def test_create_knowledge_source_web_file_upload_success(
     assert resp.status_code == 200
     assert "Manual de Impostos" in resp.text
 
+    with TestingSession() as session:
+        sources = SqlAlchemyKnowledgeSourceRepository(session).list_by_topic(topic_id)
+        assert len(sources) == 1
+        assert sources[0].content_type == "FILE"
+        assert "fato gerador" in sources[0].raw_text
+
 
 @pytest.mark.integration
 def test_create_knowledge_source_web_missing_topics_error(client: TestClient) -> None:
+    """Garante redirecionamento com erro ao tentar salvar material sem tema selecionado."""
     form_data = {
         "title": "Material Sem Tema",
         "content_text": "Texto explicativo detalhado sobre temas e matérias diversas.",
@@ -205,6 +206,7 @@ def test_delete_knowledge_source_web_success(
     db_engine: Any,
     test_user: User,
 ) -> None:
+    """Valida exclusão de material didático via POST /knowledge/manage/{id}/delete."""
     TestingSession = sessionmaker(bind=db_engine)
     with TestingSession() as session:
         subj_repo = SqlAlchemySubjectRepository(session)
@@ -220,6 +222,8 @@ def test_delete_knowledge_source_web_success(
             title="Material CLT",
             content_type="TEXT",
             topic_ids=(topic.id,),
+            raw_text="Consolidação das Leis do Trabalho e direitos fundamentais.",
+            char_count=58,
         )
         source_repo.save(source)
         session.commit()
@@ -236,6 +240,7 @@ def test_create_knowledge_source_web_file_too_large_error(
     db_engine: Any,
     test_user: User,
 ) -> None:
+    """Garante rejeição de arquivos acima de 15MB no formulário web."""
     TestingSession = sessionmaker(bind=db_engine)
     with TestingSession() as session:
         subj_repo = SqlAlchemySubjectRepository(session)
@@ -265,6 +270,7 @@ def test_create_knowledge_source_web_unsupported_file_error(
     db_engine: Any,
     test_user: User,
 ) -> None:
+    """Garante rejeição de extensão não suportada no formulário web."""
     TestingSession = sessionmaker(bind=db_engine)
     with TestingSession() as session:
         subj_repo = SqlAlchemySubjectRepository(session)
@@ -291,13 +297,8 @@ def test_create_knowledge_source_web_invalid_topic_id_format_skipped(
     client: TestClient,
     db_engine: Any,
     test_user: User,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        GeminiEmbeddingAdapter,
-        "generate_embeddings_batch",
-        AsyncMock(side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts]),
-    )
+    """Ignora UUIDs malformados em topic_ids quando há ao menos um tema válido."""
     TestingSession = sessionmaker(bind=db_engine)
     with TestingSession() as session:
         subj_repo = SqlAlchemySubjectRepository(session)
@@ -325,6 +326,7 @@ def test_create_knowledge_source_web_short_content_error(
     db_engine: Any,
     test_user: User,
 ) -> None:
+    """Garante redirecionamento com erro quando conteúdo possui menos de 20 caracteres úteis."""
     TestingSession = sessionmaker(bind=db_engine)
     with TestingSession() as session:
         subj_repo = SqlAlchemySubjectRepository(session)
@@ -348,6 +350,7 @@ def test_create_knowledge_source_web_short_content_error(
 
 @pytest.mark.integration
 def test_delete_knowledge_source_web_error(client: TestClient) -> None:
+    """Garante redirecionamento com erro ao tentar excluir fonte inexistente."""
     resp = client.post(f"/knowledge/manage/{uuid4()}/delete", follow_redirects=False)
     assert resp.status_code == 303
     assert "error=" in resp.headers["location"]

@@ -65,7 +65,7 @@ def user_b() -> User:
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -78,7 +78,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def client(db_engine: Any, user_a: User, user_b: User) -> Generator[TestClient]:
+def client(db_engine: Any, user_a: User, user_b: User) -> Generator[TestClient, None, None]:
     TestingSession = sessionmaker(bind=db_engine)
 
     with TestingSession() as session:
@@ -87,7 +87,7 @@ def client(db_engine: Any, user_a: User, user_b: User) -> Generator[TestClient]:
         u_repo.save(user_b)
         session.commit()
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         session = TestingSession()
         try:
             yield session

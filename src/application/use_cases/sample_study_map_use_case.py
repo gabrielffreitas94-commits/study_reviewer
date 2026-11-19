@@ -67,7 +67,7 @@ class CreateSampleMathStudyMapUseCase:
                 description=(
                     "Trilha estruturada em grafo RPG cobrindo Álgebra Linear Computacional, "
                     "Cálculo Diferencial Vetorial, Simulação Estocástica de Monte Carlo, "
-                    "Equações Diferenciais Ordinárias (EDOs) e Otimização para Machine Learning."
+                    "Equações Diferenciais Ordinárias (EDOs) e Otimização Numérica."
                 ),
                 is_public=False,
             )
@@ -84,8 +84,8 @@ class CreateSampleMathStudyMapUseCase:
                 "icon": "calculator",
                 "theory_content": (
                     "# Álgebra Linear Computacional\n\n"
-                    "A Álgebra Linear Computacional é a espinha dorsal da computação científica moderna e dos "
-                    "motores de Inteligência Artificial. Diferente da abordagem puramente teórica, a vertente computacional "
+                    "A Álgebra Linear Computacional é a espinha dorsal da computação científica moderna e da "
+                    "simulação numérica de alta performance. Diferente da abordagem puramente teórica, a vertente computacional "
                     "investiga a representação vetorial em memória, condicionamento numérico e estabilidade de algoritmos.\n\n"
                     "## 1. Espaços Vetoriais e Transformações Lineares\n"
                     "Um espaço vetorial $\\mathbb{R}^n$ fornece o alicerce para armazenar tensores de parâmetros e características. "
@@ -102,7 +102,7 @@ class CreateSampleMathStudyMapUseCase:
                 ),
                 "material": (
                     "Fundamentos de Álgebra Linear Computacional e Fatorações",
-                    "A álgebra linear computacional constitui a espinha dorsal da computação científica moderna e do aprendizado de máquina. Aborda a representação de dados em espaços vetoriais euclidianos, condicionamento numérico e resolução eficiente de sistemas lineares Ax = b.",
+                    "A álgebra linear computacional constitui a espinha dorsal da computação científica moderna e da otimização numérica. Aborda a representação de dados em espaços vetoriais euclidianos, condicionamento numérico e resolução eficiente de sistemas lineares Ax = b.",
                 ),
                 "flashcards": [
                     (
@@ -305,13 +305,13 @@ class CreateSampleMathStudyMapUseCase:
             },
             {
                 "key": "optimization_ml",
-                "title": "Otimização Numérica & Machine Learning",
+                "title": "Otimização Numérica & Computação Científica",
                 "description": "Mínimos Quadrados, Regularização L1/L2 (Lasso e Ridge), Otimização Convexa, Backpropagation e otimizadores adaptativos (Adam).",
                 "pos_x": 740.0,
                 "pos_y": 350.0,
                 "icon": "brain",
                 "theory_content": (
-                    "# Otimização Numérica & Machine Learning\n\n"
+                    "# Otimização Numérica & Computação Científica\n\n"
                     "A otimização matemática constitui o núcleo algorítmico do treinamento de modelos preditivos "
                     "e redes neurais profundas.\n\n"
                     "## 1. Otimização Convexa e Garantias Globais\n"
@@ -327,12 +327,12 @@ class CreateSampleMathStudyMapUseCase:
                     "ajustando a taxa de aprendizado individualmente por peso e acelerando a convergência em topologias não-convexas."
                 ),
                 "material": (
-                    "Otimização Matemática em Inteligência Artificial e Ciência de Dados",
+                    "Otimização Matemática em Computação Científica e Ciência de Dados",
                     "Integração de cálculo vetorial, probabilidade e álgebra matricial para ajuste de modelos estatísticos e treinamento de redes neurais profundas.",
                 ),
                 "flashcards": [
                     (
-                        "Por que problemas de otimização convexa são centrais no design de modelos de aprendizado de máquina?",
+                        "Por que problemas de otimização convexa são centrais no design de métodos de otimização numérica?",
                         "Porque em conjuntos e funções convexas, qualquer mínimo local é garantidamente um mínimo global, tornando a convergência previsível e confiável.",
                     ),
                     (

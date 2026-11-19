@@ -859,7 +859,6 @@ class ReviewNodeQuestionUseCase:
         score: int = 100,
         difficulty: str | None = None,
         student_answer: str | None = None,
-        ai_feedback: str | None = None,
         evaluation_mode: str = "MANUAL",
     ) -> dict[str, Any]:
         study_map = self.map_repo.get_by_id(map_id)
@@ -955,7 +954,6 @@ class ReviewNodeQuestionUseCase:
                     evaluation_mode=evaluation_mode,
                     logged_at=now,
                     student_answer=student_answer,
-                    ai_feedback=ai_feedback,
                 )
                 self.audit_repo.save(audit_log)
 

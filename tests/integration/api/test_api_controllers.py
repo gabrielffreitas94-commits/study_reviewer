@@ -28,7 +28,7 @@ def test_user() -> User:
 
 
 @pytest.fixture
-def client(test_user: User) -> Generator[TestClient]:
+def client(test_user: User) -> Generator[TestClient, None, None]:
     """Cria cliente de testes com banco SQLite em memória isolado e usuário autenticado."""
     engine = create_engine(
         "sqlite:///:memory:",
@@ -42,7 +42,7 @@ def client(test_user: User) -> Generator[TestClient]:
     with TestingSession() as session:
         SqlAlchemyUserRepository(session).save(test_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         session = TestingSession()
         try:
             yield session

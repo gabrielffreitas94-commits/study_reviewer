@@ -85,23 +85,7 @@ class KnowledgeSourceNotFoundError(EntityNotFoundError):
 
 
 class EmptyKnowledgeContentError(DomainValidationError):
-    """Conteúdo textual de conhecimento ou chunk vazio ou insuficiente."""
-
-
-class InvalidEmbeddingError(DomainValidationError):
-    """Vetor de embedding com formato inválido, nulo ou dimensões incorretas."""
-
-
-class InsufficientTokensError(DomainException):
-    """Tentativa de executar inferência de IA sem saldo suficiente de tokens (HTTP 402)."""
-
-
-class EvaluationServiceError(DomainException):
-    """Falha ou indisponibilidade temporária no serviço de avaliação de respostas por IA."""
-
-
-class AIProviderError(EvaluationServiceError):
-    """Falha de comunicação, modelo não encontrado ou erro de execução no provedor de IA."""
+    """Conteúdo textual de conhecimento vazio ou insuficiente."""
 
 
 # --- Árvore de Estudos RPG & Grafo de Aprendizado ---

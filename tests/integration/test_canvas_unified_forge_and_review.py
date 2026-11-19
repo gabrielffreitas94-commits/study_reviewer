@@ -35,7 +35,7 @@ def test_user() -> User:
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -48,7 +48,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def db_session(db_engine: Any) -> Generator[Session]:
+def db_session(db_engine: Any) -> Generator[Session, None, None]:
     testing_session = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
     session = testing_session()
     try:
@@ -58,11 +58,11 @@ def db_session(db_engine: Any) -> Generator[Session]:
 
 
 @pytest.fixture
-def client(db_session: Session, test_user: User) -> Generator[TestClient]:
+def client(db_session: Session, test_user: User) -> Generator[TestClient, None, None]:
     user_repo = SqlAlchemyUserRepository(db_session)
     user_repo.save(test_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     def override_get_current_user() -> User:
@@ -131,7 +131,7 @@ def test_study_canvas_js_unified_forge_and_nodes_layer_pan() -> None:
 
 @pytest.mark.integration
 def test_node_grimoire_dificil_button_and_review_wiring(client: TestClient) -> None:
-    """Valida se o node_grimoire.html envia 25% para Dificil e inclui campos semanticos de IA."""
+    """Valida se o node_grimoire.html envia 25% para Dificil e campos locais de autoavaliacao."""
     sample_res = client.post("/api/v1/study-maps/sample-math")
     assert sample_res.status_code == 201
     map_id = sample_res.json()["id"]
@@ -150,9 +150,9 @@ def test_node_grimoire_dificil_button_and_review_wiring(client: TestClient) -> N
     assert "Difícil (25%)" in html
     assert "submitNodeReview(null, 'hard', 25)" in html
 
-    # 2. Função submitNodeReview deve empacotar student_answer, ai_feedback e evaluation_mode
+    # 2. Função submitNodeReview deve empacotar student_answer e evaluation_mode locais
     assert "student_answer" in html
-    assert "ai_feedback" in html
     assert "evaluation_mode" in html
-    assert "conjure-textarea" in html
-    assert "conjure-feedback" in html
+    assert "WRITTEN_SELF_REVIEW" in html
+    assert "scratchpad-textarea" in html
+    assert "active-expected-answer-box" in html

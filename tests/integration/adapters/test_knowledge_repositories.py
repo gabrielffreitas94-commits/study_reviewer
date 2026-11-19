@@ -1,4 +1,4 @@
-"""Testes de integração para os repositórios SQLAlchemy de Base de Conhecimento e Chunks."""
+"""Testes de integração para os repositórios SQLAlchemy de Materiais Didáticos Locais."""
 
 from collections.abc import Generator
 from uuid import uuid4
@@ -8,18 +8,19 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.adapters.persistence.repositories import (
-    SqlAlchemyKnowledgeChunkRepository,
     SqlAlchemyKnowledgeSourceRepository,
+    SqlAlchemyStudyMapRepository,
+    SqlAlchemyStudyNodeRepository,
     SqlAlchemySubjectRepository,
     SqlAlchemyTopicRepository,
     SqlAlchemyUserRepository,
 )
-from src.domain.entities import KnowledgeChunk, KnowledgeSource, Subject, Topic, User
+from src.domain.entities import KnowledgeSource, StudyMap, StudyNode, Subject, Topic, User
 from src.infrastructure.database import Base
 
 
 @pytest.fixture
-def db_session() -> Generator[Session]:
+def db_session() -> Generator[Session, None, None]:
     """Cria banco SQLite em memória isolado para os testes de integração."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -34,94 +35,84 @@ def db_session() -> Generator[Session]:
 
 
 @pytest.mark.integration
-def test_knowledge_repository_source_and_chunk_lifecycle(db_session: Session) -> None:
+def test_knowledge_repository_source_lifecycle_and_nn_topics(db_session: Session) -> None:
+    """Valida ciclo completo de persistência, atualização N:N e exclusão de KnowledgeSource."""
     user_repo = SqlAlchemyUserRepository(db_session)
     subj_repo = SqlAlchemySubjectRepository(db_session)
     top_repo = SqlAlchemyTopicRepository(db_session)
     source_repo = SqlAlchemyKnowledgeSourceRepository(db_session)
-    chunk_repo = SqlAlchemyKnowledgeChunkRepository(db_session)
 
-    user = User(google_sub="sub-know-1", email="know@test.com", name="Author")
+    user = User(google_sub="local:know@test.com", email="know@test.com", name="Author")
     user_repo.save(user)
     subj = Subject(name="Direito", owner_id=user.id)
     subj_repo.save(subj)
-    topic = Topic(subject_id=subj.id, name="Contratos")
-    top_repo.save(topic)
+    topic1 = Topic(subject_id=subj.id, name="Contratos")
+    topic2 = Topic(subject_id=subj.id, name="Obrigações")
+    top_repo.save(topic1)
+    top_repo.save(topic2)
 
-    # 1. Salvar fonte
+    # 1. Salvar fonte com raw_text local
+    raw_content = (
+        "Cláusula penal, arras compensatórias e rescisão contratual por inadimplemento absoluto."
+    )
     source = KnowledgeSource(
-        topic_id=topic.id,
+        topic_id=topic1.id,
         title="Livro de Contratos",
         content_type="BOOK_CHAPTER",
-        total_chunks=2,
-        char_count=3500,
+        total_chunks=0,
+        char_count=len(raw_content),
+        raw_text=raw_content,
     )
     saved = source_repo.save(source)
     assert saved.title == "Livro de Contratos"
+    assert saved.raw_text == raw_content
+    assert saved.char_count == len(raw_content)
+    assert saved.topic_ids == (topic1.id,)
 
     # 2. Buscar por ID e listar por tema
     fetched = source_repo.get_by_id(source.id)
     assert fetched is not None
     assert fetched.id == source.id
+    assert fetched.raw_text == raw_content
 
-    sources = source_repo.list_by_topic(topic.id)
+    sources = source_repo.list_by_topic(topic1.id)
     assert len(sources) == 1
     assert sources[0].id == source.id
 
-    # 3. Atualizar fonte existente
-    source.title = "Livro de Contratos - 2ª Edição"
-    updated = source_repo.save(source)
+    # 3. Atualizar fonte existente e associar a múltiplos temas (N:N)
+    updated_source = KnowledgeSource(
+        id=source.id,
+        title="Livro de Contratos - 2ª Edição",
+        topic_ids=(topic1.id, topic2.id),
+        content_type="BOOK_CHAPTER",
+        total_chunks=0,
+        char_count=len(raw_content),
+        raw_text=raw_content,
+    )
+    updated = source_repo.save(updated_source)
     assert updated.title == "Livro de Contratos - 2ª Edição"
+    assert set(updated.topic_ids) == {topic1.id, topic2.id}
+    assert len(source_repo.list_by_topic(topic2.id)) == 1
 
-    # 4. Salvar chunks
-    c1 = KnowledgeChunk(
-        source_id=source.id,
-        topic_id=topic.id,
-        chunk_index=0,
-        content="Cláusula penal e arras compensatórias.",
-        embedding=(1.0, 0.0, 0.0),
-    )
-    c2 = KnowledgeChunk(
-        source_id=source.id,
-        topic_id=topic.id,
-        chunk_index=1,
-        content="Rescisão contratual por inadimplemento.",
-        embedding=(0.0, 1.0, 0.0),
-    )
-    chunk_repo.save_batch([c1, c2])
-
-    chunks = chunk_repo.list_by_topic(topic.id)
-    assert len(chunks) == 2
-    assert chunks[0].chunk_index == 0
-    assert chunks[1].chunk_index == 1
-
-    # 5. Busca por similaridade
-    query_vec = [1.0, 0.0, 0.0]
-    similar = chunk_repo.search_similar(topic.id, query_vec, top_k=1)
-    assert len(similar) == 1
-    assert similar[0][0].id == c1.id
-    assert pytest.approx(similar[0][1], 0.01) == 1.0
-
-    # 6. Deletar chunks por fonte
-    deleted_chunks = chunk_repo.delete_by_source(source.id)
-    assert deleted_chunks == 2
-    assert len(chunk_repo.list_by_topic(topic.id)) == 0
-
-    # 7. Deletar fonte
+    # 4. Deletar fonte
     assert source_repo.delete(source.id) is True
     assert source_repo.get_by_id(source.id) is None
+    assert source_repo.list_by_topic(topic1.id) == []
+    assert source_repo.list_by_topic(topic2.id) == []
     assert source_repo.delete(uuid4()) is False
 
 
 @pytest.mark.integration
-def test_knowledge_repository_multi_topic_isolation(db_session: Session) -> None:
+def test_knowledge_repository_multi_topic_and_node_isolation(db_session: Session) -> None:
+    """Garante isolamento por tema e suporte a list_by_node para materiais de StudyNode."""
     user_repo = SqlAlchemyUserRepository(db_session)
     subj_repo = SqlAlchemySubjectRepository(db_session)
     top_repo = SqlAlchemyTopicRepository(db_session)
     source_repo = SqlAlchemyKnowledgeSourceRepository(db_session)
-    chunk_repo = SqlAlchemyKnowledgeChunkRepository(db_session)
+    map_repo = SqlAlchemyStudyMapRepository(db_session)
+    node_repo = SqlAlchemyStudyNodeRepository(db_session)
 
-    user = User(google_sub="sub-know-iso", email="iso@test.com", name="Author")
+    user = User(google_sub="local:iso@test.com", email="iso@test.com", name="Author")
     user_repo.save(user)
     subj = Subject(name="Direito", owner_id=user.id)
     subj_repo.save(subj)
@@ -131,36 +122,52 @@ def test_knowledge_repository_multi_topic_isolation(db_session: Session) -> None
     topic_b = Topic(subject_id=subj.id, name="Biologia")
     top_repo.save(topic_b)
 
-    s_a = KnowledgeSource(topic_id=topic_a.id, title="Código Penal")
-    source_repo.save(s_a)
-    c_a = KnowledgeChunk(
-        source_id=s_a.id,
+    s_a = KnowledgeSource(
         topic_id=topic_a.id,
-        chunk_index=0,
-        content="Habeas corpus e crimes contra o patrimônio.",
-        embedding=(1.0, 0.0, 0.0),
+        title="Código Penal",
+        raw_text="Habeas corpus e crimes contra o patrimônio.",
+        char_count=41,
     )
-    chunk_repo.save_batch([c_a])
+    source_repo.save(s_a)
 
-    s_b = KnowledgeSource(topic_id=topic_b.id, title="Biologia Molecular")
-    source_repo.save(s_b)
-    c_b = KnowledgeChunk(
-        source_id=s_b.id,
+    s_b = KnowledgeSource(
         topic_id=topic_b.id,
-        chunk_index=0,
-        content="Mitose e Meiose celular.",
-        embedding=(1.0, 0.0, 0.0),  # mesmo vetor propositalmente
+        title="Biologia Molecular",
+        raw_text="Mitose e Meiose celular em organismos eucariontes.",
+        char_count=50,
     )
-    chunk_repo.save_batch([c_b])
+    source_repo.save(s_b)
 
-    # Busca no Tema A deve retornar estritamente c_a e NUNCA c_b
-    results_a = chunk_repo.search_similar(topic_a.id, [1.0, 0.0, 0.0], top_k=5)
+    # Busca no Tema A deve retornar estritamente s_a e NUNCA s_b
+    results_a = source_repo.list_by_topic(topic_a.id)
     assert len(results_a) == 1
-    assert results_a[0][0].id == c_a.id
+    assert results_a[0].id == s_a.id
+
+    # Material vinculado a StudyNode
+    study_map = StudyMap(owner_id=user.id, title="Mapa Penal")
+    map_repo.save(study_map)
+    node_1 = StudyNode(map_id=study_map.id, title="Nó 1")
+    node_2 = StudyNode(map_id=study_map.id, title="Nó 2")
+    node_repo.save(node_1)
+    node_repo.save(node_2)
+
+    s_node = KnowledgeSource(
+        title="Resumo do Nó 1",
+        node_id=node_1.id,
+        raw_text="Anotação local vinculada diretamente ao nó 1 da árvore.",
+        char_count=55,
+    )
+    source_repo.save(s_node)
+
+    node1_sources = source_repo.list_by_node(node_1.id)
+    assert len(node1_sources) == 1
+    assert node1_sources[0].id == s_node.id
+    assert source_repo.list_by_node(node_2.id) == []
 
 
 @pytest.mark.unit
 def test_knowledge_source_mapper_legacy_fallback() -> None:
+    """Valida compatibilidade de mapeamento para registros legados sem tabela N:N populada."""
     from src.adapters.persistence.mappers import KnowledgeSourceMapper
     from src.adapters.persistence.models import KnowledgeSourceModel
 
