@@ -436,6 +436,44 @@ def test_get_due_questions_filter_public_subject_auto_initializes_batch(repos: R
     assert prog_repo.get_by_user_and_question(student_id, q1.id) is not None
 
 
+@pytest.mark.unit
+def test_get_due_questions_can_edit_flag(repos: RepoFixture) -> None:
+    """Verifica se card.can_edit é True para o dono da matéria e False para estudante."""
+    subj_repo, top_repo, q_repo, prog_repo, clock = repos
+    owner_id = uuid4()
+    student_id = uuid4()
+
+    subj = Subject(id=uuid4(), name="Direito Penal", owner_id=owner_id, is_public=True)
+    subj_repo.save(subj)
+    topic = Topic(id=uuid4(), subject_id=subj.id, name="Parte Geral")
+    top_repo.save(topic)
+
+    q = Question(id=uuid4(), topic_id=topic.id, prompt="Crime culposo?", expected_answer="Sim")
+    q_repo.save(q)
+
+    today = clock.today()
+    prog_repo.save(
+        UserQuestionProgress(
+            user_id=owner_id, question_id=q.id, current_level=0, next_review_date=today
+        )
+    )
+    prog_repo.save(
+        UserQuestionProgress(
+            user_id=student_id, question_id=q.id, current_level=0, next_review_date=today
+        )
+    )
+
+    use_case = GetDueQuestionsUseCase(prog_repo, q_repo, top_repo, subj_repo, clock)
+
+    owner_items = use_case.execute(user_id=owner_id)
+    assert len(owner_items) == 1
+    assert owner_items[0].can_edit is True
+
+    student_items = use_case.execute(user_id=student_id)
+    assert len(student_items) == 1
+    assert student_items[0].can_edit is False
+
+
 # ---------------------------------------------------------------------------
 # ReviewQuestionUseCase
 # ---------------------------------------------------------------------------

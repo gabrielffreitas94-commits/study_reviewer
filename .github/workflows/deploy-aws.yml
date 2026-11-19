@@ -35,6 +35,9 @@ jobs:
   deploy-aws-serverless:
     name: Deploy to AWS Lambda & DynamoDB (R$ 0,00)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     if: >
       !github.event.repository.fork &&
       (github.event_name == 'workflow_dispatch' ||
@@ -66,6 +69,28 @@ jobs:
           echo "🎯 AMBIENTE DE DEPLOY ALVO: $TARGET_ENV"
           echo "📌 GATILHO: ${{ github.event_name }} (base: ${{ github.event.pull_request.base.ref || github.ref_name }})"
           echo "=========================================================="
+
+      - name: Comment Deployment Started on PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TARGET_ENV: ${{ steps.env-resolver.outputs.target_env }}
+        run: |
+          cat << EOF > /tmp/deploy_started_comment.md
+          ### 🟡 Deploy iniciado para o ambiente: \`$TARGET_ENV\`
+          
+          O merge foi concluído e o pipeline de deploy na AWS já está em andamento.
+          
+          🔍 **Acompanhe a execução em tempo real:**
+          👉 [Ver logs da execução no GitHub Actions]($RUN_URL)
+          
+          ---
+          *(Um novo comentário será adicionado quando a publicação for concluída)*
+          EOF
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body-file /tmp/deploy_started_comment.md
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -345,6 +370,26 @@ jobs:
             exit 1
           fi
 
+      - name: Comment Deployment Success on PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && success()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TARGET_ENV: ${{ steps.env-resolver.outputs.target_env }}
+          PROD_URL: ${{ steps.get-url.outputs.production_url }}
+        run: |
+          cat << EOF > /tmp/deploy_success_comment.md
+          ### 🟢 Deploy finalizado com sucesso no ambiente: \`$TARGET_ENV\`! 🎉
+          
+          - 🌐 **URL da Aplicação:** [$PROD_URL]($PROD_URL)
+          - 🩺 **Health Check / Smoke Test:** HTTP 200 OK
+          - 📜 **Logs da Execução:** [Ver no GitHub Actions]($RUN_URL)
+          - 🔖 **Commit:** \`${{ github.sha }}\`
+          EOF
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body-file /tmp/deploy_success_comment.md
+
       - name: Fetch and Display CloudWatch Logs
         if: github.event.inputs.fetch_logs_only == 'true' || failure()
         env:
@@ -359,3 +404,22 @@ jobs:
             --since "$SINCE" \
             --format short \
             --region "$AWS_REGION" || true
+
+      - name: Comment Deployment Failure on PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TARGET_ENV: ${{ steps.env-resolver.outputs.target_env }}
+        run: |
+          cat << EOF > /tmp/deploy_failure_comment.md
+          ### 🔴 Falha no Deploy para o ambiente: \`$TARGET_ENV\`
+          
+          Ocorreu um erro durante a execução do pipeline de deploy.
+          
+          ⚠️ **Verifique os logs detalhados para corrigir:**
+          👉 [Ver logs de erro no GitHub Actions]($RUN_URL)
+          EOF
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body-file /tmp/deploy_failure_comment.md

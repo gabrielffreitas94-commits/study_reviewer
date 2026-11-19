@@ -355,6 +355,7 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
             topic = self._topic_repo.get_by_id(q.topic_id)
             topic_name = topic.name if topic else "Tema"
             subject_name = "Matéria"
+            can_edit = False
             if topic:
                 if topic_id is not None and topic.id != topic_id:
                     continue
@@ -363,6 +364,7 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
                     if subject_id is not None and subj.id != subject_id:
                         continue
                     subject_name = subj.name
+                    can_edit = subj.owner_id == user_id
 
             level_idx = min(p.current_level, 6)
             items.append(
@@ -375,6 +377,7 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
                     current_level=p.current_level,
                     interval_days=intervals[level_idx],
                     due_date=p.next_review_date,
+                    can_edit=can_edit,
                 )
             )
             if len(items) >= limit:

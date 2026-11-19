@@ -342,6 +342,23 @@
                     </svg>
                     <span>Contestar Avaliação</span>
                 </button>
+
+                {% if card.can_edit %}
+                <!-- Botão Sutil: Editar Pergunta e Gabarito -->
+                <button
+                    type="button"
+                    id="btn-edit-question-modal"
+                    aria-haspopup="dialog"
+                    aria-expanded="false"
+                    aria-controls="edit-question-modal"
+                    onclick="openEditQuestionModal()"
+                    class="inline-flex items-center justify-center min-h-[44px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-700/50 border border-slate-200/80 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                    title="Editar enunciado e gabarito desta questão"
+                >
+                    <span class="mr-1.5" aria-hidden="true">✏️</span>
+                    <span>Editar Questão</span>
+                </button>
+                {% endif %}
             </div>
 
             <!-- Status Informativo LGPD Art. 16 -->
@@ -703,6 +720,112 @@
         </div>
     </div>
 </div>
+
+{% if card.can_edit %}
+<!-- Modal Acessível: Edição Inline de Pergunta e Gabarito (WCAG 2.1 AA) -->
+<div
+    id="edit-question-modal"
+    class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 flex items-center justify-center transition-opacity"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="edit-question-modal-title"
+    aria-describedby="edit-question-modal-description"
+>
+    <div class="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-7 flex flex-col space-y-4 max-h-[90vh] overflow-y-auto">
+        <!-- Cabeçalho do Modal -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <h2 id="edit-question-modal-title" class="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center">
+                <span class="mr-2 text-indigo-600 dark:text-indigo-400" aria-hidden="true">✏️</span>
+                <span>Editar Enunciado e Gabarito</span>
+            </h2>
+            <button
+                type="button"
+                id="btn-close-edit-question-modal"
+                aria-label="Fechar janela de edição de questão"
+                onclick="closeEditQuestionModal()"
+                class="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors cursor-pointer"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <p id="edit-question-modal-description" class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            Ajuste o texto do enunciado ou da resposta esperada. Suporta Markdown com blocos de código, tabelas e fórmulas.
+        </p>
+
+        <!-- Formulário de Edição -->
+        <form id="edit-question-form" onsubmit="event.preventDefault(); saveQuestionEdits('{{ card.question_id }}');" class="space-y-4">
+            <!-- Enunciado (Prompt) -->
+            <div>
+                <label for="edit-question-prompt" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Enunciado da Questão:
+                </label>
+                <textarea
+                    id="edit-question-prompt"
+                    name="prompt"
+                    rows="4"
+                    required
+                    onkeydown="handleEditQuestionKeydown(event, '{{ card.question_id }}')"
+                    class="w-full text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 p-3.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors resize-y min-h-[100px]"
+                >{{ card.prompt }}</textarea>
+            </div>
+
+            <!-- Resposta Esperada (Expected Answer) -->
+            <div>
+                <label for="edit-question-expected-answer" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Resposta Esperada (Gabarito):
+                </label>
+                <textarea
+                    id="edit-question-expected-answer"
+                    name="expected_answer"
+                    rows="4"
+                    required
+                    onkeydown="handleEditQuestionKeydown(event, '{{ card.question_id }}')"
+                    class="w-full text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 p-3.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors resize-y min-h-[100px]"
+                >{{ card.expected_answer }}</textarea>
+                <div class="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-1 px-1">
+                    <span>Atalho: <kbd class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono">Ctrl + Enter</kbd> para salvar</span>
+                    <span><kbd class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono">Esc</kbd> para cancelar</span>
+                </div>
+            </div>
+
+            <!-- Indicador de Carregamento -->
+            <div id="edit-question-loading" class="hidden flex items-center justify-center space-x-2 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400" aria-live="polite">
+                <svg class="animate-spin h-5 w-5 text-indigo-600 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+                <span>Salvando alterações...</span>
+            </div>
+
+            <!-- Mensagem de Erro -->
+            <div id="edit-question-error" class="hidden p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-800 dark:text-rose-200" role="alert" aria-live="assertive"></div>
+
+            <!-- Ações: Cancelar e Salvar -->
+            <div class="pt-2 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                    type="button"
+                    id="btn-cancel-edit-question"
+                    onclick="closeEditQuestionModal()"
+                    class="inline-flex items-center justify-center min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-colors cursor-pointer"
+                >
+                    <span>Cancelar</span>
+                </button>
+                <button
+                    type="submit"
+                    id="btn-save-question-edits"
+                    class="inline-flex items-center justify-center min-h-[44px] px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all transform active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span class="mr-1.5" aria-hidden="true">💾</span>
+                    <span>Salvar Alterações</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
 
 <!-- Out-of-band updates para o badge de revisão da navbar -->
 <span id="review-badge" hx-swap-oob="outerHTML" class="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full {% if not total_due %}hidden{% endif %}">
@@ -1330,6 +1453,125 @@
         if (confirmBtn) confirmBtn.focus();
     };
 
+    {% if card.can_edit %}
+    // --- Modal Edição Inline de Pergunta (WCAG 2.1 AA) ---
+    window.openEditQuestionModal = function() {
+        window.__lastFocusedElement = document.activeElement;
+        const modal = document.getElementById('edit-question-modal');
+        const trigger = document.getElementById('btn-edit-question-modal');
+        const promptInput = document.getElementById('edit-question-prompt');
+        if (modal) {
+            modal.classList.remove('hidden');
+            if (trigger) trigger.setAttribute('aria-expanded', 'true');
+            if (promptInput) {
+                promptInput.focus();
+                promptInput.select();
+            }
+        }
+    };
+
+    window.closeEditQuestionModal = function() {
+        const modal = document.getElementById('edit-question-modal');
+        const trigger = document.getElementById('btn-edit-question-modal');
+        const errorEl = document.getElementById('edit-question-error');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+        if (errorEl) {
+            errorEl.classList.add('hidden');
+        }
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+            trigger.focus();
+        } else if (window.__lastFocusedElement) {
+            window.__lastFocusedElement.focus();
+        }
+    };
+
+    window.handleEditQuestionKeydown = function(event, questionId) {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            window.saveQuestionEdits(questionId);
+        }
+    };
+
+    window.saveQuestionEdits = async function(questionId) {
+        const promptEl = document.getElementById('edit-question-prompt');
+        const answerEl = document.getElementById('edit-question-expected-answer');
+        const errorEl = document.getElementById('edit-question-error');
+        const saveBtn = document.getElementById('btn-save-question-edits');
+        const loadingEl = document.getElementById('edit-question-loading');
+
+        const newPrompt = (promptEl?.value || '').trim();
+        const newAnswer = (answerEl?.value || '').trim();
+
+        if (!newPrompt || !newAnswer) {
+            if (errorEl) {
+                errorEl.textContent = 'Enunciado e resposta esperada são obrigatórios.';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+        if (saveBtn) saveBtn.disabled = true;
+
+        try {
+            const resp = await fetch(`/api/v1/questions/${questionId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: newPrompt,
+                    expected_answer: newAnswer
+                }),
+                credentials: 'same-origin'
+            });
+
+            if (!resp.ok) {
+                const data = await resp.json().catch(() => ({}));
+                throw new Error(data.detail || 'Falha ao salvar edições da pergunta.');
+            }
+
+            const updated = await resp.json();
+
+            // Atualiza nós no DOM com o conteúdo modificado
+            const promptNode = document.getElementById('question-prompt');
+            const answerNode = document.getElementById('expected-answer-content');
+
+            if (promptNode) {
+                promptNode.textContent = updated.prompt;
+                promptNode.removeAttribute('data-md-rendered');
+                promptNode.removeAttribute('data-raw-md');
+            }
+
+            if (answerNode) {
+                answerNode.textContent = updated.expected_answer;
+                answerNode.removeAttribute('data-md-rendered');
+                answerNode.removeAttribute('data-raw-md');
+            }
+
+            if (typeof window.applyRpgMarkdownAll === 'function') {
+                window.applyRpgMarkdownAll();
+            }
+
+            if (promptEl) promptEl.value = updated.prompt;
+            if (answerEl) answerEl.value = updated.expected_answer;
+
+            window.closeEditQuestionModal();
+        } catch (err) {
+            console.error('Erro ao editar questão:', err);
+            if (errorEl) {
+                errorEl.textContent = err.message || 'Erro de comunicação ao salvar alterações.';
+                errorEl.classList.remove('hidden');
+            }
+        } finally {
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (saveBtn) saveBtn.disabled = false;
+        }
+    };
+    {% endif %}
+
     // Fechar modais ao teclar Escape
     if (!window.__modalEscapeListenerBound) {
         window.__modalEscapeListenerBound = true;
@@ -1337,10 +1579,16 @@
             if (e.key === 'Escape') {
                 const audioModal = document.getElementById('audio-answer-modal');
                 const disputeModal = document.getElementById('dispute-modal');
+                const editModal = document.getElementById('edit-question-modal');
+
                 if (audioModal && !audioModal.classList.contains('hidden')) {
                     window.closeAudioModal();
                 } else if (disputeModal && !disputeModal.classList.contains('hidden')) {
                     window.closeDisputeModal();
+                } else if (editModal && !editModal.classList.contains('hidden')) {
+                    if (typeof window.closeEditQuestionModal === 'function') {
+                        window.closeEditQuestionModal();
+                    }
                 }
             }
         });
