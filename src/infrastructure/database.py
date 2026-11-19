@@ -43,7 +43,7 @@ engine = create_engine(db_url, **get_engine_args(db_url))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_db() -> Generator[Session]:
+def get_db() -> Generator[Session, None, None]:
     """Dependência para obtenção de sessão de banco de dados com fechamento garantido."""
     db = SessionLocal()
     try:

@@ -39,7 +39,7 @@ def test_user() -> User:
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -52,7 +52,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def db_session(db_engine: Any) -> Generator[Session]:
+def db_session(db_engine: Any) -> Generator[Session, None, None]:
     testing_session = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
     session = testing_session()
     try:
@@ -62,11 +62,11 @@ def db_session(db_engine: Any) -> Generator[Session]:
 
 
 @pytest.fixture
-def client(db_session: Session, test_user: User) -> Generator[TestClient]:
+def client(db_session: Session, test_user: User) -> Generator[TestClient, None, None]:
     user_repo = SqlAlchemyUserRepository(db_session)
     user_repo.save(test_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     def override_get_current_user() -> User:

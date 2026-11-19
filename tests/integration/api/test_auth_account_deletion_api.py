@@ -23,7 +23,7 @@ from src.infrastructure.web.app import app
 
 
 @pytest.fixture
-def api_test_db() -> Generator[sessionmaker[Session]]:
+def api_test_db() -> Generator[sessionmaker[Session], None, None]:
     """Cria banco SQLite em memória isolado."""
     engine = create_engine(
         "sqlite:///:memory:",
@@ -40,10 +40,10 @@ def api_test_db() -> Generator[sessionmaker[Session]]:
 @pytest.fixture
 def rest_client(
     api_test_db: sessionmaker[Session],
-) -> Generator[TestClient]:
+) -> Generator[TestClient, None, None]:
     """TestClient REST limpo com isolamento de banco."""
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         session = api_test_db()
         try:
             yield session

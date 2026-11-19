@@ -3,27 +3,27 @@
 {% block title %}Entrar — Grimório & Forja Ancestral — Study Reviewer{% endblock %}
 
 {% block content %}
-<div class="flex-1 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="rpg-panel border border-[#785a28] bg-[#14100d] p-8 sm:p-10 rounded-2xl shadow-2xl text-center max-w-md w-full space-y-7 relative overflow-hidden">
-        
+<div class="flex-1 flex flex-col items-center justify-center py-10 px-4 sm:px-6 lg:px-8">
+    <div class="rpg-panel border border-[#785a28] bg-[#14100d] p-8 sm:p-10 rounded-2xl shadow-2xl max-w-md w-full space-y-6 relative overflow-hidden">
+
         <!-- Efeito sutil de gradiente etéreo no topo do cartão -->
         <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-48 bg-[#c89b3c]/10 rounded-full blur-3xl pointer-events-none"></div>
 
         <!-- Medalhão de Entrada RPG com Ícone Rúnico -->
-        <div class="relative">
+        <div class="relative text-center">
             <div class="mx-auto w-20 h-20 rounded-full bg-gradient-to-b from-[#2a2018] to-[#14100d] border-2 border-[#f0c869] flex items-center justify-center shadow-lg shadow-[#c89b3c]/30 text-[#f0c869] mb-4 relative group">
                 <div class="absolute inset-0 rounded-full bg-[#f0c869]/10 animate-pulse"></div>
                 {% if get_rpg_icon_svg %}
                     {{ get_rpg_icon_svg('sword', 'w-10 h-10 text-[#f0c869] drop-shadow-[0_2px_8px_rgba(240,200,105,0.6)]') | safe }}
                 {% else %}
-                    <span class="text-3xl filter drop-shadow">⚔️</span>
+                    <span class="text-3xl filter drop-shadow" aria-hidden="true">⚔️</span>
                 {% endif %}
             </div>
 
             <h1 class="text-2xl sm:text-3xl font-extrabold tracking-wider text-[#f0c869] font-cinzel">
                 Study Reviewer
             </h1>
-            
+
             <div class="flex items-center justify-center gap-2 my-2.5 text-[#785a28]">
                 <span class="h-px w-10 bg-gradient-to-r from-transparent to-[#785a28]"></span>
                 <span class="text-[11px] uppercase tracking-widest font-cinzel text-[#c89b3c] font-bold">Códice & Forja Ancestral</span>
@@ -31,7 +31,7 @@
             </div>
 
             <p class="mt-2 text-sm text-[#a39276] font-tome text-base leading-relaxed">
-                Árvore de Habilidades & Repetição Espaçada. Acesse seu tomo para forjar conhecimento e dominar suas provações.
+                Árvore de Habilidades & Repetição Espaçada. Acesse seu tomo local para forjar conhecimento e dominar suas provações.
             </p>
         </div>
 
@@ -45,26 +45,188 @@
         </div>
         {% endif %}
 
-        <!-- Botão Oficial de Login com o Google em Moldura Rúnica -->
-        <div class="pt-2">
-            <a href="/auth/google?next={{ next_url | default('/questions/study') }}" 
-               class="w-full flex items-center justify-center gap-3 px-6 py-3.5 border border-[#785a28] rounded-xl text-sm font-bold font-cinzel tracking-wider text-[#f5ebd6] bg-[#1c1612] hover:bg-[#251e18] hover:border-[#f0c869] hover:text-[#f0c869] transition-all duration-200 shadow-lg shadow-black/60 focus:outline-none focus:ring-2 focus:ring-[#f0c869] group">
-                <!-- Google 'G' Icon SVG Oficial Mantido -->
-                <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                </svg>
-                <span>Continuar com o Google</span>
-                <span class="text-[#c89b3c] group-hover:translate-x-0.5 transition-transform font-bold" aria-hidden="true">→</span>
-            </a>
+        <!-- Alternância entre Login Local e Criação de Conta -->
+        <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-[#0c0908] border border-[#785a28]/60" role="tablist" aria-label="Modo de acesso">
+            <button
+                type="button"
+                id="tab-btn-login"
+                role="tab"
+                aria-selected="true"
+                aria-controls="panel-login"
+                onclick="switchAuthTab('login')"
+                class="py-2 px-3 rounded-lg text-xs font-cinzel font-bold tracking-wider transition-all bg-[#c89b3c] text-[#0c0908] shadow-md"
+            >
+                Entrar
+            </button>
+            <button
+                type="button"
+                id="tab-btn-register"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-register"
+                onclick="switchAuthTab('register')"
+                class="py-2 px-3 rounded-lg text-xs font-cinzel font-bold tracking-wider transition-all text-[#a39276] hover:text-[#f0c869]"
+            >
+                Criar Conta
+            </button>
+        </div>
+
+        <!-- Formulário de Login Local -->
+        <div id="panel-login" role="tabpanel" aria-labelledby="tab-btn-login">
+            <form action="/auth/login" method="POST" class="space-y-4">
+                <input type="hidden" name="next" value="{{ next_url | default('/study-maps') }}">
+
+                <div>
+                    <label for="login-email" class="block text-xs font-cinzel font-semibold text-[#c89b3c] mb-1.5">
+                        E-mail
+                    </label>
+                    <input
+                        id="login-email"
+                        name="email"
+                        type="email"
+                        required
+                        autocomplete="email"
+                        placeholder="estudante@exemplo.local"
+                        class="w-full px-4 py-2.5 text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="login-password" class="block text-xs font-cinzel font-semibold text-[#c89b3c] mb-1.5">
+                        Senha
+                    </label>
+                    <input
+                        id="login-password"
+                        name="password"
+                        type="password"
+                        required
+                        autocomplete="current-password"
+                        placeholder="••••••••"
+                        class="w-full px-4 py-2.5 text-sm"
+                    >
+                </div>
+
+                <button type="submit" class="rpg-btn-gold w-full py-3 text-sm tracking-wider">
+                    Entrar no Grimório
+                </button>
+            </form>
+        </div>
+
+        <!-- Formulário de Cadastro Local -->
+        <div id="panel-register" role="tabpanel" aria-labelledby="tab-btn-register" class="hidden">
+            <form action="/auth/register" method="POST" class="space-y-4">
+                <input type="hidden" name="next" value="{{ next_url | default('/study-maps') }}">
+
+                <div>
+                    <label for="register-name" class="block text-xs font-cinzel font-semibold text-[#c89b3c] mb-1.5">
+                        Nome do Aventureiro
+                    </label>
+                    <input
+                        id="register-name"
+                        name="name"
+                        type="text"
+                        required
+                        maxlength="150"
+                        autocomplete="name"
+                        placeholder="Seu nome"
+                        class="w-full px-4 py-2.5 text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="register-email" class="block text-xs font-cinzel font-semibold text-[#c89b3c] mb-1.5">
+                        E-mail
+                    </label>
+                    <input
+                        id="register-email"
+                        name="email"
+                        type="email"
+                        required
+                        autocomplete="email"
+                        placeholder="voce@exemplo.local"
+                        class="w-full px-4 py-2.5 text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="register-password" class="block text-xs font-cinzel font-semibold text-[#c89b3c] mb-1.5">
+                        Senha (8 a 128 caracteres)
+                    </label>
+                    <input
+                        id="register-password"
+                        name="password"
+                        type="password"
+                        required
+                        minlength="8"
+                        maxlength="128"
+                        autocomplete="new-password"
+                        placeholder="Mínimo de 8 caracteres"
+                        class="w-full px-4 py-2.5 text-sm"
+                    >
+                </div>
+
+                <button type="submit" class="rpg-btn-gold w-full py-3 text-sm tracking-wider">
+                    Forjar Nova Conta
+                </button>
+            </form>
+        </div>
+
+        <!-- Divisor e Acesso Instantâneo Demo -->
+        <div class="space-y-3 pt-2">
+            <div class="flex items-center gap-3 text-[#785a28]">
+                <span class="h-px flex-1 bg-[#785a28]/50"></span>
+                <span class="text-[10px] uppercase tracking-widest font-cinzel text-[#a39276]">Acesso Rápido</span>
+                <span class="h-px flex-1 bg-[#785a28]/50"></span>
+            </div>
+
+            <form action="/auth/demo" method="POST">
+                <input type="hidden" name="next" value="{{ next_url | default('/study-maps') }}">
+                <button
+                    type="submit"
+                    class="rpg-btn-bronze w-full py-3 px-4 text-xs sm:text-sm tracking-wider gap-2"
+                >
+                    <span aria-hidden="true">📜</span>
+                    <span>Entrar como Estudante Demo (Offline)</span>
+                </button>
+            </form>
         </div>
 
         <!-- Rodapé e Transparência LGPD -->
-        <div class="text-xs text-[#a39276] pt-3 border-t border-[#785a28]/40 font-tome text-sm">
+        <div class="text-center text-xs text-[#a39276] pt-3 border-t border-[#785a28]/40 font-tome text-sm">
             <p>Ao adentrar o tomo, você concorda com nossos <a href="/privacy" class="text-[#f0c869] hover:text-[#c89b3c] underline font-cinzel text-[11px] font-semibold">Termos & Privacidade (LGPD)</a>. Seus dados são guardados sob sigilo estrito.</p>
         </div>
     </div>
 </div>
+
+<script>
+    function switchAuthTab(mode) {
+        const loginPanel = document.getElementById('panel-login');
+        const registerPanel = document.getElementById('panel-register');
+        const loginBtn = document.getElementById('tab-btn-login');
+        const registerBtn = document.getElementById('tab-btn-register');
+
+        const activeClasses = ['bg-[#c89b3c]', 'text-[#0c0908]', 'shadow-md'];
+        const inactiveClasses = ['text-[#a39276]', 'hover:text-[#f0c869]'];
+
+        if (mode === 'register') {
+            loginPanel.classList.add('hidden');
+            registerPanel.classList.remove('hidden');
+            loginBtn.setAttribute('aria-selected', 'false');
+            registerBtn.setAttribute('aria-selected', 'true');
+            loginBtn.classList.remove(...activeClasses);
+            loginBtn.classList.add(...inactiveClasses);
+            registerBtn.classList.remove(...inactiveClasses);
+            registerBtn.classList.add(...activeClasses);
+        } else {
+            registerPanel.classList.add('hidden');
+            loginPanel.classList.remove('hidden');
+            registerBtn.setAttribute('aria-selected', 'false');
+            loginBtn.setAttribute('aria-selected', 'true');
+            registerBtn.classList.remove(...activeClasses);
+            registerBtn.classList.add(...inactiveClasses);
+            loginBtn.classList.remove(...inactiveClasses);
+            loginBtn.classList.add(...activeClasses);
+        }
+    }
+</script>
 {% endblock %}

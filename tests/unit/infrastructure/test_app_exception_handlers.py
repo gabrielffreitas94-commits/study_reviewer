@@ -15,7 +15,7 @@ from src.infrastructure.web.app import create_app
 
 
 @pytest.fixture
-def app_with_test_routes() -> Generator[TestClient]:
+def app_with_test_routes() -> Generator[TestClient, None, None]:
     app = create_app()
 
     @app.get("/api/test-ownership-error")

@@ -73,7 +73,6 @@ class ReviewQuestionRequest(BaseModel):
 
     score: int = Field(...)
     student_answer: str | None = Field(default=None)
-    ai_feedback: str | None = Field(default=None)
     evaluation_mode: str = Field(default="MANUAL", max_length=50)
 
 
@@ -182,7 +181,6 @@ def review_question_api(
                 question_id=question_id,
                 score=payload.score,
                 student_answer=payload.student_answer,
-                ai_feedback=payload.ai_feedback,
                 evaluation_mode=payload.evaluation_mode,
             ),
             user_id=current_user.id,

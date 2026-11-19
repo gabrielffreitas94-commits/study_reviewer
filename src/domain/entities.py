@@ -7,10 +7,7 @@ from uuid import UUID, uuid4
 
 from src.domain.exceptions import (
     DomainValidationError,
-    EmptyKnowledgeContentError,
-    InsufficientTokensError,
     InvalidEmailError,
-    InvalidEmbeddingError,
     InvalidExpectedAnswerError,
     InvalidGoogleSubError,
     InvalidPromptError,
@@ -30,6 +27,7 @@ class User:
     avatar_url: str | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: date = field(default_factory=date.today)
+    password_hash: str | None = None
 
     def __post_init__(self) -> None:
         self.google_sub = self.google_sub.strip() if self.google_sub is not None else ""
@@ -382,7 +380,6 @@ class ReviewAuditLog:
     logged_at: datetime | None = None
     id: UUID = field(default_factory=uuid4)
     student_answer: str | None = None
-    ai_feedback: str | None = None
 
     def __post_init__(self) -> None:
         if not (0 <= self.score <= 100):
@@ -399,14 +396,7 @@ class ReviewAuditLog:
             raise DomainValidationError("O nome histórico da matéria não pode ser vazio.")
         if not self.historical_topic_name or not self.historical_topic_name.strip():
             raise DomainValidationError("O nome histórico do tema não pode ser vazio.")
-        if self.evaluation_mode not in (
-            "MANUAL",
-            "AI_TEXT",
-            "AI_AUDIO",
-            "MULTIAGENT_DISPUTE",
-            "TEXT_AI",
-            "VOICE_AI",
-        ):
+        if self.evaluation_mode not in ("MANUAL", "WRITTEN_SELF_REVIEW"):
             raise DomainValidationError(f"Modo de avaliação inválido: {self.evaluation_mode}")
 
     @property
@@ -495,180 +485,6 @@ class KnowledgeSource:
     def topic_id(self) -> UUID:
         """Compatibilidade regressiva: retorna o primeiro tema associado."""
         return self.topic_ids[0]
-
-
-@dataclass(slots=True)
-class KnowledgeChunk:
-    """Entidade que representa um fragmento semântico de conhecimento vetorizado."""
-
-    source_id: UUID
-    topic_id: UUID
-    chunk_index: int
-    content: str
-    embedding: tuple[float, ...] = field(default_factory=tuple)
-    token_estimate: int = 0
-    id: UUID = field(default_factory=uuid4)
-    created_at: date = field(default_factory=date.today)
-
-    def __post_init__(self) -> None:
-        self.content = self.content.strip() if self.content is not None else ""
-        if not self.content:
-            raise EmptyKnowledgeContentError("Conteúdo do chunk não pode ser vazio.")
-        if self.chunk_index < 0:
-            raise DomainValidationError("Índice do chunk não pode ser negativo.")
-        if not self.embedding:
-            raise InvalidEmbeddingError("Vetor de embedding não pode ser vazio.")
-
-
-@dataclass(slots=True, frozen=True)
-class ValidationResult:
-    """Entidade de valor representando o resultado da validação de uma questão contra a base RAG."""
-
-    is_grounded: bool
-    confidence_score: float
-    evidence_chunk_ids: tuple[UUID, ...]
-    evidence_quotes: tuple[str, ...]
-    reasoning: str
-    suggested_improvements: tuple[str, ...]
-
-    def __post_init__(self) -> None:
-        if not (0.0 <= self.confidence_score <= 1.0):
-            raise DomainValidationError("confidence_score deve estar entre 0.0 e 1.0.")
-
-
-@dataclass(slots=True)
-class TokenLedger:
-    """Entidade que controla o saldo e a retenção em duas fases de tokens do usuário."""
-
-    user_id: UUID
-    balance: int = 1000
-    held_balance: int = 0
-    id: UUID = field(default_factory=uuid4)
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-
-    def __post_init__(self) -> None:
-        if self.balance < 0:
-            raise DomainValidationError("O saldo de tokens não pode ser negativo.")
-        if self.held_balance < 0:
-            raise DomainValidationError("O saldo retido de tokens não pode ser negativo.")
-        if self.held_balance > self.balance:
-            raise DomainValidationError("O saldo retido não pode exceder o saldo total.")
-
-    @property
-    def available_balance(self) -> int:
-        return self.balance - self.held_balance
-
-    def hold(self, amount: int) -> None:
-        if amount <= 0:
-            raise DomainValidationError("A quantidade para retenção deve ser positiva.")
-        if self.available_balance < amount:
-            raise InsufficientTokensError(
-                f"Saldo insuficiente de tokens. Disponível: {self.available_balance}, "
-                f"Solicitado: {amount}"
-            )
-        self.held_balance += amount
-        self.updated_at = datetime.now(UTC)
-
-    def settle(self, hold_amount: int, actual_tokens: int) -> None:
-        if hold_amount <= 0 or actual_tokens < 0:
-            raise DomainValidationError("Valores de liquidação inválidos.")
-        if hold_amount > self.held_balance:
-            raise DomainValidationError("A retenção a liberar excede o saldo atualmente retido.")
-        self.held_balance -= hold_amount
-        self.balance = max(0, self.balance - actual_tokens)
-        self.updated_at = datetime.now(UTC)
-
-    def refund_hold(self, amount: int) -> None:
-        if amount <= 0:
-            raise DomainValidationError("A quantidade para estorno deve ser positiva.")
-        if amount > self.held_balance:
-            raise DomainValidationError("A quantidade de estorno excede o saldo retido.")
-        self.held_balance -= amount
-        self.updated_at = datetime.now(UTC)
-
-    def deposit(self, amount: int) -> None:
-        if amount <= 0:
-            raise DomainValidationError("A quantidade de depósito deve ser positiva.")
-        self.balance += amount
-        self.updated_at = datetime.now(UTC)
-
-
-@dataclass(slots=True, frozen=True)
-class TokenTransaction:
-    """Entidade indelével registrando uma movimentação financeira no ledger de tokens."""
-
-    user_id: UUID
-    transaction_type: str  # DEPOSIT, HOLD, SETTLEMENT, REFUND
-    amount: int
-    reference_id: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    id: UUID = field(default_factory=uuid4)
-
-    def __post_init__(self) -> None:
-        if self.amount < 0:
-            raise DomainValidationError("O montante da transação não pode ser negativo.")
-        if self.transaction_type not in ("DEPOSIT", "HOLD", "SETTLEMENT", "REFUND"):
-            raise DomainValidationError(f"Tipo de transação inválido: {self.transaction_type}")
-
-
-@dataclass(slots=True, frozen=True)
-class AnswerEvaluationResult:
-    """Resultado estruturado e auditável da avaliação semântica de uma resposta aberta."""
-
-    score: int
-    feedback: str
-    coverage_score: int = 100
-    accuracy_score: int = 100
-    depth_score: int = 100
-    evidence_quotes: tuple[str, ...] = ()
-    tokens_used: int = 0
-    cached_context: bool = False
-    evaluation_mode: str = "AI_TEXT"
-    transcribed_text: str | None = None
-
-    def __post_init__(self) -> None:
-        if not (0 <= self.score <= 100):
-            raise DomainValidationError("O score de avaliação deve estar entre 0 e 100.")
-        if not (0 <= self.coverage_score <= 100):
-            raise DomainValidationError("O coverage_score deve estar entre 0 e 100.")
-        if not (0 <= self.accuracy_score <= 100):
-            raise DomainValidationError("O accuracy_score deve estar entre 0 e 100.")
-        if not (0 <= self.depth_score <= 100):
-            raise DomainValidationError("O depth_score deve estar entre 0 e 100.")
-        if self.tokens_used < 0:
-            raise DomainValidationError("Tokens consumidos não podem ser negativos.")
-
-        if not self.feedback or not self.feedback.strip():
-            raise DomainValidationError("Feedback de avaliação não pode ser vazio.")
-        if self.evaluation_mode not in ("AI_TEXT", "AI_AUDIO", "MULTIAGENT_DISPUTE"):
-            raise DomainValidationError(f"Modo de avaliação inválido: {self.evaluation_mode}")
-
-
-@dataclass(slots=True, frozen=True)
-class DisputeEvaluationResult:
-    """Resultado deliberado pelo conselho multiagente na contestação de avaliação."""
-
-    status: str  # "UPHELD" ou "REJECTED"
-    revised_score: int
-    advocate_rationale: str
-    critic_rationale: str
-    arbitrator_verdict: str
-    tokens_used: int = 0
-    refund_dispute_tokens: bool = False
-
-    def __post_init__(self) -> None:
-        if self.status not in ("UPHELD", "REJECTED"):
-            raise DomainValidationError(f"Status de contestação inválido: {self.status}")
-        if not (0 <= self.revised_score <= 100):
-            raise DomainValidationError("O revised_score deve estar entre 0 e 100.")
-        if not self.advocate_rationale or not self.advocate_rationale.strip():
-            raise DomainValidationError("O parecer do advogado não pode ser vazio.")
-        if not self.critic_rationale or not self.critic_rationale.strip():
-            raise DomainValidationError("O parecer do crítico não pode ser vazio.")
-        if not self.arbitrator_verdict or not self.arbitrator_verdict.strip():
-            raise DomainValidationError("O veredito do árbitro não pode ser vazio.")
-        if self.tokens_used < 0:
-            raise DomainValidationError("Tokens consumidos não podem ser negativos.")
 
 
 # --- Árvore de Estudos RPG & Grafo de Aprendizado ---

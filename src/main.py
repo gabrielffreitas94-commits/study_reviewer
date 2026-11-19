@@ -1,14 +1,11 @@
 """Ponto de entrada principal da aplicação Study Reviewer."""
 
 import uvicorn
-from mangum import Mangum
 
 from src.infrastructure.config import settings
 from src.infrastructure.web.app import app
 
-handler = Mangum(app, lifespan="off")
-
-__all__ = ["app", "handler"]
+__all__ = ["app"]
 
 if __name__ == "__main__":
     uvicorn.run(

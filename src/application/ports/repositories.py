@@ -8,7 +8,6 @@ from src.application.dto.question_dto import DueQuestionItemDTO
 from src.domain.entities import (
     Flashcard,
     FlashcardPoolSession,
-    KnowledgeChunk,
     KnowledgeSource,
     Question,
     ReviewAuditLog,
@@ -16,8 +15,6 @@ from src.domain.entities import (
     StudyMap,
     StudyNode,
     Subject,
-    TokenLedger,
-    TokenTransaction,
     Topic,
     User,
     UserQuestionProgress,
@@ -330,51 +327,6 @@ class IKnowledgeSourceRepository(Protocol):
 
     def delete(self, source_id: UUID) -> bool:
         """Remove uma fonte de conhecimento."""
-        ...
-
-
-class IKnowledgeChunkRepository(Protocol):
-    """Porta de persistência para Fragmentos Vetoriais de Conhecimento (Chunks)."""
-
-    def save_batch(self, chunks: list[KnowledgeChunk]) -> None:
-        """Persiste uma lista de chunks de conhecimento em lote."""
-        ...
-
-    def list_by_topic(self, topic_id: UUID) -> list[KnowledgeChunk]:
-        """Lista todos os chunks de conhecimento de um tema."""
-        ...
-
-    def delete_by_source(self, source_id: UUID) -> int:
-        """Remove todos os chunks associados a uma fonte específica."""
-        ...
-
-    def search_similar(
-        self,
-        topic_id: UUID,
-        query_embedding: list[float] | tuple[float, ...],
-        top_k: int = 5,
-    ) -> list[tuple[KnowledgeChunk, float]]:
-        """Busca os top-k chunks mais relevantes de um tema por similaridade de cosseno."""
-        ...
-
-
-class ITokenLedgerRepository(Protocol):
-    """Porta de persistência para o saldo e transações de tokens do usuário."""
-
-    def get_by_user_id(self, user_id: UUID, for_update: bool = False) -> TokenLedger | None:
-        """Recupera o saldo/ledger de tokens do usuário."""
-        ...
-
-    def save(self, ledger: TokenLedger) -> TokenLedger:
-        """Persiste ou atualiza o saldo/ledger de tokens."""
-        ...
-
-    def record_transaction(self, transaction: TokenTransaction) -> TokenTransaction:
-        """Registra uma movimentação no extrato/ledger de tokens."""
-        ...
-
-    def list_transactions(self, user_id: UUID, limit: int = 50) -> list[TokenTransaction]:
-        """Lista as transações mais recentes do usuário ordenadas por data descendente."""
         ...
 
 

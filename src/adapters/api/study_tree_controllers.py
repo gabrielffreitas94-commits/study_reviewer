@@ -107,7 +107,6 @@ class ReviewNodeQuestionRequest(BaseModel):
     score: int = Field(default=100, ge=0, le=100)
     difficulty: str | None = Field(default=None, max_length=20)
     student_answer: str | None = Field(default=None)
-    ai_feedback: str | None = Field(default=None)
     evaluation_mode: str = Field(default="MANUAL", max_length=50)
 
 
@@ -662,7 +661,6 @@ def review_node_question(
             score=payload.score,
             difficulty=payload.difficulty,
             student_answer=payload.student_answer,
-            ai_feedback=payload.ai_feedback,
             evaluation_mode=payload.evaluation_mode,
         )
         db.commit()

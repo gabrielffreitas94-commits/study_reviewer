@@ -7,7 +7,6 @@ from fastapi import (
     APIRouter,
     Depends,
     Form,
-    HTTPException,
     Query,
     Request,
     Response,
@@ -19,18 +18,21 @@ from sqlalchemy.orm import Session
 
 from src.adapters.persistence.repositories import SqlAlchemyUserRepository
 from src.adapters.web.rpg_icons import get_rpg_icon_svg
-from src.application.dto.auth_dto import GoogleAuthInputDTO
-from src.application.ports.auth import IGoogleAuthClient, ISessionTokenService
+from src.application.dto.auth_dto import LocalLoginInputDTO, LocalRegisterInputDTO
+from src.application.ports.auth import IPasswordHasher, ISessionTokenService
 from src.application.use_cases.auth_use_cases import (
-    AuthenticateWithGoogleUseCase,
+    AuthenticateDemoUserUseCase,
+    AuthenticateLocalUserUseCase,
     LogoutUseCase,
+    RegisterLocalUserUseCase,
 )
 from src.domain.entities import User
+from src.domain.exceptions import DomainException
 from src.infrastructure.config import settings
 from src.infrastructure.database import get_db
 from src.infrastructure.security.dependencies import (
     get_current_user_optional,
-    get_google_client,
+    get_password_hasher,
     get_session_service,
 )
 
@@ -43,7 +45,7 @@ templates.env.globals["get_rpg_icon_svg"] = get_rpg_icon_svg
 auth_router = APIRouter(prefix="/auth", tags=["Web Auth"])
 
 
-def _safe_redirect_url(target: str | None, default: str = "/questions/study") -> str:
+def _safe_redirect_url(target: str | None, default: str = "/study-maps") -> str:
     """Valida e sanitiza rotas de redirecionamento prevenindo Open Redirect (CWE-601)."""
     if not target:
         return default
@@ -53,15 +55,29 @@ def _safe_redirect_url(target: str | None, default: str = "/questions/study") ->
     return default
 
 
+def _set_session_cookie(response: Response, request: Request, session_token: str) -> None:
+    """Grava o cookie de sessão seguro AES-256-GCM na resposta HTTP."""
+    is_https = settings.ENVIRONMENT in ("production", "staging") or request.url.scheme == "https"
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        httponly=True,
+        samesite="lax",
+        secure=is_https,
+        max_age=30 * 24 * 3600,
+        path="/",
+    )
+
+
 @auth_router.get("/login", response_class=HTMLResponse)
 def login_page(
     request: Request,
-    next: str = Query("/questions/study"),
+    next: str = Query("/study-maps"),
     error: str | None = Query(None),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> Response:
-    """Renderiza a página de login com botão Google e tratamento de redirecionamento."""
-    safe_next = _safe_redirect_url(next, "/questions/study")
+    """Renderiza a página de login local, cadastro e acesso demo offline."""
+    safe_next = _safe_redirect_url(next, "/study-maps")
     if current_user is not None:
         return RedirectResponse(url=safe_next, status_code=status.HTTP_303_SEE_OTHER)
 
@@ -76,154 +92,95 @@ def login_page(
     )
 
 
-def _get_oauth_redirect_uri(request: Request) -> str:
-    """Determina a redirect_uri canônica e segura para o fluxo OAuth2 com Google.
-
-    Garantias de compatibilidade e segurança:
-    1. Se `settings.GOOGLE_REDIRECT_URI` estiver explicitamente definido E pertencer ao mesmo host
-       da requisição atual, honra a configuração.
-    2. Caso contrário (ou se GOOGLE_REDIRECT_URI pertencer a outro domínio, como staging em prod),
-       constrói a URI dinamicamente baseando-se no host da requisição, assegurando o protocolo HTTPS
-       para ambientes remotos (Lambda Function URLs, CloudFront ou instâncias de produção).
-    """
-    host = (
-        request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
-    )
-    req_host_only = host.split(":")[0].strip() if host else ""
-
-    if settings.GOOGLE_REDIRECT_URI:
-        parsed = urllib.parse.urlparse(settings.GOOGLE_REDIRECT_URI)
-        conf_host_only = (parsed.netloc or "").split(":")[0].strip()
-        if conf_host_only and req_host_only and conf_host_only == req_host_only:
-            return settings.GOOGLE_REDIRECT_URI
-
-    scheme = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
-    if "lambda-url" in (host or "") or (
-        req_host_only not in ("localhost", "127.0.0.1", "testserver")
-    ):
-        scheme = "https"
-
-    return f"{scheme}://{host}/auth/callback"
-
-
-@auth_router.get("/google")
-def google_login_redirect(
+@auth_router.post("/login")
+def login_submit(
     request: Request,
-    next: str = Query("/questions/study"),
-    google_client: IGoogleAuthClient = Depends(get_google_client),
+    email: Annotated[str, Form(...)],
+    password: Annotated[str, Form(...)],
+    next: Annotated[str, Form()] = "/study-maps",
+    db: Session = Depends(get_db),
+    password_hasher: IPasswordHasher = Depends(get_password_hasher),
     session_service: ISessionTokenService = Depends(get_session_service),
 ) -> Response:
-    """Gera state CSRF criptografado e redireciona o usuário para o Google Consent."""
-    safe_next = _safe_redirect_url(next, "/questions/study")
-    state = session_service.create_oauth_state(safe_next)
-
-    redirect_uri = _get_oauth_redirect_uri(request)
-    auth_url = google_client.get_authorization_url(state=state, redirect_uri=redirect_uri)
-
-    is_https = (
-        settings.ENVIRONMENT in ("production", "staging")
-        or request.url.scheme == "https"
-        or "lambda-url" in (request.headers.get("host") or "")
+    """Autentica usuário local por e-mail e senha e grava cookie de sessão."""
+    safe_next = _safe_redirect_url(next, "/study-maps")
+    user_repo = SqlAlchemyUserRepository(db)
+    use_case = AuthenticateLocalUserUseCase(
+        user_repo=user_repo,
+        password_hasher=password_hasher,
+        token_service=session_service,
     )
-    response = RedirectResponse(url=auth_url, status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(
-        key="oauth_state",
-        value=state,
-        httponly=True,
-        samesite="lax",
-        secure=is_https,
-        max_age=600,
-        path="/",
-    )
+
+    try:
+        result = use_case.execute(LocalLoginInputDTO(email=email, password=password))
+    except DomainException as exc:
+        err_param = urllib.parse.quote(str(exc), safe="")
+        next_param = urllib.parse.quote(safe_next, safe="")
+        return RedirectResponse(
+            url=f"/auth/login?error={err_param}&next={next_param}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    response = RedirectResponse(url=safe_next, status_code=status.HTTP_303_SEE_OTHER)
+    _set_session_cookie(response, request, result.session_token)
     return response
 
 
-@auth_router.get("/callback", name="google_oauth_callback")
-def google_oauth_callback(
+@auth_router.post("/register")
+def register_submit(
     request: Request,
-    code: str | None = Query(None),
-    state: str | None = Query(None),
-    error: str | None = Query(None),
+    name: Annotated[str, Form(...)],
+    email: Annotated[str, Form(...)],
+    password: Annotated[str, Form(...)],
+    next: Annotated[str, Form()] = "/study-maps",
     db: Session = Depends(get_db),
-    google_client: IGoogleAuthClient = Depends(get_google_client),
+    password_hasher: IPasswordHasher = Depends(get_password_hasher),
     session_service: ISessionTokenService = Depends(get_session_service),
 ) -> Response:
-    """Processa o retorno do Google, valida state CSRF, autentica/provisiona e grava cookie."""
-    if error or not code:
-        err_msg = error or "Código de autorização não fornecido pelo Google."
-        return RedirectResponse(
-            url=f"/auth/login?error={urllib.parse.quote(err_msg)}",
-            status_code=status.HTTP_303_SEE_OTHER,
-        )
-
-    # Validação do state CSRF
-    expected_state = request.cookies.get("oauth_state")
-    clean_state = (state or "").strip().strip('"')
-    clean_expected = (expected_state or "").strip().strip('"')
-
-    if not clean_state:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Parâmetro state de segurança inválido ou divergente (possível tentativa de CSRF)."
-            ),
-        )
-
-    # Se o cookie estiver presente no navegador, exige correspondência exata (Double Submit Cookie)
-    if clean_expected and clean_state != clean_expected:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Parâmetro state de segurança inválido ou divergente (possível tentativa de CSRF)."
-            ),
-        )
-
-    # Recupera e valida criptograficamente o state (AES-256-GCM AEAD com expiração e integridade)
-    verified_next = session_service.verify_oauth_state(clean_state)
-    if verified_next is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Parâmetro state de segurança inválido ou divergente (possível tentativa de CSRF)."
-            ),
-        )
-
-    next_url = _safe_redirect_url(verified_next, "/questions/study")
-
-    redirect_uri = _get_oauth_redirect_uri(request)
+    """Registra nova conta local e inicia a sessão imediatamente."""
+    safe_next = _safe_redirect_url(next, "/study-maps")
+    user_repo = SqlAlchemyUserRepository(db)
+    use_case = RegisterLocalUserUseCase(
+        user_repo=user_repo,
+        password_hasher=password_hasher,
+        token_service=session_service,
+    )
 
     try:
-        user_repo = SqlAlchemyUserRepository(db)
-        use_case = AuthenticateWithGoogleUseCase(
-            google_client=google_client,
-            user_repo=user_repo,
-            token_service=session_service,
-        )
-        result = use_case.execute(GoogleAuthInputDTO(code=code, redirect_uri=redirect_uri))
-    except Exception as exc:
+        result = use_case.execute(LocalRegisterInputDTO(email=email, name=name, password=password))
+    except DomainException as exc:
+        err_param = urllib.parse.quote(str(exc), safe="")
+        next_param = urllib.parse.quote(safe_next, safe="")
         return RedirectResponse(
-            url=f"/auth/login?error={urllib.parse.quote(str(exc))}",
+            url=f"/auth/login?error={err_param}&next={next_param}",
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
-    is_https = (
-        settings.ENVIRONMENT in ("production", "staging")
-        or request.url.scheme == "https"
-        or "lambda-url" in (request.headers.get("host") or "")
+    response = RedirectResponse(url=safe_next, status_code=status.HTTP_303_SEE_OTHER)
+    _set_session_cookie(response, request, result.session_token)
+    return response
+
+
+@auth_router.post("/demo")
+def demo_login_submit(
+    request: Request,
+    next: Annotated[str, Form()] = "/study-maps",
+    db: Session = Depends(get_db),
+    password_hasher: IPasswordHasher = Depends(get_password_hasher),
+    session_service: ISessionTokenService = Depends(get_session_service),
+) -> Response:
+    """Autentica instantaneamente com a conta de Estudante Demo offline."""
+    safe_next = _safe_redirect_url(next, "/study-maps")
+    user_repo = SqlAlchemyUserRepository(db)
+    use_case = AuthenticateDemoUserUseCase(
+        user_repo=user_repo,
+        password_hasher=password_hasher,
+        token_service=session_service,
     )
-    response = RedirectResponse(url=next_url, status_code=status.HTTP_303_SEE_OTHER)
-    # Grava cookie de sessão seguro com AES-256-GCM
-    response.set_cookie(
-        key="session_token",
-        value=result.session_token,
-        httponly=True,
-        samesite="lax",
-        secure=is_https,
-        max_age=30 * 24 * 3600,  # 30 dias
-        path="/",
-    )
-    # Remove cookie temporário de state
-    response.delete_cookie(key="oauth_state", path="/")
+    result = use_case.execute()
+
+    response = RedirectResponse(url=safe_next, status_code=status.HTTP_303_SEE_OTHER)
+    _set_session_cookie(response, request, result.session_token)
     return response
 
 

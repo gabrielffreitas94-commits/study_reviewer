@@ -30,7 +30,7 @@ def test_user() -> User:
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -43,7 +43,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def db_session(db_engine: Any) -> Generator[Session]:
+def db_session(db_engine: Any) -> Generator[Session, None, None]:
     testing_session = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
     session = testing_session()
     try:
@@ -53,11 +53,11 @@ def db_session(db_engine: Any) -> Generator[Session]:
 
 
 @pytest.fixture
-def authenticated_client(db_session: Session, test_user: User) -> Generator[TestClient]:
+def authenticated_client(db_session: Session, test_user: User) -> Generator[TestClient, None, None]:
     user_repo = SqlAlchemyUserRepository(db_session)
     user_repo.save(test_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     def override_get_current_user() -> User:
@@ -108,11 +108,11 @@ def test_sample_math_tree_to_node_grimoire_end_to_end(authenticated_client: Test
     assert 'id="new-material-form"' in html
     assert "createNodeMaterial" in html
 
-    # Coluna Direita: Provações de Maestria com SRS Arena, modos e forja de perguntas
+    # Coluna Direita: Provações de Maestria com SRS Arena, rascunho e forja de perguntas
     assert "Provações de Maestria" in html
-    assert "Revelar Runas" in html
-    assert "Conjurar Resposta" in html
-    assert "Voz Arcana" in html
+    assert "Anotar Resposta e Revelar Gabarito" in html
+    assert 'id="btn-reveal-runes"' in html
+    assert 'id="scratchpad-textarea"' in html
     assert "submitNodeReview" in html
     assert "Modo Treino Livre" in html
     assert "Forjar Nova Provação" in html

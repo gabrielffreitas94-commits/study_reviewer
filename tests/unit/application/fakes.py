@@ -355,6 +355,7 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
             topic = self._topic_repo.get_by_id(q.topic_id)
             topic_name = topic.name if topic else "Tema"
             subject_name = "Matéria"
+            can_edit = False
             if topic:
                 if topic_id is not None and topic.id != topic_id:
                     continue
@@ -363,6 +364,7 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
                     if subject_id is not None and subj.id != subject_id:
                         continue
                     subject_name = subj.name
+                    can_edit = subj.owner_id == user_id
 
             level_idx = min(p.current_level, 6)
             items.append(
@@ -375,6 +377,7 @@ class FakeQuestionProgressRepository(IQuestionProgressRepository):
                     current_level=p.current_level,
                     interval_days=intervals[level_idx],
                     due_date=p.next_review_date,
+                    can_edit=can_edit,
                 )
             )
             if len(items) >= limit:
@@ -460,7 +463,9 @@ class FakeReviewAuditRepository(IReviewAuditRepository):
     def get_all_by_user(self, user_id: UUID) -> list[ReviewAuditLog]:
         return [log for log in self.logs if log.user_id == user_id]
 
-    def stream_by_user(self, user_id: UUID, chunk_size: int = 1000) -> Generator[ReviewAuditLog]:
+    def stream_by_user(
+        self, user_id: UUID, chunk_size: int = 1000
+    ) -> Generator[ReviewAuditLog, None, None]:
         user_logs = [log for log in self.logs if log.user_id == user_id]
         for i in range(0, len(user_logs), chunk_size):
             yield from user_logs[i : i + chunk_size]

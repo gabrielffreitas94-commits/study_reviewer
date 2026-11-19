@@ -5,23 +5,21 @@ from datetime import date
 from uuid import UUID
 
 
-@dataclass(frozen=True)
-class GoogleAuthInputDTO:
-    """Dados de entrada para autenticação via Google OIDC."""
+@dataclass(slots=True, frozen=True)
+class LocalRegisterInputDTO:
+    """Dados de entrada para cadastro de conta local."""
 
-    code: str | None = None
-    id_token: str | None = None
-    redirect_uri: str = ""
-
-
-@dataclass(frozen=True)
-class GoogleUserInfoDTO:
-    """Claims extraídas com segurança a partir do ID Token ou UserInfo do Google."""
-
-    sub: str
     email: str
     name: str
-    avatar_url: str | None = None
+    password: str
+
+
+@dataclass(slots=True, frozen=True)
+class LocalLoginInputDTO:
+    """Dados de entrada para autenticação local via e-mail e senha."""
+
+    email: str
+    password: str
 
 
 @dataclass(frozen=True)

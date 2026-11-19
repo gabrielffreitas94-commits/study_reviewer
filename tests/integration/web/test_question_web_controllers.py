@@ -46,7 +46,7 @@ def other_user() -> User:
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -59,7 +59,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestClient]:
+def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestClient, None, None]:
     TestingSession = sessionmaker(bind=db_engine)
 
     with TestingSession() as session:
@@ -67,7 +67,7 @@ def client(db_engine: Any, test_user: User, other_user: User) -> Generator[TestC
         u_repo.save(test_user)
         u_repo.save(other_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         session = TestingSession()
         try:
             yield session
@@ -132,8 +132,10 @@ def test_study_page_renders_due_question_card_and_active_recall(
     assert "pointer-events-none" in res.text
     assert 'id="tab-mode-text"' in res.text
     assert 'id="student-text-answer"' in res.text
-    assert 'id="btn-submit-text-eval"' in res.text
-    assert 'id="ai-eval-feedback-panel"' in res.text
+    assert 'id="btn-reveal-written-compare"' in res.text
+    assert 'id="panel-mode-text"' in res.text
+    assert 'id="panel-mode-manual"' in res.text
+    assert "WRITTEN_SELF_REVIEW" in res.text
 
 
 @pytest.mark.integration
@@ -484,11 +486,11 @@ def test_navigation_three_tabs_and_active_highlighting(client: TestClient) -> No
 
 
 @pytest.mark.integration
-def test_study_page_question_card_audio_and_dispute_accessible_features(
+def test_study_page_question_card_accessible_self_review_features(
     client: TestClient, test_user: User, db_engine: Any
 ) -> None:
-    """Verifica presença dos botões acessíveis de áudio e contestação (WCAG 2.1 AA)
-    e nota de privacidade LGPD."""
+    """Verifica presença dos controles acessíveis locais de autoavaliação (WCAG 2.1 AA)
+    sem modais externos de IA ou áudio."""
     with Session(db_engine) as session:
         subj = Subject(name="Direito Constitucional", owner_id=test_user.id)
         SqlAlchemySubjectRepository(session).save(subj)
@@ -509,19 +511,100 @@ def test_study_page_question_card_audio_and_dispute_accessible_features(
 
     res = client.get("/questions/study")
     assert res.status_code == 200
-    # Botão e Modal de Áudio
-    assert "btn-audio-answer" in res.text
-    assert "Responder por Áudio" in res.text
-    assert "audio-answer-modal" in res.text
-    assert 'aria-haspopup="dialog"' in res.text
-    assert 'role="dialog"' in res.text
-    assert "Privacidade Efêmera (LGPD Art. 16)" in res.text
+    # Tabs acessíveis de modo local (Escrito vs Gabarito Direto)
+    assert 'role="tablist"' in res.text
+    assert 'id="tab-mode-text"' in res.text
+    assert 'id="tab-mode-manual"' in res.text
+    assert "Responder por Escrito" in res.text
+    assert "Gabarito Direto" in res.text
+    assert 'id="btn-reveal-written-compare"' in res.text
 
-    # Botão e Modal de Contestação (Conselho Multiagente)
-    assert "btn-dispute-evaluation" in res.text
-    assert "Contestar Avaliação" in res.text
-    assert "dispute-modal" in res.text
-    assert "Conselho Multiagente" in res.text
-    assert "Advogado do Estudante" in res.text
-    assert "Crítico Técnico" in res.text
-    assert "Árbitro Imparcial" in res.text
+    # Controles acessíveis de autoavaliação
+    assert 'role="group"' in res.text
+    assert 'id="score-slider"' in res.text
+    assert 'id="score-display"' in res.text
+    assert 'aria-live="polite"' in res.text
+    assert 'id="srs-announcer"' in res.text
+
+    # Sem botões/modais de áudio ou disputa IA
+    assert "btn-audio-answer" not in res.text
+    assert "btn-dispute-evaluation" not in res.text
+
+
+@pytest.mark.integration
+def test_study_page_question_card_inline_edit_button_and_modal_for_owner(
+    client: TestClient, test_user: User, db_engine: Any
+) -> None:
+    """Verifica presença do botão sutil de edição e modal acessível quando o usuário é dono da matéria."""
+    with Session(db_engine) as session:
+        subj = Subject(name="Direito Administrativo", owner_id=test_user.id)
+        SqlAlchemySubjectRepository(session).save(subj)
+        topic = Topic(subject_id=subj.id, name="Atos Administrativos")
+        SqlAlchemyTopicRepository(session).save(topic)
+        q = Question(
+            topic_id=topic.id,
+            prompt="O que é ato administrativo?",
+            expected_answer="Manifestação unilateral de vontade da Administração Pública.",
+        )
+        SqlAlchemyQuestionRepository(session).save(q)
+        SqlAlchemyQuestionProgressRepository(session).save(
+            UserQuestionProgress(
+                user_id=test_user.id, question_id=q.id, next_review_date=date.today()
+            )
+        )
+        session.commit()
+
+    res = client.get("/questions/study")
+    assert res.status_code == 200
+
+    # Botão sutil de edição
+    assert 'id="btn-edit-question-modal"' in res.text
+    assert "Editar Questão" in res.text or "btn-edit-question-modal" in res.text
+    assert 'aria-controls="edit-question-modal"' in res.text
+
+    # Modal acessível de edição inline
+    assert 'id="edit-question-modal"' in res.text
+    assert 'role="dialog"' in res.text
+    assert 'aria-modal="true"' in res.text
+    assert 'aria-labelledby="edit-question-modal-title"' in res.text
+
+    # Campos de edição com texto pré-carregado
+    assert 'id="edit-question-prompt"' in res.text
+    assert "O que é ato administrativo?" in res.text
+    assert 'id="edit-question-expected-answer"' in res.text
+    assert "Manifestação unilateral de vontade da Administração Pública." in res.text
+
+    # Botões de salvar e cancelar e funções JS associadas
+    assert "saveQuestionEdits" in res.text
+    assert "closeEditQuestionModal" in res.text
+    assert "applyRpgMarkdownAll" in res.text
+
+
+@pytest.mark.integration
+def test_study_page_question_card_inline_edit_button_hidden_for_non_owner(
+    client: TestClient, test_user: User, other_user: User, db_engine: Any
+) -> None:
+    """Verifica que o botão e o modal de edição NÃO são renderizados quando o usuário não é o dono."""
+    with Session(db_engine) as session:
+        subj_other = Subject(name="Direito Penal", owner_id=other_user.id, is_public=True)
+        SqlAlchemySubjectRepository(session).save(subj_other)
+        topic_other = Topic(subject_id=subj_other.id, name="Tipicidade")
+        SqlAlchemyTopicRepository(session).save(topic_other)
+        q_other = Question(
+            topic_id=topic_other.id,
+            prompt="O que é dolo eventual?",
+            expected_answer="Assunção consciente do risco de produzir o resultado.",
+        )
+        SqlAlchemyQuestionRepository(session).save(q_other)
+        SqlAlchemyQuestionProgressRepository(session).save(
+            UserQuestionProgress(
+                user_id=test_user.id, question_id=q_other.id, next_review_date=date.today()
+            )
+        )
+        session.commit()
+
+    res = client.get("/questions/study")
+    assert res.status_code == 200
+    assert "O que é dolo eventual?" in res.text
+    assert "btn-edit-question-modal" not in res.text
+    assert 'id="edit-question-modal"' not in res.text

@@ -1,5 +1,6 @@
-"""Catálogo e gerador de ícones vetoriais RPG (Game-Icons.net).
+"""Catálogo e gerador de ícones vetoriais RPG.
 
+Ícones adaptados de Game-Icons.net sob licença CC BY 3.0.
 Contém as 21 runas canônicas da Forja Ancestral e Códice de Habilidades em SVG 512x512.
 """
 

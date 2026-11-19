@@ -1,6 +1,6 @@
-"""Testes de integração para autenticação Web.
+"""Testes de integração para autenticação Web local e demo.
 
-Cookies de sessão e proteção anti-CSRF (Sprint 02).
+Cookies de sessão HttpOnly/SameSite=Lax e proteção contra Open Redirect (CWE-601).
 """
 
 import urllib.parse
@@ -16,40 +16,15 @@ from src.adapters.persistence.repositories import (
     SqlAlchemySubjectRepository,
     SqlAlchemyUserRepository,
 )
-from src.application.dto.auth_dto import GoogleUserInfoDTO
-from src.application.ports.auth import IGoogleAuthClient, ISessionTokenService
+from src.application.ports.auth import ISessionTokenService
 from src.domain.entities import Subject, User
 from src.infrastructure.database import Base, get_db
-from src.infrastructure.security.dependencies import (
-    get_google_client,
-    get_session_service,
-)
+from src.infrastructure.security.dependencies import get_session_service
 from src.infrastructure.web.app import app
 
 
-class MockGoogleAuthClient(IGoogleAuthClient):
-    """Cliente Google simulado para testes de integração."""
-
-    def __init__(self) -> None:
-        self.code_users: dict[str, GoogleUserInfoDTO] = {}
-        self.id_token_users: dict[str, GoogleUserInfoDTO] = {}
-
-    def get_authorization_url(self, state: str, redirect_uri: str) -> str:
-        return f"https://accounts.google.com/o/oauth2/v2/auth?state={state}&redirect_uri={redirect_uri}"
-
-    def exchange_code_for_user_info(self, code: str, redirect_uri: str) -> GoogleUserInfoDTO:
-        if code in self.code_users:
-            return self.code_users[code]
-        raise ValueError("Invalid authorization code")
-
-    def verify_id_token(self, id_token: str) -> GoogleUserInfoDTO:
-        if id_token in self.id_token_users:
-            return self.id_token_users[id_token]
-        raise ValueError("Invalid id token")
-
-
 @pytest.fixture
-def test_db_session() -> Generator[sessionmaker[Session]]:
+def test_db_session() -> Generator[sessionmaker[Session], None, None]:
     """Configura banco em memória isolado."""
     engine = create_engine(
         "sqlite:///:memory:",
@@ -64,17 +39,12 @@ def test_db_session() -> Generator[sessionmaker[Session]]:
 
 
 @pytest.fixture
-def mock_google() -> MockGoogleAuthClient:
-    return MockGoogleAuthClient()
-
-
-@pytest.fixture
 def auth_client(
-    test_db_session: sessionmaker[Session], mock_google: MockGoogleAuthClient
-) -> Generator[TestClient]:
-    """TestClient sem usuário autenticado por padrão (para testar fluxo de login)."""
+    test_db_session: sessionmaker[Session],
+) -> Generator[TestClient, None, None]:
+    """TestClient sem usuário autenticado por padrão (para testar fluxo de login local)."""
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         session = test_db_session()
         try:
             yield session
@@ -82,19 +52,25 @@ def auth_client(
             session.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_google_client] = lambda: mock_google
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
 
 
 @pytest.mark.integration
-def test_login_page_renders_for_anonymous_user(auth_client: TestClient) -> None:
-    """Verifica se a página de login é renderizada para usuários não autenticados."""
+def test_login_page_renders_local_forms_and_no_google_oauth(auth_client: TestClient) -> None:
+    """Verifica se /auth/login renderiza login local, cadastro e acesso demo sem Google OAuth."""
     response = auth_client.get("/auth/login")
     assert response.status_code == 200
-    assert "Continuar com o Google" in response.text
-    assert "/auth/google" in response.text
+    html = response.text
+
+    assert 'action="/auth/login"' in html
+    assert 'action="/auth/register"' in html
+    assert 'action="/auth/demo"' in html
+    assert "Entrar como Estudante Demo (Offline)" in html
+
+    assert "/auth/google" not in html
+    assert "Continuar com o Google" not in html
 
 
 @pytest.mark.integration
@@ -102,13 +78,11 @@ def test_login_page_redirects_if_already_authenticated(
     auth_client: TestClient, test_db_session: sessionmaker[Session]
 ) -> None:
     """Garante que usuário com sessão ativa seja redirecionado ao acessar /auth/login."""
-    user = User(google_sub="sub-active", email="active@test.com", name="User Ativo")
+    user = User(google_sub="local:active@test.com", email="active@test.com", name="User Ativo")
     with test_db_session() as db:
         SqlAlchemyUserRepository(db).save(user)
 
-    session_service: ISessionTokenService = app.dependency_overrides.get(
-        get_session_service, lambda: get_session_service()
-    )()
+    session_service: ISessionTokenService = get_session_service()
     token = session_service.create_session_token(user.id, user.email)
 
     auth_client.cookies.set("session_token", token)
@@ -118,86 +92,158 @@ def test_login_page_redirects_if_already_authenticated(
 
 
 @pytest.mark.security
-def test_google_login_redirect_sets_state_cookie(auth_client: TestClient) -> None:
-    """Valida geração do state anti-CSRF e redirecionamento para o Google.
-
-    Vulnerabilidade prevenida: Cross-Site Request Forgery (CSRF) no fluxo de login federado.
-    Garantia de segurança: O endpoint gera state criptografado e armazena em cookie HttpOnly.
-    """
-    response = auth_client.get("/auth/google?next=/study", follow_redirects=False)
-    assert response.status_code == 303
-    assert "https://accounts.google.com/o/oauth2/v2/auth" in response.headers["location"]
-    assert "oauth_state" in response.cookies
-
-
-@pytest.mark.security
-def test_oauth_callback_rejects_missing_or_mismatched_state(auth_client: TestClient) -> None:
-    """Rejeita callback com state divergente ou ausente para impedir CSRF.
-
-    Vulnerabilidade prevenida: Ataque de CSRF com injeção de authorization code forjado.
-    Garantia de segurança: Lança HTTP 400 Bad Request ao detectar divergência no state.
-    """
-    # 1. State ausente
-    res_no_state = auth_client.get("/auth/callback?code=some-code")
-    assert res_no_state.status_code == 400
-    assert "possível tentativa de CSRF" in res_no_state.json()["detail"]
-
-    # 2. State mismatch
-    auth_client.cookies.set("oauth_state", "legitimate-state")
-    res_mismatch = auth_client.get("/auth/callback?code=some-code&state=attacker-state")
-    assert res_mismatch.status_code == 400
-    assert "possível tentativa de CSRF" in res_mismatch.json()["detail"]
-
-
-@pytest.mark.integration
-def test_oauth_callback_handles_google_error(auth_client: TestClient) -> None:
-    """Trata cancelamento ou erro retornado diretamente pelo Google."""
-    response = auth_client.get("/auth/callback?error=access_denied", follow_redirects=False)
-    assert response.status_code == 303
-    assert "/auth/login?error=access_denied" in response.headers["location"]
-
-
-@pytest.mark.security
-def test_oauth_callback_successful_login_and_cookie_issuance(
-    auth_client: TestClient,
-    mock_google: MockGoogleAuthClient,
-    test_db_session: sessionmaker[Session],
+def test_web_register_sets_httponly_samesite_cookie_and_redirects(
+    auth_client: TestClient, test_db_session: sessionmaker[Session]
 ) -> None:
-    """Valida autenticação bem-sucedida, provisionamento e emissão de cookie AES-256-GCM.
+    """Valida criação de conta via POST /auth/register com cookie HttpOnly e SameSite=Lax.
 
-    Vulnerabilidade prevenida: Sequestro de sessão e exposição de dados em trânsito.
-    Garantia de segurança: Emissão de cookie session_token HttpOnly criptografado com AES-256-GCM.
+    Vulnerabilidade prevenida: Roubo de token de sessão via XSS (document.cookie) e CSRF.
+    Garantia de segurança: O cookie session_token é emitido criptografado com flags HttpOnly
+    e SameSite=Lax, e redireciona apenas para destinos locais seguros.
     """
-    # 1. Inicia fluxo para obter state legítimo
-    init_res = auth_client.get("/auth/google?next=/study", follow_redirects=False)
-    state_cookie = init_res.cookies.get("oauth_state")
-    assert state_cookie is not None
-
-    # 2. Configura resposta do mock Google
-    mock_google.code_users["valid-code-123"] = GoogleUserInfoDTO(
-        sub="google-sub-web-999",
-        email="sucesso@web.com",
-        name="Estudante Web",
-        avatar_url="https://avatar.google.com/999.png",
-    )
-
-    # 3. Executa callback
-    auth_client.cookies.set("oauth_state", state_cookie)
-    callback_res = auth_client.get(
-        f"/auth/callback?code=valid-code-123&state={urllib.parse.quote(state_cookie)}",
+    response = auth_client.post(
+        "/auth/register",
+        data={
+            "name": "Estudante Local",
+            "email": "estudante.local@test.com",
+            "password": "SenhaSegura123!",
+            "next": "/questions/study",
+        },
         follow_redirects=False,
     )
 
-    assert callback_res.status_code == 303
-    assert callback_res.headers["location"] == "/study"
-    assert "session_token" in callback_res.cookies
+    assert response.status_code == 303
+    assert response.headers["location"] == "/questions/study"
+    assert "session_token" in response.cookies
 
-    # 4. Verifica se o usuário foi criado no banco
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    session_cookies = [h for h in set_cookie_headers if h.startswith("session_token=")]
+    assert len(session_cookies) == 1
+    cookie_header_lower = session_cookies[0].lower()
+    assert "httponly" in cookie_header_lower
+    assert "samesite=lax" in cookie_header_lower
+
     with test_db_session() as db:
-        user_repo = SqlAlchemyUserRepository(db)
-        user = user_repo.get_by_google_sub("google-sub-web-999")
+        user = SqlAlchemyUserRepository(db).get_by_email("estudante.local@test.com")
         assert user is not None
-        assert user.email == "sucesso@web.com"
+        assert user.name == "Estudante Local"
+
+
+@pytest.mark.integration
+def test_web_register_error_redirects_to_login_with_error(auth_client: TestClient) -> None:
+    """Garante redirecionamento para /auth/login?error=... em falha de cadastro local."""
+    res_bad_pw = auth_client.post(
+        "/auth/register",
+        data={
+            "name": "Curto",
+            "email": "curto@test.com",
+            "password": "123",
+            "next": "/study-maps",
+        },
+        follow_redirects=False,
+    )
+    assert res_bad_pw.status_code == 303
+    assert res_bad_pw.headers["location"].startswith("/auth/login?error=")
+
+
+@pytest.mark.security
+def test_web_login_valid_and_invalid_credentials_with_cookie_flags(
+    auth_client: TestClient,
+) -> None:
+    """Valida login local via POST /auth/login e resposta uniforme em caso de erro.
+
+    Vulnerabilidade prevenida: Sequestro de sessão via XSS e enumeração de contas no login Web.
+    Garantia de segurança: Credenciais válidas emitem cookie HttpOnly/SameSite=Lax; falhas
+    redirecionam para /auth/login?error=... com mensagem genérica uniforme.
+    """
+    auth_client.post(
+        "/auth/register",
+        data={
+            "name": "Login Web",
+            "email": "web.login@test.com",
+            "password": "Password123!",
+        },
+        follow_redirects=False,
+    )
+    auth_client.cookies.clear()
+
+    # 1. Login válido
+    ok_res = auth_client.post(
+        "/auth/login",
+        data={
+            "email": "web.login@test.com",
+            "password": "Password123!",
+            "next": "/performance",
+        },
+        follow_redirects=False,
+    )
+    assert ok_res.status_code == 303
+    assert ok_res.headers["location"] == "/performance"
+    assert "session_token" in ok_res.cookies
+
+    set_cookie_headers = ok_res.headers.get_list("set-cookie")
+    session_cookies = [h for h in set_cookie_headers if h.startswith("session_token=")]
+    assert len(session_cookies) == 1
+    assert "httponly" in session_cookies[0].lower()
+    assert "samesite=lax" in session_cookies[0].lower()
+
+    # 2. Senha inválida e e-mail inexistente retornam erro idêntico
+    auth_client.cookies.clear()
+    bad_pw = auth_client.post(
+        "/auth/login",
+        data={"email": "web.login@test.com", "password": "WrongPassword!"},
+        follow_redirects=False,
+    )
+    bad_email = auth_client.post(
+        "/auth/login",
+        data={"email": "naoexiste@test.com", "password": "WrongPassword!"},
+        follow_redirects=False,
+    )
+    assert bad_pw.status_code == 303
+    assert bad_email.status_code == 303
+    assert bad_pw.headers["location"] == bad_email.headers["location"]
+    assert "/auth/login?error=" in bad_pw.headers["location"]
+
+
+@pytest.mark.security
+def test_web_demo_login_sets_secure_cookie_and_is_idempotent(
+    auth_client: TestClient, test_db_session: sessionmaker[Session]
+) -> None:
+    """Valida acesso instantâneo demo via POST /auth/demo com cookie HttpOnly e SameSite=Lax.
+
+    Vulnerabilidade prevenida: Exposição de token de sessão demo a scripts no navegador.
+    Garantia de segurança: Emite cookie session_token HttpOnly e SameSite=Lax e reutiliza o
+    mesmo usuário demo de forma idempotente.
+    """
+    res1 = auth_client.post(
+        "/auth/demo",
+        data={"next": "/study-maps"},
+        follow_redirects=False,
+    )
+    assert res1.status_code == 303
+    assert res1.headers["location"] == "/study-maps"
+    assert "session_token" in res1.cookies
+
+    set_cookie_headers = res1.headers.get_list("set-cookie")
+    session_cookies = [h for h in set_cookie_headers if h.startswith("session_token=")]
+    assert len(session_cookies) == 1
+    assert "httponly" in session_cookies[0].lower()
+    assert "samesite=lax" in session_cookies[0].lower()
+
+    with test_db_session() as db:
+        u1 = SqlAlchemyUserRepository(db).get_by_email("demo@studyreviewer.local")
+        assert u1 is not None
+        first_id = u1.id
+
+    auth_client.cookies.clear()
+    res2 = auth_client.post("/auth/demo", follow_redirects=False)
+    assert res2.status_code == 303
+    assert res2.headers["location"] == "/study-maps"
+
+    with test_db_session() as db:
+        u2 = SqlAlchemyUserRepository(db).get_by_email("demo@studyreviewer.local")
+        assert u2 is not None
+        assert u2.id == first_id
 
 
 @pytest.mark.integration
@@ -247,8 +293,10 @@ def test_toggle_subject_public_web_by_owner_and_forbidden_for_non_owner(
     Vulnerabilidade prevenida: Insecure Direct Object Reference (IDOR) em rotas web.
     Garantia de segurança: Retorna HTTP 403 Forbidden caso outro usuário tente alterar a matéria.
     """
-    owner = User(google_sub="sub-owner", email="owner@test.com", name="Owner")
-    intruder = User(google_sub="sub-intruder", email="intruder@test.com", name="Intruder")
+    owner = User(google_sub="local:owner@test.com", email="owner@test.com", name="Owner")
+    intruder = User(
+        google_sub="local:intruder@test.com", email="intruder@test.com", name="Intruder"
+    )
 
     with test_db_session() as db:
         user_repo = SqlAlchemyUserRepository(db)
@@ -261,7 +309,6 @@ def test_toggle_subject_public_web_by_owner_and_forbidden_for_non_owner(
 
     session_service: ISessionTokenService = get_session_service()
 
-    # 1. Owner torna a matéria pública
     owner_token = session_service.create_session_token(owner.id, owner.email)
     auth_client.cookies.set("session_token", owner_token)
     res_toggle = auth_client.post(
@@ -276,7 +323,6 @@ def test_toggle_subject_public_web_by_owner_and_forbidden_for_non_owner(
         assert sub is not None
         assert sub.is_public is True
 
-    # 2. Intruder tenta tornar a matéria privada
     intruder_token = session_service.create_session_token(intruder.id, intruder.email)
     auth_client.cookies.set("session_token", intruder_token)
     res_intruder = auth_client.post(
@@ -289,37 +335,19 @@ def test_toggle_subject_public_web_by_owner_and_forbidden_for_non_owner(
 
 
 @pytest.mark.integration
-def test_oauth_callback_exception_redirects_to_login_with_error(
-    auth_client: TestClient,
-) -> None:
-    """Valida redirecionamento para login com mensagem de erro quando ocorre exceção interna."""
-    init_res = auth_client.get("/auth/google?next=/study", follow_redirects=False)
-    state = init_res.cookies.get("oauth_state")
-    assert state is not None
-
-    auth_client.cookies.set("oauth_state", state)
-    quoted_state = urllib.parse.quote(state)
-    res = auth_client.get(
-        f"/auth/callback?code=codigo-inexistente&state={quoted_state}", follow_redirects=False
-    )
-    assert res.status_code == 303
-    assert "/auth/login?error=" in res.headers["location"]
-
-
-@pytest.mark.integration
 @pytest.mark.security
-def test_login_page_open_redirect_sanitized(
+def test_login_page_and_post_routes_open_redirect_sanitized(
     auth_client: TestClient,
     test_db_session: sessionmaker[Session],
 ) -> None:
-    """Valida neutralização de tentativas de Open Redirect na rota de login e autenticação web.
+    """Valida neutralização de tentativas de Open Redirect nas rotas GET e POST de autenticação.
 
     Vulnerabilidade prevenida: Open Redirect (CWE-601) e ataques de phishing através de
     parâmetros de redirecionamento manipulados para domínios externos.
     Garantia de segurança: O sistema sanitiza qualquer URL de destino que não seja estritamente
-    relativa no mesmo domínio, revertendo para a rota segura '/study'.
+    relativa no mesmo domínio, revertendo para a rota segura '/study-maps'.
     """
-    user = User(google_sub="sub-open-redir", email="redir@test.com", name="Redir")
+    user = User(google_sub="local:redir@test.com", email="redir@test.com", name="Redir")
     with test_db_session() as db:
         SqlAlchemyUserRepository(db).save(user)
 
@@ -327,30 +355,67 @@ def test_login_page_open_redirect_sanitized(
     token = session_service.create_session_token(user.id, user.email)
     auth_client.cookies.set("session_token", token)
 
-    # 1. Tentativa com URL externa absoluta
+    # 1. GET /auth/login com URL externa absoluta
     res1 = auth_client.get("/auth/login?next=https://evil.com/phishing", follow_redirects=False)
     assert res1.status_code == 303
-    assert res1.headers["location"] == "/questions/study"
+    assert res1.headers["location"] == "/study-maps"
 
-    # 2. Tentativa com protocolo relativo (//evil.com)
+    # 2. GET /auth/login com protocolo relativo (//evil.com)
     res2 = auth_client.get("/auth/login?next=//evil.com", follow_redirects=False)
     assert res2.status_code == 303
-    assert res2.headers["location"] == "/questions/study"
+    assert res2.headers["location"] == "/study-maps"
 
-    # 3. Tentativa com barra invertida (/\\evil.com)
+    # 3. GET /auth/login com barra invertida (/\evil.com)
     res3 = auth_client.get("/auth/login?next=/\\evil.com", follow_redirects=False)
     assert res3.status_code == 303
-    assert res3.headers["location"] == "/questions/study"
+    assert res3.headers["location"] == "/study-maps"
 
     # 4. Rota relativa legítima é aceita
     res4 = auth_client.get("/auth/login?next=/subjects", follow_redirects=False)
     assert res4.status_code == 303
     assert res4.headers["location"] == "/subjects"
 
-    # 5. Tentativa com parâmetro next vazio (deve cair no fallback seguro default)
+    # 5. Parâmetro next vazio cai no fallback seguro default
     res5 = auth_client.get("/auth/login?next=", follow_redirects=False)
     assert res5.status_code == 303
-    assert res5.headers["location"] == "/questions/study"
+    assert res5.headers["location"] == "/study-maps"
+
+    # 6. POST /auth/register, POST /auth/login e POST /auth/demo também bloqueiam Open Redirect
+    auth_client.cookies.clear()
+    reg_evil = auth_client.post(
+        "/auth/register",
+        data={
+            "name": "Evil Next",
+            "email": "evilnext@test.com",
+            "password": "Password123!",
+            "next": "https://evil.com",
+        },
+        follow_redirects=False,
+    )
+    assert reg_evil.status_code == 303
+    assert reg_evil.headers["location"] == "/study-maps"
+
+    auth_client.cookies.clear()
+    login_evil = auth_client.post(
+        "/auth/login",
+        data={
+            "email": "evilnext@test.com",
+            "password": "Password123!",
+            "next": "//evil.com",
+        },
+        follow_redirects=False,
+    )
+    assert login_evil.status_code == 303
+    assert login_evil.headers["location"] == "/study-maps"
+
+    auth_client.cookies.clear()
+    demo_evil = auth_client.post(
+        "/auth/demo",
+        data={"next": "/\\evil.com"},
+        follow_redirects=False,
+    )
+    assert demo_evil.status_code == 303
+    assert demo_evil.headers["location"] == "/study-maps"
 
 
 @pytest.mark.integration
@@ -364,99 +429,13 @@ def test_get_current_user_preserves_query_string(
     assert res.headers["location"] == f"/auth/login?next={expected_next}"
 
 
-@pytest.mark.security
-def test_oauth_callback_succeeds_with_valid_aead_state_when_cookie_is_missing(
-    auth_client: TestClient,
-    mock_google: MockGoogleAuthClient,
-    test_db_session: sessionmaker[Session],
-) -> None:
-    """Valida autenticação resiliente quando o navegador bloqueia cookies de redirecionamento, mas o state AEAD é íntegro.
+@pytest.mark.integration
+def test_auth_privacy_routes_redirect(auth_client: TestClient) -> None:
+    """Valida que /auth/privacy e /auth/account-deletion-request redirecionam para rotas canônicas."""
+    res_privacy = auth_client.get("/auth/privacy", follow_redirects=False)
+    assert res_privacy.status_code == 301
+    assert res_privacy.headers["location"] == "/privacy"
 
-    Vulnerabilidade prevenida: Negação de serviço ou bloqueio acidental de login para usuários legítimos com navegadores restritivos (ex: Safari ITP ou particionamento de cookies cross-site).
-    Garantia de segurança: O endpoint valida o token criptográfico AEAD AES-256-GCM mesmo se o cookie transitório foi expurgado, assegurando autenticidade, integridade e expiração temporal do state.
-    """
-    # 1. Gera state AEAD legítimo
-    session_service = get_session_service()
-    valid_state = session_service.create_oauth_state("/study")
-
-    # 2. Configura mock Google
-    mock_google.code_users["code-no-cookie"] = GoogleUserInfoDTO(
-        sub="google-sub-no-cookie",
-        email="nocookie@test.com",
-        name="No Cookie User",
-        avatar_url="https://avatar.google.com/nc.png",
-    )
-
-    # 3. Callback SEM cookie oauth_state no cliente
-    auth_client.cookies.clear()
-    callback_res = auth_client.get(
-        f"/auth/callback?code=code-no-cookie&state={urllib.parse.quote(valid_state)}",
-        follow_redirects=False,
-    )
-    assert callback_res.status_code == 303
-    assert callback_res.headers["location"] == "/study"
-    assert "session_token" in callback_res.cookies
-
-
-@pytest.mark.security
-def test_oauth_redirect_uri_detects_host_mismatch_and_resolves_dynamically() -> None:
-    """Garante que se settings.GOOGLE_REDIRECT_URI pertencer a outro domínio, a URI seja derivada do host da requisição com HTTPS.
-
-    Vulnerabilidade prevenida: Vazamento de authorization code e credenciais federadas para domínios ou ambientes divergentes (ex: redirecionamento cruzado entre staging e produção).
-    Garantia de segurança: A resolução canônica detecta disparidade entre o host configurado e a requisição atual, reconstruindo dinamicamente a URI canônica sob HTTPS correspondente ao host de origem.
-    """
-    from fastapi import Request
-
-    from src.adapters.web.auth_controllers import _get_oauth_redirect_uri
-    from src.infrastructure.config import settings
-
-    old_redirect_uri = settings.GOOGLE_REDIRECT_URI
-    try:
-        # Simula configuração apontando para staging
-        settings.GOOGLE_REDIRECT_URI = "https://staging.lambda-url.sa-east-1.on.aws/auth/callback"
-
-        # Simula requisição chegando em produção
-        scope = {
-            "type": "http",
-            "method": "GET",
-            "path": "/auth/google",
-            "headers": [
-                (b"host", b"prod.lambda-url.sa-east-1.on.aws"),
-                (b"x-forwarded-proto", b"https"),
-            ],
-        }
-        request = Request(scope)
-        resolved_uri = _get_oauth_redirect_uri(request)
-        assert resolved_uri == "https://prod.lambda-url.sa-east-1.on.aws/auth/callback"
-
-        # Simula requisição chegando em staging (host compatível)
-        scope_staging = {
-            "type": "http",
-            "method": "GET",
-            "path": "/auth/google",
-            "headers": [
-                (b"host", b"staging.lambda-url.sa-east-1.on.aws"),
-            ],
-        }
-        request_staging = Request(scope_staging)
-        assert (
-            _get_oauth_redirect_uri(request_staging)
-            == "https://staging.lambda-url.sa-east-1.on.aws/auth/callback"
-        )
-    finally:
-        settings.GOOGLE_REDIRECT_URI = old_redirect_uri
-
-
-@pytest.mark.security
-def test_oauth_callback_fails_with_forged_or_invalid_aead_state(
-    auth_client: TestClient,
-) -> None:
-    """Valida rejeição com HTTP 400 quando o parâmetro state forjado não decodifica via AEAD.
-
-    Vulnerabilidade prevenida: Ataques de Cross-Site Request Forgery (CSRF) e sequestro de sessão OAuth.
-    Garantia de segurança: O endpoint valida criptograficamente o token AEAD do state e rejeita com HTTP 400 qualquer token inválido ou ausente.
-    """
-    auth_client.cookies.clear()
-    res = auth_client.get("/auth/callback?code=some-code&state=invalid-forged-state-12345")
-    assert res.status_code == 400
-    assert "Parâmetro state de segurança inválido ou divergente" in res.text
+    res_del = auth_client.get("/auth/account-deletion-request", follow_redirects=False)
+    assert res_del.status_code == 301
+    assert res_del.headers["location"] == "/privacy/account-deletion-request"

@@ -18,7 +18,7 @@ from src.infrastructure.web.app import app
 
 
 @pytest.fixture
-def web_test_db() -> Generator[sessionmaker[Session]]:
+def web_test_db() -> Generator[sessionmaker[Session], None, None]:
     """Cria banco SQLite em memória isolado para os testes web."""
     engine = create_engine(
         "sqlite:///:memory:",
@@ -35,10 +35,10 @@ def web_test_db() -> Generator[sessionmaker[Session]]:
 @pytest.fixture
 def web_client(
     web_test_db: sessionmaker[Session],
-) -> Generator[TestClient]:
+) -> Generator[TestClient, None, None]:
     """TestClient Web sem autenticação prévia."""
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         session = web_test_db()
         try:
             yield session
@@ -53,14 +53,14 @@ def web_client(
 
 @pytest.mark.integration
 def test_privacy_page_renders_successfully(web_client: TestClient) -> None:
-    """Valida a renderização pública da página de política de privacidade."""
+    """Valida a renderização pública da página de política de privacidade local."""
     response = web_client.get("/privacy")
     assert response.status_code == 200
     assert "Política de Privacidade" in response.text
     assert "LGPD" in response.text
     assert "AES-256-GCM" in response.text
-    assert "Google Play Data Safety" in response.text
-    assert "privacidade@studyreviewer.com" in response.text
+    assert "Execução 100% Local Offline" in response.text
+    assert "Zero Compartilhamento com Terceiros ou Nuvem" in response.text
     assert "/privacy/account-deletion-request" in response.text
 
 
@@ -115,7 +115,8 @@ def test_privacy_page_security_and_transparency(web_client: TestClient) -> None:
     text = response.text
     assert "AES-256-GCM" in text
     assert "Art. 18 da LGPD" in text or "Artigo 18" in text or "Art. 16, IV da LGPD" in text
-    assert "comercializados" in text and "terceiros" in text
+    assert "Zero Compartilhamento com Terceiros ou Nuvem" in text
+    assert "zero telemetria externa" in text
 
 
 @pytest.mark.security

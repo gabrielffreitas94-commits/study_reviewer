@@ -33,6 +33,7 @@ class UserModel(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
 
     subjects: Mapped[list["SubjectModel"]] = relationship(
@@ -330,7 +331,6 @@ class ReviewAuditLogModel(Base):
     level_after: Mapped[int] = mapped_column(Integer, nullable=False)
     evaluation_mode: Mapped[str] = mapped_column(String(50), nullable=False, default="MANUAL")
     student_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
-    ai_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
     logged_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
@@ -384,77 +384,6 @@ class KnowledgeSourceModel(Base):
         back_populates="knowledge_sources",
         lazy="selectin",
     )
-    chunks: Mapped[list["KnowledgeChunkModel"]] = relationship(
-        "KnowledgeChunkModel",
-        back_populates="source",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
-
-
-class KnowledgeChunkModel(Base):
-    """Tabela de Fragmentos Semânticos Vetorizados de Conhecimento."""
-
-    __tablename__ = "knowledge_chunks"
-    __table_args__ = (
-        Index("ix_knowledge_chunks_topic", "topic_id"),
-        Index("ix_knowledge_chunks_source", "source_id"),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    source_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("knowledge_sources.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    topic_id: Mapped[UUID | None] = mapped_column(
-        Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
-    )
-    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[list[float]] = mapped_column(JSON, nullable=False)
-    token_estimate: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
-
-    source: Mapped["KnowledgeSourceModel"] = relationship(
-        "KnowledgeSourceModel", back_populates="chunks"
-    )
-    topic: Mapped["TopicModel | None"] = relationship("TopicModel", foreign_keys=[topic_id])
-
-
-class TokenLedgerModel(Base):
-    """Tabela de Saldos e Retenções de Tokens por Usuário (Sprint 08)."""
-
-    __tablename__ = "token_ledgers"
-
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
-    )
-    balance: Mapped[int] = mapped_column(Integer, nullable=False, default=1000)
-    held_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
-    )
-
-    user: Mapped["UserModel"] = relationship("UserModel")
-
-
-class TokenTransactionModel(Base):
-    """Tabela Imutável de Transações do Ledger de Tokens (Sprint 08)."""
-
-    __tablename__ = "token_transactions"
-    __table_args__ = (Index("ix_token_transactions_user_created", "user_id", "created_at"),)
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    transaction_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    amount: Mapped[int] = mapped_column(Integer, nullable=False)
-    reference_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
-    )
-
-    user: Mapped["UserModel"] = relationship("UserModel")
 
 
 # --- Árvore de Estudos RPG & Grafo de Conhecimento ---

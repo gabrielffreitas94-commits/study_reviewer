@@ -34,7 +34,7 @@ def test_user() -> User:
 
 
 @pytest.fixture
-def db_engine() -> Generator[Any]:
+def db_engine() -> Generator[Any, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -47,7 +47,7 @@ def db_engine() -> Generator[Any]:
 
 
 @pytest.fixture
-def db_session(db_engine: Any) -> Generator[Session]:
+def db_session(db_engine: Any) -> Generator[Session, None, None]:
     testing_session = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
     session = testing_session()
     try:
@@ -57,11 +57,11 @@ def db_session(db_engine: Any) -> Generator[Session]:
 
 
 @pytest.fixture
-def authenticated_client(db_session: Session, test_user: User) -> Generator[TestClient]:
+def authenticated_client(db_session: Session, test_user: User) -> Generator[TestClient, None, None]:
     user_repo = SqlAlchemyUserRepository(db_session)
     user_repo.save(test_user)
 
-    def override_get_db() -> Generator[Session]:
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     def override_get_current_user() -> User:
@@ -94,13 +94,9 @@ def test_canvas_template_and_js_contain_json_prompt_and_markdown_support(
     assert res.status_code == 200
     html = res.text
 
-    assert 'id="btn-copy-ai-json-prompt"' in html
-    assert "copyAiJsonPrompt" in html
-    assert 'id="copy-ai-prompt-status"' in html
     assert 'id="drawer-bulk-questions-input"' in html
     assert "Questões em Lote (JSON)" in html
     assert "expected_answer" in html
-    assert "skill" in html
     assert "rpg_icons.js?v=20261028b" in html
     assert "study_canvas.js?v=20261028b" in html
 
@@ -109,7 +105,6 @@ def test_canvas_template_and_js_contain_json_prompt_and_markdown_support(
     assert js_path.exists()
     js_code = js_path.read_text(encoding="utf-8")
 
-    assert "copyAiJsonPrompt" in js_code
     assert "JSON.parse" in js_code
     assert "expected_answer" in js_code
     assert "renderRpgMarkdown" in js_code
@@ -118,13 +113,13 @@ def test_canvas_template_and_js_contain_json_prompt_and_markdown_support(
 
 
 @pytest.mark.integration
-def test_node_grimoire_template_contains_json_prompt_and_markdown_support(
+def test_node_grimoire_template_contains_json_import_and_markdown_support(
     authenticated_client: TestClient, db_session: Session, test_user: User
 ) -> None:
-    """Valida se node_grimoire.html contém o botão sutil 'skill', suporte a JSON e classes rpg-markdown."""
+    """Valida se node_grimoire.html contém suporte a importação JSON e classes rpg-markdown."""
     map_res = authenticated_client.post(
         "/api/v1/study-maps",
-        json={"title": "Grimório com IA", "description": "Validação de Prompt e JSON"},
+        json={"title": "Grimório Local", "description": "Validação de JSON e Markdown"},
     )
     assert map_res.status_code == 201
     map_id = map_res.json()["id"]
@@ -150,13 +145,9 @@ def test_node_grimoire_template_contains_json_prompt_and_markdown_support(
     assert res.status_code == 200
     html = res.text
 
-    # Botão de cópia de prompt e textarea
-    assert 'id="btn-grimoire-copy-ai-json"' in html
-    assert "copyGrimoireAiJsonPrompt" in html
-    assert 'id="grimoire-copy-prompt-status"' in html
+    # Textarea de importação JSON em bloco
     assert 'id="paste-questions-textarea"' in html
     assert "importPastedQuestions" in html
-    assert "skill" in html
 
     # Elementos de renderização de Markdown
     assert 'id="theory-display-area"' in html
@@ -169,21 +160,6 @@ def test_node_grimoire_template_contains_json_prompt_and_markdown_support(
     assert "JSON.parse" in html
     assert "renderRpgMarkdown" in html
     assert "renderCurrentQuestion" in html
-
-
-@pytest.mark.integration
-def test_study_questions_json_skill_file_exists_and_valid() -> None:
-    """Valida a existência e o conteúdo da Skill de geração de questões JSON com Markdown."""
-    skill_path = Path(".agents/skills/study-questions-json/SKILL.md")
-    assert skill_path.exists(), (
-        "O arquivo de Skill .agents/skills/study-questions-json/SKILL.md deve existir"
-    )
-    content = skill_path.read_text(encoding="utf-8")
-    assert "name: study-questions-json" in content
-    assert "expected_answer" in content
-    assert "prompt" in content
-    assert "JSON" in content
-    assert "Markdown" in content
 
 
 @pytest.mark.integration

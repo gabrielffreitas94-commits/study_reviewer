@@ -1,4 +1,4 @@
-"""Casos de uso para gestão da base de conhecimento e validação factual via RAG (Sprint 07)."""
+"""Casos de uso para gestão de materiais didáticos locais."""
 
 from uuid import UUID
 
@@ -8,16 +8,13 @@ from src.application.dto.knowledge_dto import (
     CreateKnowledgeSourceRequest,
     KnowledgeSourceResponse,
     LinkKnowledgeSourceRequest,
-    ValidateQuestionWithKnowledgeRequest,
-    ValidationResultResponse,
 )
 from src.application.ports.repositories import (
-    IKnowledgeChunkRepository,
     IKnowledgeSourceRepository,
     ISubjectRepository,
     ITopicRepository,
 )
-from src.domain.entities import KnowledgeChunk, KnowledgeSource, ValidationResult
+from src.domain.entities import KnowledgeSource
 from src.domain.exceptions import (
     DomainValidationError,
     EmptyKnowledgeContentError,
@@ -25,26 +22,20 @@ from src.domain.exceptions import (
     KnowledgeSourceNotFoundError,
     ResourceOwnershipError,
 )
-from src.domain.protocols import IEmbeddingService, IKnowledgeValidationService
-from src.domain.services import SemanticChunkerService
 
 
 class IngestKnowledgeSourceUseCase:
-    """Caso de uso para ingestão, sanitização, chunking e vetorização de materiais didáticos."""
+    """Caso de uso para ingestão e sanitização local de materiais didáticos."""
 
     def __init__(
         self,
         source_repo: IKnowledgeSourceRepository,
-        chunk_repo: IKnowledgeChunkRepository,
         topic_repo: ITopicRepository,
         subject_repo: ISubjectRepository,
-        embedding_service: IEmbeddingService,
     ) -> None:
         self._source_repo = source_repo
-        self._chunk_repo = chunk_repo
         self._topic_repo = topic_repo
         self._subject_repo = subject_repo
-        self._embedding_service = embedding_service
 
     async def execute(
         self,
@@ -79,36 +70,16 @@ class IngestKnowledgeSourceUseCase:
                 "O conteúdo do material deve ter pelo menos 20 caracteres úteis."
             )
 
-        # Chunking semântico
-        chunk_texts = SemanticChunkerService.chunk_text(cleaned_content)
-
-        # Vetorização em lote via serviço de embedding
-        embeddings = await self._embedding_service.generate_embeddings_batch(chunk_texts)
-
-        # Criação da entidade fonte com suporte a múltiplos temas
+        # Criação da entidade fonte com suporte a múltiplos temas (100% local/offline)
         source = KnowledgeSource(
             title=request.title,
             topic_ids=tuple(target_topic_ids),
             content_type=request.content_type,
-            total_chunks=len(chunk_texts),
+            total_chunks=0,
             char_count=len(cleaned_content),
+            raw_text=cleaned_content,
         )
         saved_source = self._source_repo.save(source)
-
-        # Criação e persistência dos chunks
-        primary_topic = target_topic_ids[0]
-        chunks = [
-            KnowledgeChunk(
-                source_id=saved_source.id,
-                topic_id=primary_topic,
-                chunk_index=idx,
-                content=txt,
-                embedding=tuple(emb),
-                token_estimate=max(1, len(txt) // 4),
-            )
-            for idx, (txt, emb) in enumerate(zip(chunk_texts, embeddings, strict=True))
-        ]
-        self._chunk_repo.save_batch(chunks)
 
         return KnowledgeSourceResponse(
             id=saved_source.id,
@@ -164,6 +135,8 @@ class LinkKnowledgeSourceToTopicsUseCase:
             content_type=source.content_type,
             total_chunks=source.total_chunks,
             char_count=source.char_count,
+            raw_text=source.raw_text,
+            node_id=source.node_id,
             created_at=source.created_at,
         )
         saved = self._source_repo.save(updated_source)
@@ -215,23 +188,22 @@ class GetTopicKnowledgeSourcesUseCase:
                 total_chunks=s.total_chunks,
                 char_count=s.char_count,
                 created_at=s.created_at.isoformat(),
+                topic_ids=list(s.topic_ids),
             )
             for s in sources
         ]
 
 
 class DeleteKnowledgeSourceUseCase:
-    """Caso de uso para remoção de uma fonte e cascata de chunks."""
+    """Caso de uso para remoção de um material didático."""
 
     def __init__(
         self,
         source_repo: IKnowledgeSourceRepository,
-        chunk_repo: IKnowledgeChunkRepository,
         topic_repo: ITopicRepository,
         subject_repo: ISubjectRepository,
     ) -> None:
         self._source_repo = source_repo
-        self._chunk_repo = chunk_repo
         self._topic_repo = topic_repo
         self._subject_repo = subject_repo
 
@@ -248,72 +220,4 @@ class DeleteKnowledgeSourceUseCase:
         if not subject or not subject.can_be_edited_by(user_id):
             raise ResourceOwnershipError("Apenas o proprietário pode excluir materiais didáticos.")
 
-        self._chunk_repo.delete_by_source(source_id)
         self._source_repo.delete(source_id)
-
-
-class ValidateQuestionWithKnowledgeUseCase:
-    """Caso de uso para validação factual de enunciado e gabarito via RAG."""
-
-    def __init__(
-        self,
-        chunk_repo: IKnowledgeChunkRepository,
-        topic_repo: ITopicRepository,
-        subject_repo: ISubjectRepository,
-        embedding_service: IEmbeddingService,
-        validation_service: IKnowledgeValidationService,
-    ) -> None:
-        self._chunk_repo = chunk_repo
-        self._topic_repo = topic_repo
-        self._subject_repo = subject_repo
-        self._embedding_service = embedding_service
-        self._validation_service = validation_service
-
-    async def execute(
-        self,
-        user_id: UUID,
-        topic_id: UUID,
-        request: ValidateQuestionWithKnowledgeRequest,
-    ) -> ValidationResultResponse:
-        topic = self._topic_repo.get_by_id(topic_id)
-        if not topic:
-            raise EntityNotFoundError("Tema não encontrado.")
-
-        subject = self._subject_repo.get_by_id(topic.subject_id)
-        if not subject or not subject.can_be_studied_by(user_id):
-            raise ResourceOwnershipError("Sem permissão para consultar o tema.")
-
-        query_text = f"{request.prompt.strip()}\n{request.expected_answer.strip()}"
-        query_embedding = await self._embedding_service.generate_embedding(query_text)
-
-        similar_chunks = self._chunk_repo.search_similar(
-            topic_id=topic_id,
-            query_embedding=query_embedding,
-            top_k=5,
-        )
-
-        if not similar_chunks:
-            return ValidationResultResponse(
-                is_grounded=False,
-                confidence_score=0.0,
-                evidence_chunk_ids=[],
-                evidence_quotes=[],
-                reasoning="Nenhum material de conhecimento cadastrado no tema para validação.",
-                suggested_improvements=["Cadastre livros ou resumos no tema para auditoria de IA."],
-            )
-
-        context_chunks = [chunk for chunk, _ in similar_chunks]
-        result: ValidationResult = await self._validation_service.validate_question_grounding(
-            prompt=request.prompt,
-            expected_answer=request.expected_answer,
-            context_chunks=context_chunks,
-        )
-
-        return ValidationResultResponse(
-            is_grounded=result.is_grounded,
-            confidence_score=result.confidence_score,
-            evidence_chunk_ids=[str(cid) for cid in result.evidence_chunk_ids],
-            evidence_quotes=list(result.evidence_quotes),
-            reasoning=result.reasoning,
-            suggested_improvements=list(result.suggested_improvements),
-        )

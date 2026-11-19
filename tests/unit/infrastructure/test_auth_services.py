@@ -1,15 +1,73 @@
-"""Testes para os serviços de segurança, tokens AES-256-GCM e Google OAuth (Sprint 02)."""
+"""Testes unitários para os serviços de segurança: PBKDF2 e tokens AES-256-GCM."""
 
 import time
-from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
-from src.application.dto.auth_dto import GoogleUserInfoDTO
-from src.infrastructure.security.dependencies import get_google_client
-from src.infrastructure.security.google_client import GoogleOAuthClient
+from src.infrastructure.security.dependencies import get_password_hasher, get_session_service
+from src.infrastructure.security.password_hasher import Pbkdf2PasswordHasher
 from src.infrastructure.security.session_service import AesGcmSessionTokenService
+
+
+@pytest.mark.unit
+@pytest.mark.security
+def test_pbkdf2_password_hasher_generates_unique_salts_and_verifies() -> None:
+    """Valida geração de hash PBKDF2-HMAC-SHA256 com salt aleatório único e verificação válida.
+
+    Vulnerabilidade prevenida: Ataques de rainbow table e correlação de senhas idênticas (CWE-916).
+    Garantia de segurança: Cada chamada gera um salt criptográfico de 16 bytes distinto,
+    produzindo digests diferentes para a mesma senha e validando corretamente em tempo constante.
+    """
+    hasher = Pbkdf2PasswordHasher(iterations=10_000)
+    password = "SenhaSegura@2026!"
+
+    hash_a = hasher.hash_password(password)
+    hash_b = hasher.hash_password(password)
+
+    assert hash_a != hash_b
+    assert hash_a != password
+    assert hash_a.startswith("pbkdf2_sha256$10000$")
+    assert len(hash_a.split("$")) == 4
+
+    assert hasher.verify_password(password, hash_a) is True
+    assert hasher.verify_password(password, hash_b) is True
+    assert hasher.verify_password("SenhaErrada@2026!", hash_a) is False
+
+
+@pytest.mark.unit
+@pytest.mark.security
+@pytest.mark.parametrize(
+    "malformed_hash",
+    [
+        "",
+        "plaintext",
+        "pbkdf2_sha256$10000$onlythree",
+        "bcrypt$10000$abcd$ef01",
+        "pbkdf2_sha256$notanint$abcd$ef01",
+        "pbkdf2_sha256$0$abcd$ef01",
+        "pbkdf2_sha256$-5$abcd$ef01",
+        "pbkdf2_sha256$1000$zzzz$ef01",
+        "pbkdf2_sha256$1000$abcd$zzzz",
+    ],
+)
+def test_pbkdf2_password_hasher_rejects_malformed_hashes(malformed_hash: str) -> None:
+    """Valida rejeição segura de hashes malformados, algoritmos desconhecidos ou iterações inválidas.
+
+    Vulnerabilidade prevenida: Downgrade de algoritmo, bypass de verificação e exceções não tratadas (CWE-327).
+    Garantia de segurança: Qualquer formato divergente de pbkdf2_sha256$<iter>$<salt>$<dk> retorna False.
+    """
+    hasher = Pbkdf2PasswordHasher(iterations=10_000)
+    assert hasher.verify_password("QualquerSenha123", malformed_hash) is False
+
+
+@pytest.mark.unit
+def test_pbkdf2_password_hasher_rejects_non_string_inputs() -> None:
+    """Garante que entradas não textuais retornem False sem lançar exceções."""
+    hasher = Pbkdf2PasswordHasher(iterations=1_000)
+    valid_hash = hasher.hash_password("Senha12345")
+    assert hasher.verify_password(None, valid_hash) is False  # type: ignore[arg-type]
+    assert hasher.verify_password("Senha12345", None) is False  # type: ignore[arg-type]
 
 
 @pytest.mark.unit
@@ -71,180 +129,15 @@ def test_aes_gcm_session_token_tampered_rejected() -> None:
     service = AesGcmSessionTokenService(secret_key=secret)
     token = service.create_session_token(user_id=uuid4(), email="legitimo@teste.com")
 
-    # Inverte os últimos caracteres do token em base64
     tampered = token[:-4] + "AAAA"
     assert service.verify_session_token(tampered) is None
     assert service.verify_session_token("token-invalido-curto") is None
 
 
 @pytest.mark.unit
-@pytest.mark.security
-def test_oauth_state_generation_and_validation() -> None:
-    """Valida criação e validação de state assinado com destino next_url para prevenção de CSRF.
-
-    Vulnerabilidade prevenida: Cross-Site Request Forgery (CSRF) no fluxo de login federado
-    OAuth 2.0.
-    Garantia de segurança: O state contém payload assinado e criptografado com nonce,
-    impedindo injeção de parâmetros ou login forçado por terceiros.
-    """
-    secret = "chave-para-validacao-csrf-state"
-    service = AesGcmSessionTokenService(secret_key=secret, ttl_seconds=300)
-
-    state = service.create_oauth_state(next_url="/flashcards/study")
-    assert isinstance(state, str)
-
-    resolved_next = service.verify_oauth_state(state)
-    assert resolved_next == "/flashcards/study"
-
-    # State inválido
-    assert service.verify_oauth_state("state-falso-adulterado") is None
-
-
-@pytest.mark.unit
-def test_google_oauth_client_authorization_url() -> None:
-    """Valida montagem correta da URL de autorização com escopos openid, email e profile."""
-    client = GoogleOAuthClient(
-        client_id="meu-client-id.apps.googleusercontent.com",
-        client_secret="meu-secret",
-    )
-    url = client.get_authorization_url(
-        state="xyz123", redirect_uri="http://localhost:8000/auth/callback"
-    )
-
-    assert "https://accounts.google.com/o/oauth2/auth" in url
-    assert "client_id=meu-client-id.apps.googleusercontent.com" in url
-    assert "state=xyz123" in url
-    assert "redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fauth%2Fcallback" in url
-    assert "response_type=code" in url
-    assert "scope=" in url
-
-
-@pytest.mark.unit
-def test_google_oauth_client_exchange_code_success() -> None:
-    """Valida troca de authorization code por dados do usuário com mock httpx."""
-    client = GoogleOAuthClient(
-        client_id="meu-client-id",
-        client_secret="meu-secret",
-    )
-
-    fake_token_response = MagicMock()
-    fake_token_response.status_code = 200
-    fake_token_response.json.return_value = {"access_token": "fake-access-token"}
-
-    fake_userinfo_response = MagicMock()
-    fake_userinfo_response.status_code = 200
-    fake_userinfo_response.json.return_value = {
-        "sub": "google-sub-555",
-        "email": "usuario@google.com",
-        "name": "Nome Google",
-        "picture": "https://lh3.google.com/avatar.jpg",
-    }
-
-    with patch("httpx.Client.post", return_value=fake_token_response):
-        with patch("httpx.Client.get", return_value=fake_userinfo_response):
-            user_info = client.exchange_code_for_user_info(
-                code="auth-code-123",
-                redirect_uri="http://localhost:8000/auth/callback",
-            )
-
-    assert isinstance(user_info, GoogleUserInfoDTO)
-    assert user_info.sub == "google-sub-555"
-    assert user_info.email == "usuario@google.com"
-    assert user_info.name == "Nome Google"
-    assert user_info.avatar_url == "https://lh3.google.com/avatar.jpg"
-
-
-@pytest.mark.unit
-def test_google_oauth_client_exchange_code_error_raises_exception() -> None:
-    """Valida lançamento de exceção quando o Google retorna erro HTTP no token exchange."""
-    client = GoogleOAuthClient(client_id="id", client_secret="secret")
-
-    fake_response = MagicMock()
-    fake_response.status_code = 400
-    fake_response.text = "invalid_grant"
-
-    with patch("httpx.Client.post", return_value=fake_response):
-        with pytest.raises(ValueError, match="Erro ao trocar código com Google"):
-            client.exchange_code_for_user_info("code-invalido", "http://callback")
-
-
-@pytest.mark.unit
-def test_google_oauth_client_exchange_code_userinfo_error() -> None:
-    """Valida erro quando o endpoint de userinfo do Google responde com status != 200."""
-    client = GoogleOAuthClient(client_id="id", client_secret="secret")
-
-    fake_token_res = MagicMock()
-    fake_token_res.status_code = 200
-    fake_token_res.json.return_value = {"access_token": "token-xyz"}
-
-    fake_userinfo_res = MagicMock()
-    fake_userinfo_res.status_code = 401
-    fake_userinfo_res.text = "unauthorized"
-
-    with patch("httpx.Client.post", return_value=fake_token_res):
-        with patch("httpx.Client.get", return_value=fake_userinfo_res):
-            with pytest.raises(ValueError, match="Erro ao obter userinfo do Google"):
-                client.exchange_code_for_user_info("code-123", "http://callback")
-
-
-@pytest.mark.unit
-def test_google_oauth_client_verify_id_token_success_and_error() -> None:
-    """Valida método verify_id_token com resposta bem-sucedida e erro de validação."""
-    client = GoogleOAuthClient(client_id="id", client_secret="secret")
-
-    # Caso de Sucesso
-    fake_success = MagicMock()
-    fake_success.status_code = 200
-    fake_success.json.return_value = {
-        "aud": "id",
-        "sub": "sub-idtoken-123",
-        "email": "idtoken@google.com",
-        "name": "ID Token User",
-        "picture": "https://picture.png",
-    }
-    with patch("httpx.Client.get", return_value=fake_success):
-        info = client.verify_id_token("valid-jwt-token")
-        assert info.sub == "sub-idtoken-123"
-        assert info.email == "idtoken@google.com"
-
-    # Caso de Erro
-    fake_err = MagicMock()
-    fake_err.status_code = 400
-    fake_err.text = "invalid_id_token"
-    with patch("httpx.Client.get", return_value=fake_err):
-        with pytest.raises(ValueError, match="ID Token do Google inválido"):
-            client.verify_id_token("bad-token")
-
-
-@pytest.mark.unit
-@pytest.mark.security
-def test_google_oauth_client_verify_id_token_aud_mismatch() -> None:
-    """Valida rejeição de ID Token cujo audience (aud) não pertence a esta aplicação.
-
-    Vulnerabilidade prevenida: Confused Deputy Attack e autenticação forjada via ID Tokens
-    emitidos para outros clientes OAuth da Google (CWE-287).
-    Garantia de segurança: O token é rejeitado com ValueError se a claim 'aud' divergir do
-    client_id configurado no sistema.
-    """
-    client = GoogleOAuthClient(client_id="meu-client-id-oficial", client_secret="secret")
-    fake_token_data = {
-        "aud": "outro-client-id-malicioso",
-        "sub": "sub-123",
-        "email": "alvo@google.com",
-    }
-    fake_resp = MagicMock()
-    fake_resp.status_code = 200
-    fake_resp.json.return_value = fake_token_data
-
-    with patch("httpx.Client.get", return_value=fake_resp):
-        with pytest.raises(ValueError, match="Audience do ID Token incompatível"):
-            client.verify_id_token("token-de-outro-app")
-
-
-@pytest.mark.unit
 def test_aes_gcm_session_service_with_bytes_key() -> None:
     """Valida inicialização do AesGcmSessionTokenService fornecendo chave em bytes brutos."""
-    raw_key = b"0123456789abcdef0123456789abcdef"  # 32 bytes
+    raw_key = b"0123456789abcdef0123456789abcdef"
     service = AesGcmSessionTokenService(secret_key=raw_key)
     uid = uuid4()
     token = service.create_session_token(uid, "bytes@teste.com")
@@ -254,33 +147,10 @@ def test_aes_gcm_session_service_with_bytes_key() -> None:
 
 
 @pytest.mark.unit
-def test_oauth_state_invalid_type_or_expired() -> None:
-    """Valida rejeição de state expirado ou com payload de tipo incorreto."""
-    import json
+def test_security_dependencies_providers() -> None:
+    """Valida resolução das dependências get_password_hasher e get_session_service."""
+    hasher = get_password_hasher()
+    session_service = get_session_service()
 
-    service = AesGcmSessionTokenService(secret_key="segredo-qualquer")
-
-    # 1. State expirado
-    expired_payload = {
-        "type": "oauth_state",
-        "next": "/study",
-        "exp": int(time.time()) - 10,
-    }
-    expired_state = service._cipher.encrypt(json.dumps(expired_payload))
-    assert service.verify_oauth_state(expired_state) is None
-
-    # 2. State com tipo inválido
-    wrong_type_payload = {
-        "type": "other_token",
-        "next": "/study",
-        "exp": int(time.time()) + 600,
-    }
-    wrong_state = service._cipher.encrypt(json.dumps(wrong_type_payload))
-    assert service.verify_oauth_state(wrong_state) is None
-
-
-@pytest.mark.unit
-def test_get_google_client_dependency() -> None:
-    """Valida resolução da dependência get_google_client do FastAPI."""
-    client = get_google_client()
-    assert isinstance(client, GoogleOAuthClient)
+    assert isinstance(hasher, Pbkdf2PasswordHasher)
+    assert isinstance(session_service, AesGcmSessionTokenService)

@@ -18,7 +18,7 @@
                     <span>Estúdio de Criação de Conteúdo & Perguntas</span>
                 </h1>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    Cadastre temas, bases de conhecimento e perguntas interdisciplinares com suporte a múltiplos temas e matérias.
+                    Cadastre temas, materiais de estudo e perguntas interdisciplinares com suporte a múltiplos temas e matérias.
                 </p>
             </div>
             <!-- Indicador de Rascunho e Ações Principais -->
@@ -187,13 +187,13 @@
         </div>
     </div>
 
-    <!-- SEÇÃO 2: Novas Bases de Conhecimento (RAG) -->
+    <!-- SEÇÃO 2: Novos Materiais de Estudo -->
     <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
                 <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span aria-hidden="true">📚</span>
-                    <span>2. Novas Bases de Conhecimento (RAG)</span>
+                    <span>2. Novos Materiais de Estudo</span>
                 </h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     Adicione materiais didáticos (texto colado ou upload de PDF/DOCX) e selecione a quais temas eles pertencem.
@@ -204,7 +204,7 @@
                 onclick="addNewSourceCard()"
                 class="px-3.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 font-semibold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 flex items-center space-x-1.5 transition cursor-pointer self-start sm:self-auto"
             >
-                <span>➕ Adicionar Base Didática</span>
+                <span>➕ Adicionar Material de Estudo</span>
             </button>
         </div>
 
@@ -213,7 +213,7 @@
         </div>
 
         <div id="no-new-sources-hint" class="p-3 bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-500 dark:text-slate-400">
-            Nenhuma nova base de conhecimento adicionada neste lote (opcional).
+            Nenhum novo material de estudo adicionado neste lote (opcional).
         </div>
     </div>
 
@@ -354,7 +354,7 @@
         <div class="animate-spin text-3xl">⏳</div>
         <h3 class="text-sm font-bold text-slate-900 dark:text-white">Publicando Conteúdo em Lote...</h3>
         <p class="text-xs text-slate-500 dark:text-slate-400">
-            Processando criação de temas, vetorização RAG de materiais didáticos e registro de perguntas com transação atômica.
+            Processando criação de temas, registro de materiais de estudo e cadastro de perguntas com transação atômica.
         </p>
     </div>
 </div>
@@ -686,7 +686,7 @@
     }
 
     // ==========================================
-    // 2. GERENCIAMENTO DE BASES DE CONHECIMENTO
+    // 2. GERENCIAMENTO DE MATERIAIS DE ESTUDO
     // ==========================================
     function addNewSourceCard() {
         const initialTopics = [];
@@ -734,20 +734,20 @@
             card.innerHTML = `
                 <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
                     <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
-                        <span>📖 Base Didática #${idx + 1}</span>
+                        <span>📖 Material de Estudo #${idx + 1}</span>
                     </span>
                     <button
                         type="button"
                         onclick="removeSourceCard(${idx})"
                         class="text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2.5 py-1 rounded-lg transition cursor-pointer"
                     >
-                        🗑️ Remover Base
+                        🗑️ Remover Material
                     </button>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">
-                            Título da Base <span class="text-rose-500">*</span>
+                            Título do Material <span class="text-rose-500">*</span>
                         </label>
                         <input
                             type="text"
@@ -1293,7 +1293,7 @@
                 localStorage.removeItem(STORAGE_KEY);
             } catch (e) {}
 
-            alert(`✅ Conteúdo publicado com sucesso!\n• ${data.created_topics_count} novos temas criados\n• ${data.created_sources_count} bases RAG vetorizadas\n• ${data.created_questions_count} perguntas prontas para estudo.`);
+            alert(`✅ Conteúdo publicado com sucesso!\n• ${data.created_topics_count} novos temas criados\n• ${data.created_sources_count} materiais de estudo salvos\n• ${data.created_questions_count} perguntas prontas para estudo.`);
 
             window.location.reload();
 
